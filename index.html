@@ -21,6 +21,7 @@
     <!-- FIREBASE (Base de données) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
@@ -39,7 +40,7 @@
     <script type="text/babel">
         // --- GESTION HYBRIDE DES DONNÉES (LOCAL / FIREBASE) ---
         
-        // 1. CONFIGURATION FIREBASE
+        // 1. CONFIGURATION FIREBASE (MISE À JOUR AVEC TES CLÉS)
         const firebaseConfig = {
             apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
             authDomain: "logiops-data.firebaseapp.com",
@@ -54,8 +55,10 @@
         let db = null;
         let USE_FIREBASE = false;
 
+        // Vérification si la config est valide (ce qui est le cas maintenant)
         const isConfigured = firebaseConfig.projectId !== "PROJECT_ID";
 
+        // Si on est dans l'environnement Canvas (développement), on utilise la config injectée si dispo
         if (typeof __firebase_config !== 'undefined') {
             try {
                 const envConfig = JSON.parse(__firebase_config);
@@ -65,9 +68,14 @@
                 console.log("Mode: CANEVAS (Online)");
             } catch (e) { console.warn("Erreur init Canvas config", e); }
         } 
+        // Sinon, si l'utilisateur a mis sa propre config (Ton cas)
         else if (isConfigured) {
             try {
-                if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+                if (!firebase.apps.length) {
+                    const app = firebase.initializeApp(firebaseConfig);
+                    // Activation optionnelle de l'analytics puisque tu as fourni l'ID
+                    if (firebase.analytics) { firebase.analytics(); }
+                }
                 db = firebase.firestore();
                 USE_FIREBASE = true;
                 console.log("Mode: PROD (Online) - Connecté à " + firebaseConfig.projectId);
@@ -231,6 +239,24 @@
                 const newCount = Math.max(0, currentCount + delta);
                 
                 const newContent = { ...config.content, [modelId]: newCount };
+                if (newCount === 0) delete newContent[modelId];
+
+                const newConfigs = configurations.map(c => c.id === configId ? { ...c, content: newContent } : c);
+                setConfigurations(newConfigs);
+                StorageService.save({ configurations: newConfigs });
+            };
+
+            // NOUVELLE FONCTION : Saisie directe de la quantité
+            const setConfigurationCount = (configId, modelId, value) => {
+                const config = configurations.find(c => c.id === configId);
+                if(!config) return;
+                
+                // Convertit l'entrée en nombre entier, min 0
+                const newCount = Math.max(0, parseInt(value) || 0);
+                
+                const newContent = { ...config.content, [modelId]: newCount };
+                // On garde l'entrée même si 0 pour permettre la saisie, le nettoyage se fera si nécessaire à la sauvegarde/chargement ou déploiement
+                // Pour l'UX immédiate, on met à jour l'état :
                 if (newCount === 0) delete newContent[modelId];
 
                 const newConfigs = configurations.map(c => c.id === configId ? { ...c, content: newContent } : c);
@@ -795,10 +821,19 @@
                                                         return (
                                                             <div key={model.id} className={`flex justify-between items-center p-2 border ${count > 0 ? 'border-blue-600 bg-blue-900/10' : 'border-blue-900/30 opacity-60'}`}>
                                                                 <span className="text-[9px] font-bold text-gray-400 truncate max-w-[100px]">{model.name}</span>
-                                                                <div className="flex items-center gap-2">
-                                                                    <button onClick={() => updateConfiguration(currentConfigId, model.id, -1)} className="text-blue-700 hover:text-blue-400">{MinusCircle && <MinusCircle size={14}/>}</button>
-                                                                    <span className="text-xs font-mono font-bold text-blue-400 w-4 text-center">{count}</span>
-                                                                    <button onClick={() => updateConfiguration(currentConfigId, model.id, 1)} className="text-blue-700 hover:text-blue-400">{PlusCircle && <PlusCircle size={14}/>}</button>
+                                                                <div className="flex items-center gap-1">
+                                                                    <button onClick={() => updateConfiguration(currentConfigId, model.id, -1)} className="text-blue-700 hover:text-blue-400 px-1">{MinusCircle && <MinusCircle size={14}/>}</button>
+                                                                    
+                                                                    {/* INPUT QUANTITÉ SAISISSABLE */}
+                                                                    <input 
+                                                                        type="number" 
+                                                                        value={count} 
+                                                                        onChange={(e) => setConfigurationCount(currentConfigId, model.id, e.target.value)}
+                                                                        className="w-10 bg-black text-blue-400 font-mono font-bold text-center text-xs border border-blue-900/50 focus:border-blue-500 outline-none p-1"
+                                                                        onClick={(e) => e.target.select()} // Sélectionne tout le texte au clic pour remplacement rapide
+                                                                    />
+
+                                                                    <button onClick={() => updateConfiguration(currentConfigId, model.id, 1)} className="text-blue-700 hover:text-blue-400 px-1">{PlusCircle && <PlusCircle size={14}/>}</button>
                                                                 </div>
                                                             </div>
                                                         );
