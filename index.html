@@ -39,35 +39,23 @@
     <script type="text/babel">
         // --- GESTION HYBRIDE DES DONNÉES (LOCAL / FIREBASE) ---
         
-        // 1. CONFIGURATION FIREBASE (LAISSER TEL QUEL POUR LE MODE LOCAL)
-        // Pour activer le mode ONLINE (Multi-joueurs), remplacez ces valeurs par celles de votre console Firebase.
-        // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
-
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-    apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
-    authDomain: "logiops-data.firebaseapp.com",
-    projectId: "logiops-data",
-    storageBucket: "logiops-data.firebasestorage.app",
-    messagingSenderId: "791163499354",
-    appId: "1:791163499354:web:2bb76506331db9d240b963",
-    measurementId: "G-FFMXKH47M9"
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
+        // 1. CONFIGURATION FIREBASE (CORRIGÉE AVEC TES IDENTIFIANTS)
+        const firebaseConfig = {
+            apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
+            authDomain: "logiops-data.firebaseapp.com",
+            projectId: "logiops-data",
+            storageBucket: "logiops-data.firebasestorage.app",
+            messagingSenderId: "791163499354",
+            appId: "1:791163499354:web:2bb76506331db9d240b963",
+            measurementId: "G-FFMXKH47M9"
+        };
 
         // 2. LOGIQUE DE DÉTECTION
         let db = null;
         let USE_FIREBASE = false;
 
         // Vérification si la config est celle par défaut (fictive) ou si elle a été remplie
+        // Ici, comme tu as mis tes vrais identifiants, isConfigured sera true.
         const isConfigured = firebaseConfig.projectId !== "PROJECT_ID";
 
         // Si on est dans l'environnement Canvas (développement), on utilise la config injectée si dispo
@@ -80,13 +68,13 @@
                 console.log("Mode: CANEVAS (Online)");
             } catch (e) { console.warn("Erreur init Canvas config", e); }
         } 
-        // Sinon, si l'utilisateur a mis sa propre config dans le fichier
+        // Sinon, si l'utilisateur a mis sa propre config dans le fichier (C'est ton cas ici)
         else if (isConfigured) {
             try {
                 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
                 db = firebase.firestore();
                 USE_FIREBASE = true;
-                console.log("Mode: PROD (Online)");
+                console.log("Mode: PROD (Online) - Connecté à " + firebaseConfig.projectId);
             } catch (e) {
                 console.error("Erreur connexion Firebase:", e);
                 USE_FIREBASE = false;
