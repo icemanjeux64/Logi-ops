@@ -41,14 +41,27 @@
         
         // 1. CONFIGURATION FIREBASE (LAISSER TEL QUEL POUR LE MODE LOCAL)
         // Pour activer le mode ONLINE (Multi-joueurs), remplacez ces valeurs par celles de votre console Firebase.
-        const firebaseConfig = {
-            apiKey: "API_KEY",
-            authDomain: "PROJECT_ID.firebaseapp.com",
-            projectId: "PROJECT_ID",
-            storageBucket: "PROJECT_ID.appspot.com",
-            messagingSenderId: "SENDER_ID",
-            appId: "APP_ID"
-        };
+        // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
+    authDomain: "logiops-data.firebaseapp.com",
+    projectId: "logiops-data",
+    storageBucket: "logiops-data.firebasestorage.app",
+    messagingSenderId: "791163499354",
+    appId: "1:791163499354:web:2bb76506331db9d240b963",
+    measurementId: "G-FFMXKH47M9"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
 
         // 2. LOGIQUE DE DÉTECTION
         let db = null;
