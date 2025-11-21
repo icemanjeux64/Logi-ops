@@ -3,186 +3,184 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V9.0</title>
+    <title>LOGI-OPS V9.0 (HYBRID)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
-    <!-- Babel pour compiler le JSX dans le navigateur -->
+    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Lucide Icons (Version UMD explicite pour navigateur) -->
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 
-    <style>
-        /* Styles pour simuler le plugin tailwind-scrollbar et ajuster les polices */
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
-        
-        body {
-            font-family: 'JetBrains Mono', monospace;
-            background-color: #050505; /* Fond très sombre pour l'extérieur de l'app */
-        }
+    <!-- FIREBASE (Base de données) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
-        /* Scrollbar personnalisée (Style Tactique) */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #000; 
-            border-left: 1px solid #14532d;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #14532d; 
-            border: 1px solid #000;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #22c55e; 
-        }
-        
-        /* Animation pour les scanlines */
-        @keyframes scanline {
-            0% { transform: translateY(0); }
-            100% { transform: translateY(100vh); }
-        }
-        
-        /* Utilitaires pour la zone sûre sur mobile */
-        .pb-safe {
-            padding-bottom: env(safe-area-inset-bottom);
-        }
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
+        body { font-family: 'JetBrains Mono', monospace; background-color: #050505; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #14532d; }
+        ::-webkit-scrollbar-thumb { background: #14532d; border: 1px solid #000; }
+        ::-webkit-scrollbar-thumb:hover { background: #22c55e; }
+        @keyframes scanline { 0% { transform: translateY(0); } 100% { transform: translateY(100vh); } }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useMemo, useEffect } = React;
-
-        // --- ADAPTATEUR D'ICÔNES LUCIDE (Version Robuste) ---
-        const createLucideIcon = (iconName) => {
-            return ({ size = 24, className, ...props }) => {
-                if (typeof lucide === 'undefined' || !lucide.icons) return null;
-
-                const keys = Object.keys(lucide.icons);
-                const key = keys.find(k => k.toLowerCase() === iconName.toLowerCase());
-                const iconData = key ? lucide.icons[key] : null;
-
-                if (!iconData || !Array.isArray(iconData)) return null;
-
-                const tag = iconData[0];
-                const attrs = iconData[1] || {};
-                const children = iconData[2] || [];
-
-                if (typeof tag !== 'string') return null;
-
-                return React.createElement(
-                    tag,
-                    {
-                        ...attrs,
-                        width: size,
-                        height: size,
-                        className: className,
-                        ...props,
-                        stroke: props.color || "currentColor",
-                        strokeWidth: props.strokeWidth || attrs['stroke-width'] || 2,
-                        strokeLinecap: attrs['stroke-linecap'] || 'round',
-                        strokeLinejoin: attrs['stroke-linejoin'] || 'round',
-                    },
-                    Array.isArray(children) ? children.map((child, i) => {
-                        const childTag = child[0];
-                        const childAttrs = child[1];
-                        return React.createElement(childTag, { ...childAttrs, key: i });
-                    }) : null
-                );
-            };
+        // --- GESTION HYBRIDE DES DONNÉES (LOCAL / FIREBASE) ---
+        
+        // 1. CONFIGURATION FIREBASE (LAISSER TEL QUEL POUR LE MODE LOCAL)
+        // Pour activer le mode ONLINE (Multi-joueurs), remplacez ces valeurs par celles de votre console Firebase.
+        const firebaseConfig = {
+            apiKey: "API_KEY",
+            authDomain: "PROJECT_ID.firebaseapp.com",
+            projectId: "PROJECT_ID",
+            storageBucket: "PROJECT_ID.appspot.com",
+            messagingSenderId: "SENDER_ID",
+            appId: "APP_ID"
         };
 
-        // Mapping des icônes
-        const Truck = createLucideIcon('Truck');
-        const Activity = createLucideIcon('Activity');
-        const AlertTriangle = createLucideIcon('AlertTriangle');
-        const Crosshair = createLucideIcon('Crosshair');
-        const Shield = createLucideIcon('Shield');
-        const Plane = createLucideIcon('Plane');
-        const Package = createLucideIcon('Package');
-        const Plus = createLucideIcon('Plus');
-        const ArrowRight = createLucideIcon('ArrowRight');
-        const RotateCcw = createLucideIcon('RotateCcw');
-        const XCircle = createLucideIcon('XCircle');
-        const LayoutGrid = createLucideIcon('LayoutGrid');
-        const List = createLucideIcon('List');
-        const PlayCircle = createLucideIcon('PlayCircle');
-        const CheckCircle = createLucideIcon('CheckCircle');
-        const Wrench = createLucideIcon('Wrench');
-        const Skull = createLucideIcon('Skull');
-        const MapPin = createLucideIcon('MapPin');
-        const User = createLucideIcon('User');
-        const FileText = createLucideIcon('FileText');
-        const Clock = createLucideIcon('Clock');
-        const ArrowUpRight = createLucideIcon('ArrowUpRight');
-        const PieChart = createLucideIcon('PieChart');
-        const BarChart3 = createLucideIcon('BarChart3');
-        const Timer = createLucideIcon('Timer');
-        const Database = createLucideIcon('Database');
-        const Trash2 = createLucideIcon('Trash2');
-        const Save = createLucideIcon('Save');
-        const Users = createLucideIcon('Users');
-        const UserPlus = createLucideIcon('UserPlus');
-        const UserMinus = createLucideIcon('UserMinus');
-        const LogOut = createLucideIcon('LogOut');
-        const ScrollText = createLucideIcon('ScrollText');
-        const Warehouse = createLucideIcon('Warehouse');
-        const LayoutDashboard = createLucideIcon('LayoutDashboard');
-        const Settings = createLucideIcon('Settings');
-        const Target = createLucideIcon('Target');
-        const Radio = createLucideIcon('Radio');
-        const Wifi = createLucideIcon('Wifi');
+        // 2. LOGIQUE DE DÉTECTION
+        let db = null;
+        let USE_FIREBASE = false;
 
-        // --- DONNÉES ---
+        // Vérification si la config est celle par défaut (fictive) ou si elle a été remplie
+        const isConfigured = firebaseConfig.projectId !== "PROJECT_ID";
+
+        // Si on est dans l'environnement Canvas (développement), on utilise la config injectée si dispo
+        if (typeof __firebase_config !== 'undefined') {
+            try {
+                const envConfig = JSON.parse(__firebase_config);
+                if (!firebase.apps.length) firebase.initializeApp(envConfig);
+                db = firebase.firestore();
+                USE_FIREBASE = true;
+                console.log("Mode: CANEVAS (Online)");
+            } catch (e) { console.warn("Erreur init Canvas config", e); }
+        } 
+        // Sinon, si l'utilisateur a mis sa propre config dans le fichier
+        else if (isConfigured) {
+            try {
+                if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                USE_FIREBASE = true;
+                console.log("Mode: PROD (Online)");
+            } catch (e) {
+                console.error("Erreur connexion Firebase:", e);
+                USE_FIREBASE = false;
+            }
+        } else {
+            console.log("Mode: LOCAL (Offline) - Config par défaut détectée");
+            USE_FIREBASE = false;
+        }
+
+        const SESSION_ID = typeof __app_id !== 'undefined' ? __app_id : "operation_actuelle";
+        const LOCAL_STORAGE_KEY = "logiops_data_v9";
+
+        // --- SERVICE DE STOCKAGE UNIFIÉ ---
+        const StorageService = {
+            save: (data) => {
+                if (USE_FIREBASE && db) {
+                    db.collection('logiops').doc(SESSION_ID).set(data, { merge: true })
+                        .catch(err => console.warn("Erreur save cloud:", err));
+                } else {
+                    // Sauvegarde locale : on fusionne avec l'existant
+                    try {
+                        const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
+                        const merged = { ...existing, ...data };
+                        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
+                    } catch (e) { console.warn("Erreur save local:", e); }
+                }
+            },
+            loadInitial: (callback) => {
+                if (USE_FIREBASE && db) {
+                    // Écouteur temps réel Firebase
+                    return db.collection('logiops').doc(SESSION_ID).onSnapshot((doc) => {
+                        if (doc.exists) callback(doc.data());
+                        else callback(null); // Doc n'existe pas encore
+                    }, err => {
+                        console.warn("Fallback local suite erreur DB", err);
+                        // Fallback lecture locale si erreur réseau
+                        const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+                        if (local) callback(JSON.parse(local));
+                    });
+                } else {
+                    // Lecture locale simple
+                    const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+                    if (local) callback(JSON.parse(local));
+                    else callback(null);
+                    return () => {}; // Fonction de nettoyage vide
+                }
+            }
+        };
+
+        const { useState, useMemo, useEffect } = React;
+
+        // --- DONNÉES PAR DÉFAUT ---
         const INITIAL_CATALOG = [
-            // LOGISTIQUE
             { id: 'l1', cat: 'LOGI', name: 'JEEP EM', type: 'TRANSPORT EM', cost: 110, stock: 2 },
             { id: 'l2', cat: 'LOGI', name: 'CAMION RÉPA.', type: 'MAINTENANCE', cost: 175, stock: 1 },
             { id: 'l4', cat: 'LOGI', name: 'CAMION CITERNE', type: 'RAVITAILLEMENT', cost: 160, stock: 1 },
             { id: 'l5', cat: 'LOGI', name: 'CAMION ARSENAL', type: 'RAVITAILLEMENT', cost: 380, stock: 1 },
             { id: 'l6', cat: 'LOGI', name: 'CAMION CONST.', type: 'RAVITAILLEMENT', cost: 260, stock: 1 },
-            // TRANSPORT
             { id: 't1', cat: 'TRANS', name: 'CAMION TROUPES', type: 'TRANSPORT', cost: 200, stock: 4 },
             { id: 't2', cat: 'TRANS', name: 'VAB', type: 'TRANSPORT BLINDÉ', cost: 1200, stock: 1 },
-            // BLINDÉS
             { id: 'b1', cat: 'BLINDE', name: 'JLTV M1280', type: 'LÉGER NON-ARMÉ', cost: 650, stock: 1 },
             { id: 'b2', cat: 'BLINDE', name: 'JLTV M1281', type: 'LÉGER 12.7', cost: 1000, stock: 1 },
             { id: 'b4', cat: 'BLINDE', name: 'JLTV M1278', type: 'LÉGER TÉLÉ-OP', cost: 1500, stock: 1 },
-            // VCI
             { id: 'c1', cat: 'VCI', name: 'STRYKER M1126', type: 'COMBAT INFANTERIE', cost: 2000, stock: 2 },
             { id: 'c2', cat: 'VCI', name: 'STRYKER M1296', type: 'CANON 30MM', cost: 3000, stock: 1 },
-            // SANITAIRE
             { id: 's1', cat: 'SANTE', name: 'STRYKER EVASAN', type: 'SANITAIRE', cost: 975, stock: 1 },
-            // CHARS
             { id: 'h1', cat: 'CHAR', name: 'LECLERC', type: 'CHAR DE BATAILLE', cost: 8000, stock: 1 },
             { id: 'h2', cat: 'CHAR', name: 'LECLERC XLR', type: 'CHAR DE BATAILLE', cost: 8300, stock: 1 },
-            // AERIEN
             { id: 'a1', cat: 'AIR', name: 'NH90 FAUCON', type: 'MEDEVAC', cost: 3000, stock: 1 },
             { id: 'a2', cat: 'AIR', name: 'NH90 FAUCON', type: 'TRANSPORT', cost: 3000, stock: 1 },
             { id: 'a6', cat: 'AIR', name: 'GAZELLE HAP', type: 'ATTAQUE', cost: 3500, stock: 1 },
         ];
 
         const CATEGORIES = {
-            'LOGI': { label: 'LOGISTIQUE', icon: <Truck size={16} />, color: 'border-yellow-600 text-yellow-500 bg-yellow-900/10' },
-            'TRANS': { label: 'TRANSPORT', icon: <Package size={16} />, color: 'border-blue-600 text-blue-400 bg-blue-900/10' },
-            'BLINDE': { label: 'BLINDÉS', icon: <Shield size={16} />, color: 'border-orange-600 text-orange-400 bg-orange-900/10' },
-            'VCI': { label: 'VCI', icon: <Crosshair size={16} />, color: 'border-red-600 text-red-400 bg-red-900/10' },
-            'SANTE': { label: 'SANITAIRE', icon: <Activity size={16} />, color: 'border-emerald-600 text-emerald-400 bg-emerald-900/10' },
-            'CHAR': { label: 'LOURD', icon: <Shield size={16} fill="currentColor" />, color: 'border-purple-600 text-purple-400 bg-purple-900/10' },
-            'AIR': { label: 'AÉRIEN', icon: <Plane size={16} />, color: 'border-cyan-600 text-cyan-300 bg-cyan-900/10' },
+            'LOGI': { label: 'LOGISTIQUE', icon: 'Truck', color: 'border-yellow-600 text-yellow-500 bg-yellow-900/10' },
+            'TRANS': { label: 'TRANSPORT', icon: 'Package', color: 'border-blue-600 text-blue-400 bg-blue-900/10' },
+            'BLINDE': { label: 'BLINDÉS', icon: 'Shield', color: 'border-orange-600 text-orange-400 bg-orange-900/10' },
+            'VCI': { label: 'VCI', icon: 'Crosshair', color: 'border-red-600 text-red-400 bg-red-900/10' },
+            'SANTE': { label: 'SANITAIRE', icon: 'Activity', color: 'border-emerald-600 text-emerald-400 bg-emerald-900/10' },
+            'CHAR': { label: 'LOURD', icon: 'Shield', color: 'border-purple-600 text-purple-400 bg-purple-900/10' },
+            'AIR': { label: 'AÉRIEN', icon: 'Plane', color: 'border-cyan-600 text-cyan-300 bg-cyan-900/10' },
         };
+
+        // --- ADAPTATEUR ICÔNES ---
+        const createLucideIcon = (iconName) => {
+            return ({ size = 24, className, ...props }) => {
+                if (typeof lucide === 'undefined' || !lucide.icons) return null;
+                const keys = Object.keys(lucide.icons);
+                const key = keys.find(k => k.toLowerCase() === iconName.toLowerCase());
+                const iconData = key ? lucide.icons[key] : null;
+                if (!iconData || !Array.isArray(iconData)) return null;
+                const [tag, attrs = {}, children = []] = iconData;
+                if (typeof tag !== 'string') return null;
+                return React.createElement(tag, { ...attrs, width: size, height: size, className, ...props, stroke: props.color || "currentColor", strokeWidth: 2 }, 
+                    Array.isArray(children) ? children.map((c, i) => React.createElement(c[0], { ...c[1], key: i })) : null
+                );
+            };
+        };
+
+        const Icons = {};
+        ['Truck','Activity','AlertTriangle','Crosshair','Shield','Plane','Package','Plus','ArrowRight','RotateCcw','XCircle','LayoutGrid','List','PlayCircle','CheckCircle','Wrench','Skull','MapPin','User','FileText','Clock','ArrowUpRight','PieChart','BarChart3','Timer','Database','Trash2','Save','Users','UserPlus','UserMinus','LogOut','ScrollText','Warehouse','LayoutDashboard','Settings','Target','Radio','Wifi'].forEach(name => {
+            Icons[name] = createLucideIcon(name);
+        });
 
         function LogiOpsV9() {
             const [activeTab, setActiveTab] = useState('dashboard'); 
+            
             const [activeUnits, setActiveUnits] = useState([]);
             const [catalog, setCatalog] = useState(INITIAL_CATALOG);
             const [squad, setSquad] = useState([]); 
@@ -190,6 +188,7 @@
             const [supplySources, setSupplySources] = useState([{ id: 'base', name: 'BASE PRINCIPALE', amount: 38000 }]);
             const [slName, setSlName] = useState(''); 
             const [isSlActive, setIsSlActive] = useState(false);
+            const [dataLoaded, setDataLoaded] = useState(false);
 
             const [actionModal, setActionModal] = useState(null);
             const [showSupplyModal, setShowSupplyModal] = useState(false);
@@ -197,13 +196,37 @@
             const [inputReason, setInputReason] = useState('');
             const [selectedMemberId, setSelectedMemberId] = useState('');
 
+            // --- CHARGEMENT INITIAL ---
+            useEffect(() => {
+                const unsubscribe = StorageService.loadInitial((data) => {
+                    if (data) {
+                        if(data.activeUnits) setActiveUnits(data.activeUnits);
+                        if(data.catalog) setCatalog(data.catalog);
+                        if(data.squad) setSquad(data.squad);
+                        if(data.globalLogs) setGlobalLogs(data.globalLogs);
+                        if(data.supplySources) setSupplySources(data.supplySources);
+                        if(data.slName) setSlName(data.slName);
+                        if(typeof data.isSlActive !== 'undefined') setIsSlActive(data.isSlActive);
+                    }
+                    setDataLoaded(true);
+                });
+                return () => unsubscribe && unsubscribe();
+            }, []);
+
+            // --- ACTIONS METIERS ---
+
             const logEvent = (type, message) => {
                 const timestamp = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                setGlobalLogs(prev => [{ id: Date.now(), time: timestamp, type, msg: message }, ...prev]);
+                const newLog = { id: Date.now(), time: timestamp, type, msg: message };
+                const newLogs = [newLog, ...globalLogs].slice(0, 50); 
+                setGlobalLogs(newLogs);
+                StorageService.save({ globalLogs: newLogs });
             };
 
             const updateStock = (modelId, delta) => {
-                setCatalog(prev => prev.map(m => m.id === modelId ? { ...m, stock: Math.max(0, m.stock + delta) } : m));
+                const newCatalog = catalog.map(m => m.id === modelId ? { ...m, stock: Math.max(0, m.stock + delta) } : m);
+                setCatalog(newCatalog);
+                StorageService.save({ catalog: newCatalog });
             };
 
             const deployUnit = (modelId) => {
@@ -225,46 +248,100 @@
                     deployTime: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                     logs: []
                 };
-                setActiveUnits([newUnit, ...activeUnits]);
+                const newUnits = [newUnit, ...activeUnits];
+                setActiveUnits(newUnits);
+                StorageService.save({ activeUnits: newUnits });
                 logEvent('GARAGE', `DÉPLOIEMENT: ${model.name}`);
             };
 
             const toggleSlShift = () => {
                 if (!slName) return;
-                if (isSlActive) { logEvent('RH', `FIN SERVICE SL: ${slName}`); setIsSlActive(false); } 
-                else { logEvent('RH', `PRISE POSTE SL: ${slName}`); setIsSlActive(true); }
+                const newState = !isSlActive;
+                setIsSlActive(newState);
+                StorageService.save({ isSlActive: newState, slName });
+                logEvent('RH', newState ? `PRISE POSTE SL: ${slName}` : `FIN SERVICE SL: ${slName}`);
             };
+
             const addSquadMember = (name) => {
                 if (!name) return;
                 const newMember = { id: Date.now(), name: name.toUpperCase(), role: 'LOGISTICIEN', status: 'active', startTime: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
-                setSquad([...squad, newMember]);
+                const newSquad = [...squad, newMember];
+                setSquad(newSquad);
+                StorageService.save({ squad: newSquad });
                 logEvent('RH', `RENFORT: ${name.toUpperCase()}`);
             };
+
             const removeSquadMember = (id) => {
                 const member = squad.find(m => m.id === id);
-                if(member) { logEvent('RH', `DÉPART: ${member.name}`); setSquad(squad.filter(m => m.id !== id)); }
+                if(member) { 
+                    const newSquad = squad.filter(m => m.id !== id);
+                    setSquad(newSquad);
+                    StorageService.save({ squad: newSquad });
+                    logEvent('RH', `DÉPART: ${member.name}`); 
+                }
             };
+
             const updateUnitStatus = (uuid, newStatus, additionalData = {}) => {
-                setActiveUnits(prev => prev.map(u => {
-                if (u.uuid !== uuid) return u;
-                let logMsg = `Statut: ${newStatus.toUpperCase()}`;
-                if (newStatus === 'mission') logMsg += ` (Chef: ${additionalData.responsible})`;
-                if (newStatus === 'destroyed') logMsg += ` (Cause: ${additionalData.reasonHS})`;
-                logEvent('FLOTTE', `${u.name}: ${logMsg}`);
-                return { ...u, status: newStatus, ...additionalData, logs: [...u.logs, { time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), msg: logMsg }] };
-                }));
+                const newUnits = activeUnits.map(u => {
+                    if (u.uuid !== uuid) return u;
+                    let logMsg = `Statut: ${newStatus.toUpperCase()}`;
+                    if (newStatus === 'mission') logMsg += ` (Chef: ${additionalData.responsible})`;
+                    if (newStatus === 'destroyed') logMsg += ` (Cause: ${additionalData.reasonHS})`;
+                    return { ...u, status: newStatus, ...additionalData, logs: [...(u.logs || []), { time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), msg: logMsg }] };
+                });
+                setActiveUnits(newUnits);
+                StorageService.save({ activeUnits: newUnits });
+                
+                const unit = activeUnits.find(u => u.uuid === uuid);
+                if(unit) logEvent('FLOTTE', `${unit.name}: ${newStatus.toUpperCase()}`);
             };
+
             const endMission = (unit) => {
                 if (!unit.missionStartTime) return;
                 const durationMs = Date.now() - unit.missionStartTime;
                 const minutes = Math.floor(durationMs / 60000);
                 const durationStr = `${minutes} min`;
+                
+                const newUnits = activeUnits.map(u => {
+                    if (u.uuid !== unit.uuid) return u;
+                    return { ...u, status: 'operational', missionStartTime: null, responsible: 'BASE', logs: [...(u.logs||[]), { time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), msg: `RETOUR MISSION (${durationStr})` }] };
+                });
+                
+                setActiveUnits(newUnits);
+                StorageService.save({ activeUnits: newUnits });
                 logEvent('FLOTTE', `${unit.name}: RETOUR BASE (${durationStr})`);
-                setActiveUnits(prev => prev.map(u => {
-                if (u.uuid !== unit.uuid) return u;
-                return { ...u, status: 'operational', missionStartTime: null, responsible: 'BASE', logs: [...u.logs, { time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), msg: `RETOUR MISSION (${durationStr})` }] };
-                }));
             };
+
+            const returnToBase = (uuid) => {
+                if (window.confirm("CONFIRMER RTB ?")) {
+                    const unit = activeUnits.find(u => u.uuid === uuid);
+                    const newUnits = activeUnits.filter(u => u.uuid !== uuid);
+                    setActiveUnits(newUnits);
+                    StorageService.save({ activeUnits: newUnits });
+                    if(unit) logEvent('GARAGE', `RTB: ${unit.name}`);
+                }
+            };
+
+            const updateSupplySource = (id, field, value) => {
+                const newSupply = supplySources.map(s => s.id === id ? { ...s, [field]: value } : s);
+                setSupplySources(newSupply);
+                StorageService.save({ supplySources: newSupply });
+            };
+
+            const addSupplySource = () => { 
+                const newSupply = [...supplySources, { id: Date.now(), name: 'NOUVELLE SOURCE', amount: 0 }];
+                setSupplySources(newSupply);
+                StorageService.save({ supplySources: newSupply });
+            };
+
+            const removeSupplySource = (id) => { 
+                if (supplySources.length <= 1) return; 
+                const newSupply = supplySources.filter(s => s.id !== id);
+                setSupplySources(newSupply);
+                StorageService.save({ supplySources: newSupply });
+            };
+
+            // --- HANDLERS MODALES ---
             const handleStatusClick = (unit, targetStatus) => {
                 if (unit.status === targetStatus && targetStatus !== 'mission') return;
                 if (targetStatus === 'mission') { setSelectedMemberId(''); setActionModal({ type: 'mission', unit }); } 
@@ -284,13 +361,6 @@
                 updateUnitStatus(actionModal.unit.uuid, 'destroyed', { reasonHS: inputReason, missionStartTime: null });
                 setActionModal(null);
             };
-            const returnToBase = (uuid) => {
-                if (window.confirm("CONFIRMER RTB ?")) {
-                const unit = activeUnits.find(u => u.uuid === uuid);
-                if(unit) logEvent('GARAGE', `RTB: ${unit.name}`);
-                setActiveUnits(prev => prev.filter(u => u.uuid !== uuid));
-                }
-            };
 
             const stats = useMemo(() => {
                 const deployedCost = activeUnits.reduce((sum, u) => u.status !== 'stored' ? sum + u.cost : sum, 0);
@@ -301,438 +371,391 @@
                 return { deployedCost, destroyedCount, activeCount, missionCount, totalSupply };
             }, [activeUnits, supplySources]);
 
-            const addSupplySource = () => { setSupplySources([...supplySources, { id: Date.now(), name: 'NOUVELLE SOURCE', amount: 0 }]); };
-            const updateSupplySource = (id, field, value) => { setSupplySources(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s)); };
-            const removeSupplySource = (id) => { if (supplySources.length <= 1) return; setSupplySources(prev => prev.filter(s => s.id !== id)); };
+            // --- RENDER ---
+            const Activity = Icons['Activity'];
+            const Database = Icons['Database'];
+            const LayoutDashboard = Icons['LayoutDashboard'];
+            const Warehouse = Icons['Warehouse'];
+            const Users = Icons['Users'];
+            const ScrollText = Icons['ScrollText'];
+            const Target = Icons['Target'];
+            const Shield = Icons['Shield'];
+            const Plus = Icons['Plus'];
+            const Wifi = Icons['Wifi'];
+            const LogOut = Icons['LogOut'];
+            const ArrowUpRight = Icons['ArrowUpRight'];
+            const Settings = Icons['Settings'];
+            const XCircle = Icons['XCircle'];
+            const Trash2 = Icons['Trash2'];
+            const RotateCcw = Icons['RotateCcw'];
+            const Clock = Icons['Clock'];
+            const List = Icons['List'];
+
+            if (!dataLoaded) return <div className="min-h-screen bg-black flex items-center justify-center text-green-500 font-mono animate-pulse">INITIALISATION SYSTÈME...</div>;
 
             return (
                 <div className="min-h-screen bg-black text-green-500 flex flex-col selection:bg-green-900 selection:text-white overflow-hidden relative max-w-5xl mx-auto border-x border-green-900/50 shadow-[0_0_50px_rgba(0,255,0,0.05)]">
-                
-                {/* EFFET SCANLINES (Background) */}
-                <div className="absolute inset-0 pointer-events-none z-0 opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%]"></div>
+                    <div className="absolute inset-0 pointer-events-none z-0 opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%]"></div>
 
-                {/* HEADER TACTIQUE */}
-                <header className="bg-black border-b-2 border-green-900 p-3 z-50 flex justify-between items-center shadow-[0_0_20px_rgba(0,255,0,0.1)] relative">
-                    <div className="flex items-center gap-4">
-                    <div className="border border-green-700 p-1 bg-green-900/20">
-                        <Activity size={24} className="text-green-500 animate-pulse"/>
-                    </div>
-                    <div>
-                        <h1 className="font-black text-xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-800">V9.0</span></h1>
-                        <div className="flex items-center gap-3 text-[10px] font-bold text-green-700 mt-1">
-                        <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}>
-                            <div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>
-                            SL: {slName || "N/A"}
-                        </span>
-                        <span className="border-l border-green-900 pl-3">SQD: {squad.length} PAX</span>
-                        </div>
-                    </div>
-                    </div>
-                    <div className="text-right">
-                    <div className="text-[9px] font-bold text-green-800 uppercase mb-1 flex items-center justify-end gap-1">
-                        <Database size={10}/> GLOBAL SUPPLY
-                    </div>
-                    <button 
-                        onClick={() => setShowSupplyModal(true)}
-                        className="text-xl font-black text-green-400 bg-green-900/10 px-3 py-1 border border-green-800 hover:bg-green-900/30 hover:border-green-500 transition-all flex items-center gap-2"
-                    >
-                        {stats.totalSupply.toLocaleString()}
-                    </button>
-                    </div>
-                </header>
-
-                {/* CONTENU PRINCIPAL */}
-                <main className="flex-1 overflow-y-auto p-3 pb-20 scrollbar-thin scrollbar-thumb-green-900 scrollbar-track-black relative z-10">
-                    
-                    {/* DASHBOARD VIEW */}
-                    {activeTab === 'dashboard' && (
-                    <div className="space-y-4 animate-in fade-in duration-300">
-                        {/* HUD STATS */}
-                        <div className="grid grid-cols-3 gap-2 mb-4">
-                        <div className="bg-green-900/10 border border-green-800 p-2 text-center relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-green-500"></div>
-                            <span className="text-2xl font-black text-green-500 block leading-none">{activeUnits.filter(u => u.status === 'operational').length}</span>
-                            <span className="text-[9px] font-bold text-green-800 uppercase tracking-widest">DISPO</span>
-                        </div>
-                        <div className="bg-blue-900/10 border border-blue-800 p-2 text-center relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-blue-500"></div>
-                            <span className="text-2xl font-black text-blue-500 block leading-none">{stats.missionCount}</span>
-                            <span className="text-[9px] font-bold text-blue-800 uppercase tracking-widest">MISSION</span>
-                        </div>
-                        <div className="bg-red-900/10 border border-red-800 p-2 text-center relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-red-500"></div>
-                            <span className="text-2xl font-black text-red-500 block leading-none">{stats.destroyedCount}</span>
-                            <span className="text-[9px] font-bold text-red-800 uppercase tracking-widest">PERTES</span>
-                        </div>
-                        </div>
-
-                        {/* LISTE DES UNITÉS */}
-                        {activeUnits.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-64 border border-dashed border-green-900 bg-green-900/5">
-                            <Target size={48} className="mb-4 text-green-900 opacity-50" />
-                            <p className="text-xs font-bold uppercase text-green-800 tracking-widest">AUCUNE UNITÉ DÉPLOYÉE</p>
-                            <p className="text-[10px] text-green-900 mt-1">ACCÉDER AU GARAGE POUR DÉPLOIEMENT</p>
-                        </div>
-                        ) : (
-                        Object.keys(CATEGORIES).map(catKey => {
-                            const unitsInCat = activeUnits.filter(u => u.cat === catKey);
-                            if (unitsInCat.length === 0) return null;
-                            const conf = CATEGORIES[catKey];
-                            return (
-                            <div key={catKey} className="mb-4">
-                                <div className={`flex items-center gap-2 mb-2 px-2 border-l-2 ${conf.color.split(' ')[0]} bg-black`}>
-                                <span className="font-black text-[10px] tracking-[0.2em] uppercase text-gray-500">{conf.label}</span>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                {unitsInCat.map(unit => (
-                                    <UnitCard 
-                                    key={unit.uuid} 
-                                    unit={unit} 
-                                    onStatusChange={(s) => handleStatusClick(unit, s)}
-                                    onEndMission={() => endMission(unit)}
-                                    onRTB={() => returnToBase(unit.uuid)}
-                                    onShowLogs={() => setActionModal({ type: 'logs', unit })}
-                                    />
-                                ))}
-                                </div>
+                    {/* HEADER */}
+                    <header className="bg-black border-b-2 border-green-900 p-3 z-50 flex justify-between items-center shadow-[0_0_20px_rgba(0,255,0,0.1)] relative">
+                        <div className="flex items-center gap-4">
+                            <div className="border border-green-700 p-1 bg-green-900/20">
+                                {Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}
                             </div>
-                            );
-                        })
-                        )}
-                    </div>
-                    )}
-
-                    {/* GARAGE VIEW */}
-                    {activeTab === 'garage' && (
-                    <div className="space-y-6 animate-in fade-in duration-300">
-                        <div className="flex justify-between items-center border-b border-green-900 pb-2">
-                        <h2 className="text-sm font-black text-green-500 flex items-center gap-2 uppercase tracking-widest">
-                            <Warehouse size={16}/> CATALOGUE DÉPLOIEMENT
-                        </h2>
-                        <button 
-                            onClick={() => setShowStockModal(true)} 
-                            className="text-[9px] font-bold bg-green-900/20 border border-green-800 px-3 py-1 hover:bg-green-900/40 hover:text-green-300 flex items-center gap-2 transition-colors"
-                        >
-                            <Settings size={12} /> ÉDITER STOCKS
-                        </button>
-                        </div>
-
-                        <div className="space-y-6">
-                        {Object.keys(CATEGORIES).map(catKey => {
-                            const models = catalog.filter(m => m.cat === catKey);
-                            if(models.length === 0) return null;
-                            return (
-                            <div key={catKey} className="bg-black border border-green-900 p-3 relative">
-                                {/* Corner Decorations */}
-                                <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-green-700"></div>
-                                <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-green-700"></div>
-                                <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-green-700"></div>
-                                <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-green-700"></div>
-
-                                <div className="flex items-center gap-2 mb-3 pb-1 border-b border-green-900/50">
-                                <span className={CATEGORIES[catKey].color.split(' ')[1]}>{CATEGORIES[catKey].icon}</span>
-                                <span className="font-black text-xs text-gray-400 tracking-wider">{CATEGORIES[catKey].label}</span>
-                                </div>
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                                {models.map(model => {
-                                    const activeCount = activeUnits.filter(u => u.modelId === model.id).length;
-                                    const totalSlots = model.stock;
-                                    return Array.from({ length: totalSlots }).map((_, index) => {
-                                    const isVehicleInGarage = index >= activeCount; 
-                                    return (
-                                        <button
-                                        key={`${model.id}-${index}`}
-                                        disabled={!isVehicleInGarage}
-                                        onClick={() => isVehicleInGarage && deployUnit(model.id)}
-                                        className={`relative p-2 border flex flex-col items-center justify-center text-center h-20 transition-all
-                                            ${isVehicleInGarage 
-                                            ? 'bg-green-900/10 border-green-800 hover:bg-green-900/30 hover:border-green-500 active:scale-95 group' 
-                                            : 'bg-black border-green-900/30 opacity-30 cursor-default'}`}
-                                        >
-                                        {isVehicleInGarage ? (
-                                            <>
-                                            <div className="absolute top-1 right-1 w-1 h-1 bg-green-500 shadow-[0_0_5px_#22c55e]"></div>
-                                            <span className="mt-1 text-[9px] font-black text-green-400 leading-tight uppercase">{model.name}</span>
-                                            <span className="text-[8px] text-green-800 font-mono">{model.cost} PTS</span>
-                                            </>
-                                        ) : (
-                                            <div className="flex flex-col items-center">
-                                            <ArrowUpRight size={16} className="text-green-900 mb-1"/>
-                                            <span className="text-[8px] font-black text-green-900 uppercase tracking-widest">EN MISSION</span>
-                                            </div>
-                                        )}
-                                        <div className="absolute bottom-1 left-1 text-[7px] font-mono text-green-900">SLOT {index+1}</div>
-                                        </button>
-                                    );
-                                    });
-                                })}
-                                </div>
-                            </div>
-                            );
-                        })}
-                        </div>
-                    </div>
-                    )}
-
-                    {/* SQUAD VIEW */}
-                    {activeTab === 'squad' && (
-                    <div className="space-y-4 animate-in fade-in duration-300">
-                        <div className="bg-black border border-green-800 p-4 relative">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-green-900/30"></div>
-                        <h3 className="text-[10px] font-black text-green-600 uppercase mb-3 flex items-center gap-2 tracking-widest">
-                            <Shield size={12}/> COMMANDEMENT LOGISTIQUE
-                        </h3>
-                        <div className="flex gap-2">
-                            <input 
-                            type="text" 
-                            placeholder="NOM DU SL..." 
-                            value={slName}
-                            disabled={isSlActive}
-                            onChange={(e) => setSlName(e.target.value)}
-                            className="flex-1 bg-green-900/10 border border-green-800 px-3 text-sm font-bold text-green-400 uppercase focus:border-green-500 outline-none placeholder-green-900"
-                            />
-                            <button 
-                            onClick={toggleSlShift}
-                            disabled={!slName}
-                            className={`px-4 border font-bold text-[10px] transition-all ${isSlActive ? 'bg-red-900/20 text-red-500 border-red-800 hover:bg-red-900/40' : 'bg-green-900/20 text-green-400 border-green-600 hover:bg-green-900/40'}`}
-                            >
-                            {isSlActive ? 'FIN SERVICE' : 'PRISE POSTE'}
-                            </button>
-                        </div>
-                        </div>
-
-                        <div className="bg-black border border-green-900/50 p-4">
-                        <h3 className="text-[10px] font-black text-gray-500 uppercase mb-3 flex items-center gap-2 tracking-widest">
-                            <Users size={12}/> ESCUADE LOGISTIQUE ({squad.length})
-                        </h3>
-                        <div className="space-y-2 mb-4">
-                            {squad.length === 0 && <p className="text-center text-[10px] text-green-900 italic py-4 border border-dashed border-green-900/30">AUCUN EFFECTIF</p>}
-                            {squad.map(member => (
-                            <div key={member.id} className="flex justify-between items-center bg-green-900/5 p-2 border border-green-900/30">
-                                <div>
-                                <div className="font-bold text-xs text-green-400 flex items-center gap-2">
-                                    <Wifi size={10} className="text-green-600 animate-pulse"/>
-                                    {member.name}
-                                </div>
-                                <div className="text-[9px] text-green-800 font-mono">T-IN: {member.startTime}</div>
-                                </div>
-                                <button onClick={() => removeSquadMember(member.id)} className="text-green-800 hover:text-red-500 p-1">
-                                <LogOut size={14}/>
-                                </button>
-                            </div>
-                            ))}
-                        </div>
-                        <div className="flex gap-2 border-t border-green-900/30 pt-3">
-                            <input 
-                            type="text" 
-                            id="newMemberName"
-                            placeholder="NOUVEAU MEMBRE..." 
-                            className="flex-1 bg-black border border-green-900 px-3 py-2 text-xs font-bold text-green-400 uppercase focus:border-green-600 outline-none placeholder-green-900"
-                            onKeyDown={(e) => { if(e.key === 'Enter') { addSquadMember(e.target.value); e.target.value = ''; } }}
-                            />
-                            <button 
-                            onClick={() => { const el = document.getElementById('newMemberName'); addSquadMember(el.value); el.value = ''; }}
-                            className="bg-green-900/20 hover:bg-green-900/40 text-green-500 border border-green-800 px-3"
-                            >
-                            <Plus size={16}/>
-                            </button>
-                        </div>
-                        </div>
-                    </div>
-                    )}
-
-                    {/* JOURNAL VIEW */}
-                    {activeTab === 'journal' && (
-                    <div className="space-y-4 animate-in fade-in duration-300">
-                        <h2 className="text-xs font-black text-green-600 flex items-center gap-2 uppercase tracking-widest border-b border-green-900 pb-2">
-                        <ScrollText size={14}/> JOURNAL DE MARCHE ET OPÉRATIONS
-                        </h2>
-                        <div className="space-y-0 font-mono text-xs">
-                        {globalLogs.length === 0 && <p className="text-[10px] text-green-900 italic">Aucune entrée.</p>}
-                        {globalLogs.map(log => (
-                            <div key={log.id} className="flex gap-3 py-2 border-b border-green-900/20 text-green-400">
-                            <span className="text-green-800 font-bold w-12 shrink-0">{log.time}</span>
                             <div>
-                                <span className="text-[9px] font-black bg-green-900/20 px-1 rounded text-green-600 mr-2">{log.type}</span>
-                                <span className="text-gray-400">{log.msg}</span>
+                                <h1 className="font-black text-xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-800">V9.0</span></h1>
+                                <div className="flex items-center gap-3 text-[10px] font-bold text-green-700 mt-1">
+                                    <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}>
+                                        <div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>
+                                        SL: {slName || "N/A"}
+                                    </span>
+                                    <span className="border-l border-green-900 pl-3">SQD: {squad.length} PAX</span>
+                                    <span className={`ml-2 ${USE_FIREBASE ? 'text-blue-500' : 'text-orange-500'}`}>
+                                        [{USE_FIREBASE ? 'ONLINE' : 'LOCAL'}]
+                                    </span>
+                                </div>
                             </div>
-                            </div>
-                        ))}
                         </div>
-                    </div>
+                        <div className="text-right">
+                            <div className="text-[9px] font-bold text-green-800 uppercase mb-1 flex items-center justify-end gap-1">
+                                {Database && <Database size={10}/>} GLOBAL SUPPLY
+                            </div>
+                            <button onClick={() => setShowSupplyModal(true)} className="text-xl font-black text-green-400 bg-green-900/10 px-3 py-1 border border-green-800 hover:bg-green-900/30 hover:border-green-500 transition-all flex items-center gap-2">
+                                {stats.totalSupply.toLocaleString()}
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* MAIN CONTENT */}
+                    <main className="flex-1 overflow-y-auto p-3 pb-20 scrollbar-thin scrollbar-thumb-green-900 scrollbar-track-black relative z-10">
+                        {/* DASHBOARD */}
+                        {activeTab === 'dashboard' && (
+                            <div className="space-y-4 animate-in fade-in duration-300">
+                                <div className="grid grid-cols-3 gap-2 mb-4">
+                                    <div className="bg-green-900/10 border border-green-800 p-2 text-center relative overflow-hidden">
+                                        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-green-500"></div>
+                                        <span className="text-2xl font-black text-green-500 block leading-none">{activeUnits.filter(u => u.status === 'operational').length}</span>
+                                        <span className="text-[9px] font-bold text-green-800 uppercase tracking-widest">DISPO</span>
+                                    </div>
+                                    <div className="bg-blue-900/10 border border-blue-800 p-2 text-center relative overflow-hidden">
+                                        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-blue-500"></div>
+                                        <span className="text-2xl font-black text-blue-500 block leading-none">{stats.missionCount}</span>
+                                        <span className="text-[9px] font-bold text-blue-800 uppercase tracking-widest">MISSION</span>
+                                    </div>
+                                    <div className="bg-red-900/10 border border-red-800 p-2 text-center relative overflow-hidden">
+                                        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-red-500"></div>
+                                        <span className="text-2xl font-black text-red-500 block leading-none">{stats.destroyedCount}</span>
+                                        <span className="text-[9px] font-bold text-red-800 uppercase tracking-widest">PERTES</span>
+                                    </div>
+                                </div>
+
+                                {activeUnits.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-64 border border-dashed border-green-900 bg-green-900/5">
+                                        {Target && <Target size={48} className="mb-4 text-green-900 opacity-50" />}
+                                        <p className="text-xs font-bold uppercase text-green-800 tracking-widest">AUCUNE UNITÉ DÉPLOYÉE</p>
+                                        <p className="text-[10px] text-green-900 mt-1">ACCÉDER AU GARAGE POUR DÉPLOIEMENT</p>
+                                    </div>
+                                ) : (
+                                    Object.keys(CATEGORIES).map(catKey => {
+                                        const unitsInCat = activeUnits.filter(u => u.cat === catKey);
+                                        if (unitsInCat.length === 0) return null;
+                                        const conf = CATEGORIES[catKey];
+                                        return (
+                                            <div key={catKey} className="mb-4">
+                                                <div className={`flex items-center gap-2 mb-2 px-2 border-l-2 ${conf.color.split(' ')[0]} bg-black`}>
+                                                    <span className="font-black text-[10px] tracking-[0.2em] uppercase text-gray-500">{conf.label}</span>
+                                                </div>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                                    {unitsInCat.map(unit => (
+                                                        <UnitCard 
+                                                            key={unit.uuid} 
+                                                            unit={unit} 
+                                                            onStatusChange={(s) => handleStatusClick(unit, s)}
+                                                            onEndMission={() => endMission(unit)}
+                                                            onRTB={() => returnToBase(unit.uuid)}
+                                                            onShowLogs={() => setActionModal({ type: 'logs', unit })}
+                                                            Icons={Icons}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        )}
+
+                        {/* GARAGE */}
+                        {activeTab === 'garage' && (
+                            <div className="space-y-6 animate-in fade-in duration-300">
+                                <div className="flex justify-between items-center border-b border-green-900 pb-2">
+                                    <h2 className="text-sm font-black text-green-500 flex items-center gap-2 uppercase tracking-widest">
+                                        {Warehouse && <Warehouse size={16}/>} CATALOGUE DÉPLOIEMENT
+                                    </h2>
+                                    <button onClick={() => setShowStockModal(true)} className="text-[9px] font-bold bg-green-900/20 border border-green-800 px-3 py-1 hover:bg-green-900/40 hover:text-green-300 flex items-center gap-2 transition-colors">
+                                        {Settings && <Settings size={12} />} ÉDITER STOCKS
+                                    </button>
+                                </div>
+                                <div className="space-y-6">
+                                    {Object.keys(CATEGORIES).map(catKey => {
+                                        const models = catalog.filter(m => m.cat === catKey);
+                                        if(models.length === 0) return null;
+                                        const IconComp = Icons[CATEGORIES[catKey].icon];
+                                        return (
+                                            <div key={catKey} className="bg-black border border-green-900 p-3 relative">
+                                                <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-green-700"></div>
+                                                <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-green-700"></div>
+                                                <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-green-700"></div>
+                                                <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-green-700"></div>
+                                                <div className="flex items-center gap-2 mb-3 pb-1 border-b border-green-900/50">
+                                                    <span className={CATEGORIES[catKey].color.split(' ')[1]}>{IconComp && <IconComp size={16}/>}</span>
+                                                    <span className="font-black text-xs text-gray-400 tracking-wider">{CATEGORIES[catKey].label}</span>
+                                                </div>
+                                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                                    {models.map(model => {
+                                                        const activeCount = activeUnits.filter(u => u.modelId === model.id).length;
+                                                        const totalSlots = model.stock;
+                                                        return Array.from({ length: totalSlots }).map((_, index) => {
+                                                            const isVehicleInGarage = index >= activeCount; 
+                                                            return (
+                                                                <button
+                                                                    key={`${model.id}-${index}`}
+                                                                    disabled={!isVehicleInGarage}
+                                                                    onClick={() => isVehicleInGarage && deployUnit(model.id)}
+                                                                    className={`relative p-2 border flex flex-col items-center justify-center text-center h-20 transition-all ${isVehicleInGarage ? 'bg-green-900/10 border-green-800 hover:bg-green-900/30 hover:border-green-500 active:scale-95 group' : 'bg-black border-green-900/30 opacity-30 cursor-default'}`}
+                                                                >
+                                                                    {isVehicleInGarage ? (
+                                                                        <>
+                                                                            <div className="absolute top-1 right-1 w-1 h-1 bg-green-500 shadow-[0_0_5px_#22c55e]"></div>
+                                                                            <span className="mt-1 text-[9px] font-black text-green-400 leading-tight uppercase">{model.name}</span>
+                                                                            <span className="text-[8px] text-green-800 font-mono">{model.cost} PTS</span>
+                                                                        </>
+                                                                    ) : (
+                                                                        <div className="flex flex-col items-center">
+                                                                            {ArrowUpRight && <ArrowUpRight size={16} className="text-green-900 mb-1"/>}
+                                                                            <span className="text-[8px] font-black text-green-900 uppercase tracking-widest">EN MISSION</span>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="absolute bottom-1 left-1 text-[7px] font-mono text-green-900">SLOT {index+1}</div>
+                                                                </button>
+                                                            );
+                                                        });
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* SQUAD */}
+                        {activeTab === 'squad' && (
+                            <div className="space-y-4 animate-in fade-in duration-300">
+                                <div className="bg-black border border-green-800 p-4 relative">
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-green-900/30"></div>
+                                    <h3 className="text-[10px] font-black text-green-600 uppercase mb-3 flex items-center gap-2 tracking-widest">
+                                        {Shield && <Shield size={12}/>} COMMANDEMENT LOGISTIQUE
+                                    </h3>
+                                    <div className="flex gap-2">
+                                        <input type="text" placeholder="NOM DU SL..." value={slName} disabled={isSlActive} onChange={(e) => setSlName(e.target.value)} className="flex-1 bg-green-900/10 border border-green-800 px-3 text-sm font-bold text-green-400 uppercase focus:border-green-500 outline-none placeholder-green-900" />
+                                        <button onClick={toggleSlShift} disabled={!slName} className={`px-4 border font-bold text-[10px] transition-all ${isSlActive ? 'bg-red-900/20 text-red-500 border-red-800 hover:bg-red-900/40' : 'bg-green-900/20 text-green-400 border-green-600 hover:bg-green-900/40'}`}>
+                                            {isSlActive ? 'FIN SERVICE' : 'PRISE POSTE'}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="bg-black border border-green-900/50 p-4">
+                                    <h3 className="text-[10px] font-black text-gray-500 uppercase mb-3 flex items-center gap-2 tracking-widest">
+                                        {Users && <Users size={12}/>} ESCUADE LOGISTIQUE ({squad.length})
+                                    </h3>
+                                    <div className="space-y-2 mb-4">
+                                        {squad.length === 0 && <p className="text-center text-[10px] text-green-900 italic py-4 border border-dashed border-green-900/30">AUCUN EFFECTIF</p>}
+                                        {squad.map(member => (
+                                            <div key={member.id} className="flex justify-between items-center bg-green-900/5 p-2 border border-green-900/30">
+                                                <div>
+                                                    <div className="font-bold text-xs text-green-400 flex items-center gap-2">
+                                                        {Wifi && <Wifi size={10} className="text-green-600 animate-pulse"/>}
+                                                        {member.name}
+                                                    </div>
+                                                    <div className="text-[9px] text-green-800 font-mono">T-IN: {member.startTime}</div>
+                                                </div>
+                                                <button onClick={() => removeSquadMember(member.id)} className="text-green-800 hover:text-red-500 p-1">
+                                                    {LogOut && <LogOut size={14}/>}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2 border-t border-green-900/30 pt-3">
+                                        <input type="text" id="newMemberName" placeholder="NOUVEAU MEMBRE..." className="flex-1 bg-black border border-green-900 px-3 py-2 text-xs font-bold text-green-400 uppercase focus:border-green-600 outline-none placeholder-green-900" onKeyDown={(e) => { if(e.key === 'Enter') { addSquadMember(e.target.value); e.target.value = ''; } }} />
+                                        <button onClick={() => { const el = document.getElementById('newMemberName'); addSquadMember(el.value); el.value = ''; }} className="bg-green-900/20 hover:bg-green-900/40 text-green-500 border border-green-800 px-3">
+                                            {Plus && <Plus size={16}/>}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* JOURNAL */}
+                        {activeTab === 'journal' && (
+                            <div className="space-y-4 animate-in fade-in duration-300">
+                                <h2 className="text-xs font-black text-green-600 flex items-center gap-2 uppercase tracking-widest border-b border-green-900 pb-2">
+                                    {ScrollText && <ScrollText size={14}/>} JOURNAL DE MARCHE ET OPÉRATIONS
+                                </h2>
+                                <div className="space-y-0 font-mono text-xs">
+                                    {globalLogs.length === 0 && <p className="text-[10px] text-green-900 italic">Aucune entrée.</p>}
+                                    {globalLogs.map(log => (
+                                        <div key={log.id} className="flex gap-3 py-2 border-b border-green-900/20 text-green-400">
+                                            <span className="text-green-800 font-bold w-12 shrink-0">{log.time}</span>
+                                            <div>
+                                                <span className="text-[9px] font-black bg-green-900/20 px-1 rounded text-green-600 mr-2">{log.type}</span>
+                                                <span className="text-gray-400">{log.msg}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* NAVIGATION */}
+                    <nav className="fixed bottom-0 w-full max-w-5xl left-1/2 -translate-x-1/2 bg-black border-t border-green-900 grid grid-cols-4 h-14 z-50 pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
+                        <NavButton icon={LayoutDashboard && <LayoutDashboard size={18}/>} label="OPS" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+                        <NavButton icon={Warehouse && <Warehouse size={18}/>} label="GARAGE" active={activeTab === 'garage'} onClick={() => setActiveTab('garage')} />
+                        <NavButton icon={Users && <Users size={18}/>} label="SQUAD" active={activeTab === 'squad'} onClick={() => setActiveTab('squad')} />
+                        <NavButton icon={ScrollText && <ScrollText size={18}/>} label="JMO" active={activeTab === 'journal'} onClick={() => setActiveTab('journal')} />
+                    </nav>
+
+                    {/* MODALES */}
+                    {actionModal?.type === 'mission' && (
+                        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                            <div className="bg-black border border-blue-700 w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(29,78,216,0.2)]">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-lg font-black uppercase text-blue-500 tracking-widest">ORDRE DE MISSION</h3>
+                                    <button onClick={() => setActionModal(null)} className="text-blue-700 hover:text-blue-400">{XCircle && <XCircle size={20} />}</button>
+                                </div>
+                                <div className="mb-6">
+                                    <label className="text-[9px] font-bold text-blue-800 uppercase block mb-1">CHEF DE BORD / PILOTE</label>
+                                    <select value={selectedMemberId} onChange={(e) => setSelectedMemberId(e.target.value)} className="w-full bg-blue-900/10 border border-blue-800 p-3 text-blue-300 focus:border-blue-500 outline-none font-bold uppercase text-xs appearance-none">
+                                        <option value="">-- SÉLECTIONNER PERSONNEL --</option>
+                                        {slName && <option value="SL">SL - {slName}</option>}
+                                        {squad.map(m => (<option key={m.id} value={m.id}>{m.name}</option>))}
+                                    </select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={() => setActionModal(null)} className="py-3 border border-gray-800 text-gray-500 font-bold text-xs hover:text-white hover:border-gray-500 transition-colors">ANNULER</button>
+                                    <button onClick={confirmMission} disabled={!selectedMemberId} className="py-3 bg-blue-600 text-black font-black text-xs hover:bg-blue-500 disabled:opacity-50">DÉPART</button>
+                                </div>
+                            </div>
+                        </div>
                     )}
-                </main>
 
-                {/* NAV BOTTOM */}
-                <nav className="fixed bottom-0 w-full max-w-5xl left-1/2 -translate-x-1/2 bg-black border-t border-green-900 grid grid-cols-4 h-14 z-50 pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
-                    <NavButton icon={<LayoutDashboard size={18}/>} label="OPS" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-                    <NavButton icon={<Warehouse size={18}/>} label="GARAGE" active={activeTab === 'garage'} onClick={() => setActiveTab('garage')} />
-                    <NavButton icon={<Users size={18}/>} label="SQUAD" active={activeTab === 'squad'} onClick={() => setActiveTab('squad')} />
-                    <NavButton icon={<ScrollText size={18}/>} label="JMO" active={activeTab === 'journal'} onClick={() => setActiveTab('journal')} />
-                </nav>
-
-                {/* --- MODALES (STYLE TACTIQUE) --- */}
-                {actionModal?.type === 'mission' && (
-                    <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-black border border-blue-700 w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(29,78,216,0.2)]">
-                        <div className="absolute top-0 left-0 w-2 h-2 bg-blue-600"></div>
-                        <div className="absolute top-0 right-0 w-2 h-2 bg-blue-600"></div>
-                        <div className="absolute bottom-0 left-0 w-2 h-2 bg-blue-600"></div>
-                        <div className="absolute bottom-0 right-0 w-2 h-2 bg-blue-600"></div>
-                        
-                        {/* HEADER MODAL AVEC BOUTON FERMER */}
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-black uppercase text-blue-500 tracking-widest">ORDRE DE MISSION</h3>
-                            <button onClick={() => setActionModal(null)} className="text-blue-700 hover:text-blue-400">
-                                <XCircle size={20} />
-                            </button>
-                        </div>
-                        
-                        <div className="mb-6">
-                        <label className="text-[9px] font-bold text-blue-800 uppercase block mb-1">CHEF DE BORD / PILOTE</label>
-                        <select 
-                            value={selectedMemberId}
-                            onChange={(e) => setSelectedMemberId(e.target.value)}
-                            className="w-full bg-blue-900/10 border border-blue-800 p-3 text-blue-300 focus:border-blue-500 outline-none font-bold uppercase text-xs appearance-none"
-                        >
-                            <option value="">-- SÉLECTIONNER PERSONNEL --</option>
-                            {slName && <option value="SL">SL - {slName}</option>}
-                            {squad.map(m => (<option key={m.id} value={m.id}>{m.name}</option>))}
-                        </select>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                        <button onClick={() => setActionModal(null)} className="py-3 border border-gray-800 text-gray-500 font-bold text-xs hover:text-white hover:border-gray-500 transition-colors">ANNULER</button>
-                        <button onClick={confirmMission} disabled={!selectedMemberId} className="py-3 bg-blue-600 text-black font-black text-xs hover:bg-blue-500 disabled:opacity-50">DÉPART</button>
-                        </div>
-                    </div>
-                    </div>
-                )}
-
-                {actionModal?.type === 'destroy' && (
-                    <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-black border-2 border-red-700 w-full max-w-sm p-6 relative shadow-[0_0_50px_rgba(185,28,28,0.3)]">
-                        {/* HEADER MODAL AVEC BOUTON FERMER */}
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-black uppercase text-red-600 tracking-widest animate-pulse">RAPPORT DE PERTE</h3>
-                            <button onClick={() => setActionModal(null)} className="text-red-700 hover:text-red-400">
-                                <XCircle size={20} />
-                            </button>
-                        </div>
-
-                        <input 
-                        autoFocus type="text" value={inputReason} onChange={(e) => setInputReason(e.target.value)}
-                        className="w-full bg-red-900/10 border border-red-800 p-3 text-red-200 mb-6 font-bold uppercase outline-none focus:border-red-500 text-sm" placeholder="CAUSE (EX: IED, ROQUETTE...)"
-                        />
-                        <div className="grid grid-cols-2 gap-3">
-                        <button onClick={() => setActionModal(null)} className="py-3 border border-gray-800 text-gray-500 font-bold text-xs hover:text-white">ANNULER</button>
-                        <button onClick={confirmDestruction} disabled={!inputReason} className="py-3 bg-red-700 text-white font-black text-xs hover:bg-red-600">CONFIRMER</button>
-                        </div>
-                    </div>
-                    </div>
-                )}
-
-                {showStockModal && (
-                    <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-black border border-green-800 w-full max-w-md flex flex-col max-h-[80vh]">
-                        <div className="p-3 border-b border-green-900 bg-green-900/20 flex justify-between items-center">
-                        <h3 className="font-black text-green-500 text-sm tracking-widest">GESTION STOCKS</h3>
-                        <button onClick={() => setShowStockModal(false)}><XCircle size={18} className="text-green-700 hover:text-green-400"/></button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {Object.keys(CATEGORIES).map(catKey => {
-                            const models = catalog.filter(m => m.cat === catKey);
-                            if(models.length === 0) return null;
-                            return (
-                            <div key={catKey}>
-                                <h4 className={`text-[10px] font-black mb-2 uppercase ${CATEGORIES[catKey].color.split(' ')[1]}`}>{CATEGORIES[catKey].label}</h4>
-                                <div className="space-y-1">
-                                {models.map(model => (
-                                    <div key={model.id} className="flex items-center justify-between bg-green-900/5 p-2 border border-green-900/30">
-                                    <div className="flex-1">
-                                        <div className="text-[10px] font-bold text-gray-400">{model.name}</div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <button onClick={() => updateStock(model.id, -1)} className="w-5 h-5 flex items-center justify-center bg-black border border-red-900 text-red-500 hover:bg-red-900/20 font-mono text-xs">-</button>
-                                        <span className="w-6 text-center font-mono font-bold text-green-400 text-xs">{model.stock}</span>
-                                        <button onClick={() => updateStock(model.id, 1)} className="w-5 h-5 flex items-center justify-center bg-black border border-green-900 text-green-500 hover:bg-green-900/20 font-mono text-xs">+</button>
-                                    </div>
-                                    </div>
-                                ))}
+                    {actionModal?.type === 'destroy' && (
+                        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                            <div className="bg-black border-2 border-red-700 w-full max-w-sm p-6 relative shadow-[0_0_50px_rgba(185,28,28,0.3)]">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-xl font-black uppercase text-red-600 tracking-widest animate-pulse">RAPPORT DE PERTE</h3>
+                                    <button onClick={() => setActionModal(null)} className="text-red-700 hover:text-red-400">{XCircle && <XCircle size={20} />}</button>
+                                </div>
+                                <input autoFocus type="text" value={inputReason} onChange={(e) => setInputReason(e.target.value)} className="w-full bg-red-900/10 border border-red-800 p-3 text-red-200 mb-6 font-bold uppercase outline-none focus:border-red-500 text-sm" placeholder="CAUSE (EX: IED, ROQUETTE...)" />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={() => setActionModal(null)} className="py-3 border border-gray-800 text-gray-500 font-bold text-xs hover:text-white">ANNULER</button>
+                                    <button onClick={confirmDestruction} disabled={!inputReason} className="py-3 bg-red-700 text-white font-black text-xs hover:bg-red-600">CONFIRMER</button>
                                 </div>
                             </div>
-                            );
-                        })}
                         </div>
-                        <div className="p-3 border-t border-green-900/20 bg-black">
-                            <button onClick={() => setShowStockModal(false)} className="w-full py-2 bg-green-900/20 border border-green-800 text-green-500 text-[10px] font-bold hover:bg-green-900/40 flex items-center justify-center gap-2">FERMER</button>
-                        </div>
-                    </div>
-                    </div>
-                )}
+                    )}
 
-                {showSupplyModal && (
-                    <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-black border border-green-800 w-full max-w-md">
-                        <div className="p-3 border-b border-green-900 bg-green-900/20 flex justify-between items-center">
-                        <h3 className="font-black text-green-500 text-sm tracking-widest">INVENTAIRE LOGISTIQUE</h3>
-                        <button onClick={() => setShowSupplyModal(false)}><XCircle size={18} className="text-green-700 hover:text-green-400"/></button>
-                        </div>
-                        <div className="p-4 space-y-2">
-                            {supplySources.map((src, idx) => (
-                            <div key={src.id} className="flex items-center justify-between bg-black p-2 border border-green-900/50">
-                                <span className="text-xs font-bold text-green-600 uppercase">{src.name}</span>
-                                <div className="flex items-center gap-2">
-                                <input 
-                                    type="number" 
-                                    value={src.amount}
-                                    onChange={(e) => updateSupplySource(src.id, 'amount', parseInt(e.target.value) || 0)}
-                                    className="w-20 bg-green-900/10 text-green-400 font-mono font-bold text-right p-1 outline-none border border-green-900 focus:border-green-500 text-xs"
-                                />
-                                <button onClick={() => removeSupplySource(src.id)} className="text-green-800 hover:text-red-500"><Trash2 size={14}/></button>
+                    {showStockModal && (
+                        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                            <div className="bg-black border border-green-800 w-full max-w-md flex flex-col max-h-[80vh]">
+                                <div className="p-3 border-b border-green-900 bg-green-900/20 flex justify-between items-center">
+                                    <h3 className="font-black text-green-500 text-sm tracking-widest">GESTION STOCKS</h3>
+                                    <button onClick={() => setShowStockModal(false)}>{XCircle && <XCircle size={18} className="text-green-700 hover:text-green-400"/>}</button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                    {Object.keys(CATEGORIES).map(catKey => {
+                                        const models = catalog.filter(m => m.cat === catKey);
+                                        if(models.length === 0) return null;
+                                        return (
+                                            <div key={catKey}>
+                                                <h4 className={`text-[10px] font-black mb-2 uppercase ${CATEGORIES[catKey].color.split(' ')[1]}`}>{CATEGORIES[catKey].label}</h4>
+                                                <div className="space-y-1">
+                                                    {models.map(model => (
+                                                        <div key={model.id} className="flex items-center justify-between bg-green-900/5 p-2 border border-green-900/30">
+                                                            <div className="flex-1">
+                                                                <div className="text-[10px] font-bold text-gray-400">{model.name}</div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <button onClick={() => updateStock(model.id, -1)} className="w-5 h-5 flex items-center justify-center bg-black border border-red-900 text-red-500 hover:bg-red-900/20 font-mono text-xs">-</button>
+                                                                <span className="w-6 text-center font-mono font-bold text-green-400 text-xs">{model.stock}</span>
+                                                                <button onClick={() => updateStock(model.id, 1)} className="w-5 h-5 flex items-center justify-center bg-black border border-green-900 text-green-500 hover:bg-green-900/20 font-mono text-xs">+</button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <div className="p-3 border-t border-green-900/20 bg-black">
+                                    <button onClick={() => setShowStockModal(false)} className="w-full py-2 bg-green-900/20 border border-green-800 text-green-500 text-[10px] font-bold hover:bg-green-900/40 flex items-center justify-center gap-2">FERMER</button>
                                 </div>
                             </div>
-                            ))}
-                            <button onClick={addSupplySource} className="w-full py-2 border border-dashed border-green-900 text-green-700 text-[10px] font-bold hover:border-green-500 hover:text-green-500 flex items-center justify-center gap-2 mt-4">AJOUTER SOURCE</button>
-                            <button onClick={() => setShowSupplyModal(false)} className="w-full py-2 bg-green-900/20 border border-green-800 text-green-500 text-[10px] font-bold hover:bg-green-900/40 flex items-center justify-center gap-2 mt-2">FERMER</button>
                         </div>
-                    </div>
-                    </div>
-                )}
+                    )}
 
-                {actionModal?.type === 'logs' && (
-                    <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in">
-                    <div className="bg-black border border-green-800 w-full max-w-md h-[60vh] flex flex-col relative">
-                        <div className="p-3 border-b border-green-900 bg-green-900/20 flex justify-between items-center">
-                        <h3 className="font-black text-green-500 text-sm tracking-widest">HISTORIQUE VÉHICULE</h3>
-                        <button onClick={() => setActionModal(null)}><XCircle size={18} className="text-green-700 hover:text-green-400"/></button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 font-mono text-xs">
-                        {actionModal.unit.logs?.slice().reverse().map((log, i) => (
-                            <div key={i} className="border-l border-green-900 pl-3 text-green-400">
-                            <span className="text-green-800 font-bold block text-[9px]">{log.time}</span>
-                            <p className="text-gray-400 uppercase">{log.msg}</p>
+                    {showSupplyModal && (
+                        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                            <div className="bg-black border border-green-800 w-full max-w-md">
+                                <div className="p-3 border-b border-green-900 bg-green-900/20 flex justify-between items-center">
+                                    <h3 className="font-black text-green-500 text-sm tracking-widest">INVENTAIRE LOGISTIQUE</h3>
+                                    <button onClick={() => setShowSupplyModal(false)}>{XCircle && <XCircle size={18} className="text-green-700 hover:text-green-400"/>}</button>
+                                </div>
+                                <div className="p-4 space-y-2">
+                                    {supplySources.map((src, idx) => (
+                                        <div key={src.id} className="flex items-center justify-between bg-black p-2 border border-green-900/50">
+                                            <span className="text-xs font-bold text-green-600 uppercase">{src.name}</span>
+                                            <div className="flex items-center gap-2">
+                                                <input type="number" value={src.amount} onChange={(e) => updateSupplySource(src.id, 'amount', parseInt(e.target.value) || 0)} className="w-20 bg-green-900/10 text-green-400 font-mono font-bold text-right p-1 outline-none border border-green-900 focus:border-green-500 text-xs" />
+                                                <button onClick={() => removeSupplySource(src.id)} className="text-green-800 hover:text-red-500">{Trash2 && <Trash2 size={14}/>}</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <button onClick={addSupplySource} className="w-full py-2 border border-dashed border-green-900 text-green-700 text-[10px] font-bold hover:border-green-500 hover:text-green-500 flex items-center justify-center gap-2 mt-4">AJOUTER SOURCE</button>
+                                    <button onClick={() => setShowSupplyModal(false)} className="w-full py-2 bg-green-900/20 border border-green-800 text-green-500 text-[10px] font-bold hover:bg-green-900/40 flex items-center justify-center gap-2 mt-2">FERMER</button>
+                                </div>
                             </div>
-                        ))}
                         </div>
-                    </div>
-                    </div>
-                )}
+                    )}
 
+                    {actionModal?.type === 'logs' && (
+                        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in">
+                            <div className="bg-black border border-green-800 w-full max-w-md h-[60vh] flex flex-col relative">
+                                <div className="p-3 border-b border-green-900 bg-green-900/20 flex justify-between items-center">
+                                    <h3 className="font-black text-green-500 text-sm tracking-widest">HISTORIQUE VÉHICULE</h3>
+                                    <button onClick={() => setActionModal(null)}>{XCircle && <XCircle size={18} className="text-green-700 hover:text-green-400"/>}</button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4 font-mono text-xs">
+                                    {actionModal.unit.logs?.slice().reverse().map((log, i) => (
+                                        <div key={i} className="border-l border-green-900 pl-3 text-green-400">
+                                            <span className="text-green-800 font-bold block text-[9px]">{log.time}</span>
+                                            <p className="text-gray-400 uppercase">{log.msg}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
 
-        // --- SOUS-COMPOSANTS STYLISÉS ---
-
         function NavButton({ icon, label, active, onClick }) {
             return (
-                <button 
-                onClick={onClick}
-                className={`flex flex-col items-center justify-center gap-1 transition-all border-t-2 ${active ? 'text-green-400 border-green-500 bg-green-900/20' : 'text-green-900 border-transparent hover:text-green-600'}`}
-                >
-                {icon}
-                <span className="text-[8px] font-black tracking-widest">{label}</span>
+                <button onClick={onClick} className={`flex flex-col items-center justify-center gap-1 transition-all border-t-2 ${active ? 'text-green-400 border-green-500 bg-green-900/20' : 'text-green-900 border-transparent hover:text-green-600'}`}>
+                    {icon}
+                    <span className="text-[8px] font-black tracking-widest">{label}</span>
                 </button>
             );
         }
@@ -741,83 +764,78 @@
             const [duration, setDuration] = useState('00:00:00');
             useEffect(() => {
                 const timer = setInterval(() => {
-                const diff = Date.now() - startTime;
-                const hrs = Math.floor(diff / 3600000).toString().padStart(2, '0');
-                const mins = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-                const secs = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                setDuration(`${hrs}:${mins}:${secs}`);
+                    const diff = Date.now() - startTime;
+                    const hrs = Math.floor(diff / 3600000).toString().padStart(2, '0');
+                    const mins = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+                    const secs = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+                    setDuration(`${hrs}:${mins}:${secs}`);
                 }, 1000);
                 return () => clearInterval(timer);
             }, [startTime]);
             return <span className="font-mono text-blue-400 font-bold bg-blue-900/30 px-2 py-0.5 text-[10px] border border-blue-900">T+{duration}</span>;
         }
 
-        function UnitCard({ unit, onStatusChange, onEndMission, onRTB, onShowLogs }) {
+        function UnitCard({ unit, onStatusChange, onEndMission, onRTB, onShowLogs, Icons }) {
             let borderColor = 'border-green-600';
             let statusText = 'text-green-500';
-            
             if (unit.status === 'mission') { borderColor = 'border-blue-600'; statusText = 'text-blue-500'; }
             else if (unit.status === 'damaged') { borderColor = 'border-orange-600'; statusText = 'text-orange-500'; }
             else if (unit.status === 'destroyed') { borderColor = 'border-red-600'; statusText = 'text-red-600'; }
 
+            const IconComp = Icons[CATEGORIES[unit.cat].icon];
+            const List = Icons['List'];
+            const Clock = Icons['Clock'];
+            const RotateCcw = Icons['RotateCcw'];
+            const XCircle = Icons['XCircle'];
+
             return (
                 <div className={`relative border-l-2 ${borderColor} bg-green-900/5 p-2 flex flex-col h-full border-t border-r border-b border-green-900/30 hover:bg-green-900/10 transition-all`}>
-                
-                {/* Header */}
-                <div className="flex justify-between items-start mb-2">
-                    <div className="flex gap-2 overflow-hidden">
-                    <div className={`p-1.5 bg-black border border-green-900 flex items-center justify-center h-8 w-8 shrink-0 ${statusText}`}>
-                        {CATEGORIES[unit.cat].icon}
-                    </div>
-                    <div className="min-w-0">
-                        <h3 className={`font-black text-xs text-gray-300 truncate uppercase leading-tight ${unit.status === 'destroyed' && 'line-through opacity-50'}`}>{unit.name}</h3>
-                        <div className="flex items-center gap-1 mt-0.5">
-                        <span className="text-[8px] text-green-800 font-mono">{unit.cost} PTS</span>
-                        {unit.responsible !== 'BASE' && (
-                            <span className="text-[8px] bg-blue-900/20 px-1 text-blue-400 border border-blue-900/50 truncate max-w-[80px]">
-                            {unit.responsible}
-                            </span>
-                        )}
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="flex gap-2 overflow-hidden">
+                            <div className={`p-1.5 bg-black border border-green-900 flex items-center justify-center h-8 w-8 shrink-0 ${statusText}`}>
+                                {IconComp && <IconComp size={16}/>}
+                            </div>
+                            <div className="min-w-0">
+                                <h3 className={`font-black text-xs text-gray-300 truncate uppercase leading-tight ${unit.status === 'destroyed' && 'line-through opacity-50'}`}>{unit.name}</h3>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                    <span className="text-[8px] text-green-800 font-mono">{unit.cost} PTS</span>
+                                    {unit.responsible !== 'BASE' && (
+                                        <span className="text-[8px] bg-blue-900/20 px-1 text-blue-400 border border-blue-900/50 truncate max-w-[80px]">{unit.responsible}</span>
+                                    )}
+                                </div>
+                            </div>
                         </div>
+                        <button onClick={onShowLogs} className="text-green-900 hover:text-green-500 p-1 shrink-0">{List && <List size={14} />}</button>
                     </div>
-                    </div>
-                    <button onClick={onShowLogs} className="text-green-900 hover:text-green-500 p-1 shrink-0"><List size={14} /></button>
-                </div>
-
-                {/* Timer */}
-                {unit.status === 'mission' && (
-                    <div className="mb-2 flex items-center gap-1 justify-center">
-                    <Clock size={10} className="text-blue-600"/>
-                    <MissionTimer startTime={unit.missionStartTime} />
-                    </div>
-                )}
-
-                {/* Actions */}
-                {unit.status === 'destroyed' ? (
-                    <div className="bg-red-900/10 border border-red-900/50 p-1 text-center mb-2">
-                    <p className="text-[8px] text-red-700 font-bold uppercase">CAUSE: {unit.reasonHS}</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-4 gap-1 mb-2 mt-auto">
-                    <StatusBtn label="OPS" active={unit.status === 'operational'} color="green" onClick={() => onStatusChange('operational')} />
-                    <StatusBtn label="MIS" active={unit.status === 'mission'} color="blue" onClick={() => unit.status === 'mission' ? onEndMission() : onStatusChange('mission')} />
-                    <StatusBtn label="RÉP" active={unit.status === 'damaged'} color="orange" onClick={() => onStatusChange('damaged')} />
-                    <StatusBtn label="HS" active={false} color="red" onClick={() => onStatusChange('destroyed')} />
-                    </div>
-                )}
-
-                {/* Footer */}
-                <div className="flex justify-end pt-1 border-t border-green-900/20 mt-auto">
-                    {unit.status !== 'destroyed' ? (
-                    <button onClick={onRTB} className="text-[8px] font-bold text-green-800 hover:text-green-500 uppercase flex items-center gap-1">
-                        <RotateCcw size={8} /> RENTRER
-                    </button>
-                    ) : (
-                    <button onClick={onRTB} className="text-[8px] font-bold text-red-800 hover:text-red-500 uppercase flex items-center gap-1">
-                        <XCircle size={8} /> ARCHIVER
-                    </button>
+                    {unit.status === 'mission' && (
+                        <div className="mb-2 flex items-center gap-1 justify-center">
+                            {Clock && <Clock size={10} className="text-blue-600"/>}
+                            <MissionTimer startTime={unit.missionStartTime} />
+                        </div>
                     )}
-                </div>
+                    {unit.status === 'destroyed' ? (
+                        <div className="bg-red-900/10 border border-red-900/50 p-1 text-center mb-2">
+                            <p className="text-[8px] text-red-700 font-bold uppercase">CAUSE: {unit.reasonHS}</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-4 gap-1 mb-2 mt-auto">
+                            <StatusBtn label="OPS" active={unit.status === 'operational'} color="green" onClick={() => onStatusChange('operational')} />
+                            <StatusBtn label="MIS" active={unit.status === 'mission'} color="blue" onClick={() => unit.status === 'mission' ? onEndMission() : onStatusChange('mission')} />
+                            <StatusBtn label="RÉP" active={unit.status === 'damaged'} color="orange" onClick={() => onStatusChange('damaged')} />
+                            <StatusBtn label="HS" active={false} color="red" onClick={() => onStatusChange('destroyed')} />
+                        </div>
+                    )}
+                    <div className="flex justify-end pt-1 border-t border-green-900/20 mt-auto">
+                        {unit.status !== 'destroyed' ? (
+                            <button onClick={onRTB} className="text-[8px] font-bold text-green-800 hover:text-green-500 uppercase flex items-center gap-1">
+                                {RotateCcw && <RotateCcw size={8} />} RENTRER
+                            </button>
+                        ) : (
+                            <button onClick={onRTB} className="text-[8px] font-bold text-red-800 hover:text-red-500 uppercase flex items-center gap-1">
+                                {XCircle && <XCircle size={8} />} ARCHIVER
+                            </button>
+                        )}
+                    </div>
                 </div>
             );
         }
