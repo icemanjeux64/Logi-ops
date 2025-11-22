@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V16.0 (COMMANDER + FIREBASE)</title>
+    <title>LOGI-OPS V16.5 (COMMANDER + SQUAD)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -82,23 +82,18 @@
         const SESSION_ID = typeof __app_id !== 'undefined' ? __app_id : "operation_actuelle";
         const LOCAL_STORAGE_KEY = "logiops_data_v16_cmd";
 
-        // Helper pour le chemin sécurisé (Adaptation pour l'environnement)
         const getCollectionRef = () => {
-            // Utilise le chemin strict requis par l'environnement si disponible
             if (typeof __app_id !== 'undefined') {
                 return db.collection('artifacts').doc(__app_id).collection('public').doc('data').collection('logiops').doc('global');
             }
-            // Sinon fallback sur la racine (pour usage externe)
             return db.collection('logiops').doc(SESSION_ID);
         };
 
         const StorageService = {
             save: (data) => {
                 if (USE_FIREBASE && db) {
-                    // Auth anonyme requise pour écrire si non connecté
                     const auth = firebase.auth();
                     if (!auth.currentUser) auth.signInAnonymously().catch(e => console.warn("Auth error", e));
-                    
                     getCollectionRef().set(data, { merge: true }).catch(err => console.warn(err));
                 } else {
                     try {
@@ -115,7 +110,6 @@
             },
             loadInitial: async (callback) => {
                 if (USE_FIREBASE && db) {
-                    // Auth avant lecture
                     const auth = firebase.auth();
                     if (!auth.currentUser) {
                         try {
@@ -126,7 +120,6 @@
                             }
                         } catch (e) { console.warn("Auth failed", e); }
                     }
-
                     return getCollectionRef().onSnapshot((doc) => {
                         if (doc.exists) callback(doc.data()); else callback(null);
                     }, err => {
@@ -202,7 +195,10 @@
             'Check': <polyline points="20 6 9 17 4 12" />,
             'X': <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
             'PlusCircle': <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></>,
-            'Map': <><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></>
+            'Map': <><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></>,
+            'Users': <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
+            'UserPlus': <><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></>,
+            'Trash2': <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>
         };
 
         const Icon = ({ name, size = 16, className }) => {
@@ -246,7 +242,12 @@
         // --- CARTE UNITÉ ---
         const UnitCard = ({ unit, userIdentity, isSL, actions }) => {
             const [view, setView] = useState('status'); // 'status' or 'cargo'
-            const isMyUnit = unit.responsible === userIdentity || isSL;
+            
+            // CORRECTION: Only the explicitly assigned logistician can control mission actions
+            // SL can see but not touch if unit is in mission
+            const isResponsible = unit.responsible === userIdentity;
+            const isMyUnit = isResponsible; 
+            
             const catConfig = CATEGORIES[unit.cat];
             
             const fuelColor = unit.fuel < 30 ? 'red' : (unit.fuel < 60 ? 'orange' : 'green');
@@ -302,7 +303,7 @@
                                 </div>
                             </div>
 
-                            {/* Actions Maintenance */}
+                            {/* Actions Maintenance - Visible at base, usually SL or Logi */}
                             {unit.status !== 'mission' && (
                                 <div className="grid grid-cols-2 gap-1">
                                     <button onClick={() => actions.resupplyUnit(unit, 'fuel')} disabled={unit.fuel >= 100} className="px-1 py-1 bg-green-900/20 border border-green-800 text-[8px] text-green-400 hover:bg-green-900/40 disabled:opacity-20 flex justify-center gap-1"><Icon name="Fuel" size={10}/> PLEIN</button>
@@ -310,20 +311,31 @@
                                 </div>
                             )}
 
-                            {/* Mission Control */}
+                            {/* Mission Control - RESTRICTED TO RESPONSIBLE */}
                             <div className="pt-1">
                                 {unit.responsible === 'BASE' ? (
                                     <button onClick={() => actions.takeDriver(unit)} className="w-full py-1 border border-dashed border-gray-700 text-gray-500 text-[9px] hover:text-green-500 hover:border-green-500">PRENDRE LE VOLANT</button>
                                 ) : (
-                                    isMyUnit && (
-                                        unit.status === 'mission' ? (
+                                    // If Assigned
+                                    unit.status === 'mission' ? (
+                                        // IF IN MISSION: ONLY RESPONSIBLE CAN ACT
+                                        isResponsible ? (
                                             <div className="grid grid-cols-2 gap-1">
                                                 <button onClick={() => actions.sitrep(unit)} className="py-1 bg-yellow-900/20 border border-yellow-700 text-yellow-500 font-bold text-[9px]">SITREP</button>
                                                 <button onClick={() => actions.rtb(unit)} className="py-1 bg-blue-900/20 border border-blue-700 text-blue-500 font-bold text-[9px]">RTB</button>
                                             </div>
                                         ) : (
-                                            <button onClick={() => actions.startMission(unit)} disabled={unit.status === 'damaged' || unit.fuel < 10} className="w-full py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 disabled:opacity-50">DÉPART MISSION</button>
+                                            <div className="text-center text-[9px] text-gray-500 py-1 italic border border-gray-800 bg-gray-900/20 rounded">
+                                                CONTRÔLE: {unit.responsible}
+                                            </div>
                                         )
+                                    ) : (
+                                        // IF AT BASE BUT ASSIGNED
+                                        <div className="flex gap-1">
+                                            {/* SL can force unassign if needed, or Logi can start mission */}
+                                            {isResponsible && <button onClick={() => actions.startMission(unit)} disabled={unit.status === 'damaged' || unit.fuel < 10} className="flex-1 py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 disabled:opacity-50">DÉPART</button>}
+                                            {(isResponsible || isSL) && <button onClick={() => actions.releaseDriver(unit)} className="px-2 py-1 border border-red-900 text-red-500 hover:bg-red-900/20" title="Libérer"><Icon name="X" size={12}/></button>}
+                                        </div>
                                     )
                                 )}
                             </div>
@@ -341,7 +353,7 @@
                                         {(unit.cargo || []).map((item, idx) => (
                                             <div key={idx} className="aspect-square bg-gray-800 border border-gray-600 rounded flex items-center justify-center relative group/item">
                                                 <Icon name={CARGO_TYPES[item].icon} size={14} className="text-gray-300" />
-                                                {unit.status !== 'mission' && <button onClick={() => actions.unloadCargo(unit, idx)} className="absolute inset-0 bg-red-900/80 flex items-center justify-center opacity-0 group-hover/item:opacity-100"><Icon name="X" size={14} className="text-white"/></button>}
+                                                {unit.status !== 'mission' && (isResponsible || isSL) && <button onClick={() => actions.unloadCargo(unit, idx)} className="absolute inset-0 bg-red-900/80 flex items-center justify-center opacity-0 group-hover/item:opacity-100"><Icon name="X" size={14} className="text-white"/></button>}
                                             </div>
                                         ))}
                                         {Array.from({ length: maxLoad - currentLoad }).map((_, idx) => (
@@ -368,15 +380,43 @@
 
         // --- LOGIN SCREEN ---
         function LoginScreen({ onLogin, squad }) {
-            const [user, setUser] = useState('');
+            const [userType, setUserType] = useState(null); // 'SL' or 'LOGI'
+            const [selectedMember, setSelectedMember] = useState('');
+            const [slName, setSlName] = useState('');
+
+            if (!userType) {
+                return (
+                    <div className="min-h-screen bg-black flex items-center justify-center p-4 login-scan">
+                        <div className="w-full max-w-md border border-green-800 p-8 bg-black z-10 text-center space-y-6 shadow-[0_0_50px_rgba(20,83,45,0.2)]">
+                            <h1 className="text-3xl font-black text-green-500 tracking-[0.3em]">LOGI-OPS <span className="text-sm text-green-700">V16.5</span></h1>
+                            <div className="grid grid-cols-1 gap-4">
+                                <button onClick={() => setUserType('SL')} className="py-4 border border-green-600 text-green-500 font-bold hover:bg-green-900/20">COMMANDEMENT (SL)</button>
+                                <button onClick={() => setUserType('LOGI')} className="py-4 border border-blue-600 text-blue-500 font-bold hover:bg-blue-900/20">LOGISTIQUE (SQUAD)</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
             return (
                 <div className="min-h-screen bg-black flex items-center justify-center p-4 login-scan">
                     <div className="w-full max-w-md border border-green-800 p-8 bg-black z-10 text-center space-y-6 shadow-[0_0_50px_rgba(20,83,45,0.2)]">
-                        <h1 className="text-3xl font-black text-green-500 tracking-[0.3em]">LOGI-OPS <span className="text-sm text-green-700">V16</span></h1>
-                        <input type="text" placeholder="IDENTIFIANT" className="w-full bg-green-900/10 border border-green-800 p-3 text-green-400 text-center font-bold outline-none focus:border-green-500" onChange={e => setUser(e.target.value.toUpperCase())} />
+                        <h2 className="text-xl font-bold text-gray-300 uppercase">IDENTIFICATION {userType}</h2>
+                        
+                        {userType === 'SL' && (
+                            <input type="text" placeholder="NOM DU SL" className="w-full bg-green-900/10 border border-green-800 p-3 text-green-400 text-center font-bold outline-none" onChange={e => setSlName(e.target.value.toUpperCase())} />
+                        )}
+
+                        {userType === 'LOGI' && (
+                            <select className="w-full bg-blue-900/10 border border-blue-800 p-3 text-blue-400 font-bold outline-none" onChange={e => setSelectedMember(e.target.value)} value={selectedMember}>
+                                <option value="">-- CHOISIR MEMBRE --</option>
+                                {squad.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                            </select>
+                        )}
+
                         <div className="grid grid-cols-2 gap-4">
-                            <button disabled={!user} onClick={() => onLogin('SL', user)} className="py-3 border border-green-600 text-green-500 font-bold hover:bg-green-900/20 disabled:opacity-30">COMMANDEMENT</button>
-                            <button disabled={!user} onClick={() => onLogin('LOGI', user)} className="py-3 border border-blue-600 text-blue-500 font-bold hover:bg-blue-900/20 disabled:opacity-30">LOGISTIQUE</button>
+                            <button onClick={() => setUserType(null)} className="py-3 border border-gray-700 text-gray-500 font-bold">RETOUR</button>
+                            <button disabled={userType==='SL'?!slName:!selectedMember} onClick={() => onLogin(userType, userType==='SL'?slName:selectedMember)} className="py-3 bg-green-600 text-black font-bold disabled:opacity-50">VALIDER</button>
                         </div>
                     </div>
                 </div>
@@ -388,20 +428,23 @@
             const [userRole, setUserRole] = useState(null);
             const [userIdentity, setUserIdentity] = useState(null);
             const [activeTab, setActiveTab] = useState('dashboard');
+            
+            // Data States
             const [units, setUnits] = useState([]);
             const [logs, setLogs] = useState([]);
             const [supply, setSupply] = useState(5000);
+            const [squad, setSquad] = useState([]); // SQUAD STATE ADDED
+            const [missions, setMissions] = useState([]);
+            
+            // UI States
             const [filter, setFilter] = useState('ALL');
             const [modal, setModal] = useState(null);
-            
-            // MISSION STATES
-            const [missions, setMissions] = useState([]);
             const [showGlobalMissionModal, setShowGlobalMissionModal] = useState(false);
             const [globalMissionData, setGlobalMissionData] = useState({ title: '', vehicles: [] });
+            const [newMemberName, setNewMemberName] = useState(''); // For squad management
 
             const isSL = userRole === 'SL';
 
-            // Init Data
             useEffect(() => {
                 StorageService.loadInitial((data) => {
                     if (data) {
@@ -409,16 +452,12 @@
                         setLogs(data.logs || []);
                         setSupply(data.supply || 5000);
                         setMissions(data.missions || []);
+                        setSquad(data.squad || []); // Load squad
                     }
                 });
             }, []);
 
-            // Auto-Save (Seulement si connecté et données valides)
-            useEffect(() => { 
-                if (userIdentity && units.length >= 0) {
-                    StorageService.save({ units, logs, supply, missions }); 
-                }
-            }, [units, logs, supply, missions, userIdentity]);
+            useEffect(() => { if (userIdentity) StorageService.save({ units, logs, supply, missions, squad }); }, [units, logs, supply, missions, squad, userIdentity]);
 
             const addLog = (msg, type='INFO') => {
                 setLogs(prev => [{ id: Date.now(), time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), type, msg }, ...prev].slice(0, 50));
@@ -442,6 +481,10 @@
                 takeDriver: (unit) => {
                     setUnits(units.map(u => u.uuid === unit.uuid ? { ...u, responsible: userIdentity } : u));
                     addLog(`${userIdentity} PREND LE VOLANT ${unit.name}`, 'OPS');
+                },
+                releaseDriver: (unit) => {
+                    setUnits(units.map(u => u.uuid === unit.uuid ? { ...u, responsible: 'BASE' } : u));
+                    addLog(`${userIdentity} LIBÈRE ${unit.name}`, 'OPS');
                 },
                 startMission: (unit) => {
                     const fuelCost = 5;
@@ -487,10 +530,21 @@
                     addLog(`${unit.name} DÉCHARGEMENT ${removed}`, 'LOGI');
                 },
                 showLogs: (unit) => setModal({ type: 'logs', unit }),
-                sitrep: (unit) => addLog(`SITREP ${unit.name}: EN POSITION`, 'RADIO')
+                sitrep: (unit) => addLog(`SITREP ${unit.name}: EN POSITION`, 'RADIO'),
+                
+                // SQUAD ACTIONS
+                addMember: () => {
+                    if(!newMemberName) return;
+                    setSquad([...squad, { id: Date.now(), name: newMemberName.toUpperCase() }]);
+                    setNewMemberName('');
+                    addLog(`NOUVEAU MEMBRE: ${newMemberName.toUpperCase()}`, 'RH');
+                },
+                removeMember: (id) => {
+                    setSquad(squad.filter(m => m.id !== id));
+                }
             };
 
-            // --- MISSION LOGIC ---
+            // ... Mission Logic (Same as before)
             const toggleGlobalMissionVehicle = (uuid) => {
                 setGlobalMissionData(prev => ({
                     ...prev,
@@ -504,8 +558,6 @@
                 const newMission = { id: missionId, title: globalMissionData.title, startTime: new Date().toLocaleTimeString() };
                 
                 setMissions([...missions, newMission]);
-                
-                // Assign vehicles
                 setUnits(units.map(u => {
                     if (globalMissionData.vehicles.includes(u.uuid)) {
                         return { ...u, missionId: missionId, missionName: globalMissionData.title };
@@ -537,7 +589,7 @@
                 rep: units.filter(u => u.status === 'damaged').length
             };
 
-            if (!userRole) return <LoginScreen onLogin={(r, i) => { setUserRole(r); setUserIdentity(i); }} />;
+            if (!userRole) return <LoginScreen onLogin={(r, i) => { setUserRole(r); setUserIdentity(i); }} squad={squad} />;
 
             return (
                 <div className="h-screen bg-black text-green-500 flex flex-col overflow-hidden font-mono">
@@ -546,7 +598,7 @@
                         <div className="flex items-center gap-3">
                             <Icon name="Activity" className="text-green-500 animate-pulse"/>
                             <div>
-                                <h1 className="font-black text-lg tracking-widest leading-none">LOGI-OPS <span className="text-xs text-green-700">V16</span></h1>
+                                <h1 className="font-black text-lg tracking-widest leading-none">LOGI-OPS <span className="text-xs text-green-700">V16.5</span></h1>
                                 <div className="text-[10px] text-gray-500">{userIdentity} // {userRole}</div>
                             </div>
                         </div>
@@ -563,6 +615,7 @@
                             <button onClick={()=>setActiveTab('dashboard')} className={`p-2 rounded ${activeTab==='dashboard'?'bg-green-900/30 text-white':'text-gray-600'}`}><Icon name="LayoutDashboard" size={24}/></button>
                             <button onClick={()=>setActiveTab('missions')} className={`p-2 rounded ${activeTab==='missions'?'bg-green-900/30 text-white':'text-gray-600'}`}><Icon name="Briefcase" size={24}/></button>
                             {isSL && <button onClick={()=>setActiveTab('garage')} className={`p-2 rounded ${activeTab==='garage'?'bg-green-900/30 text-white':'text-gray-600'}`}><Icon name="Warehouse" size={24}/></button>}
+                            <button onClick={()=>setActiveTab('squad')} className={`p-2 rounded ${activeTab==='squad'?'bg-green-900/30 text-white':'text-gray-600'}`}><Icon name="Users" size={24}/></button>
                             <button onClick={()=>setActiveTab('journal')} className={`p-2 rounded ${activeTab==='journal'?'bg-green-900/30 text-white':'text-gray-600'}`}><Icon name="ScrollText" size={24}/></button>
                             <div className="mt-auto"><button onClick={()=>StorageService.clear()} className="text-red-600 hover:text-red-400"><Icon name="Power" size={24}/></button></div>
                         </nav>
@@ -638,6 +691,27 @@
                                             <button onClick={() => actions.deployUnit(model.id)} className="mt-auto w-full py-2 bg-white text-black font-black text-xs hover:bg-green-400">ACHETER ({model.cost})</button>
                                         </div>
                                     ))}
+                                </div>
+                            )}
+
+                            {activeTab === 'squad' && (
+                                <div className="max-w-2xl mx-auto bg-black border border-green-900 p-6">
+                                    <h2 className="text-lg font-black text-green-500 mb-4 flex items-center gap-2"><Icon name="Users" size={20}/> EFFECTIFS LOGISTIQUES</h2>
+                                    {isSL && (
+                                        <div className="flex gap-2 mb-6 border-b border-green-900 pb-6">
+                                            <input type="text" placeholder="NOM DU MEMBRE..." className="flex-1 bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold uppercase outline-none" value={newMemberName} onChange={e=>setNewMemberName(e.target.value)} />
+                                            <button onClick={actions.addMember} className="px-4 bg-green-600 text-black font-bold text-xs hover:bg-green-500">AJOUTER</button>
+                                        </div>
+                                    )}
+                                    <div className="space-y-2">
+                                        {squad.length === 0 && <div className="text-gray-600 italic text-center text-sm">Aucun membre.</div>}
+                                        {squad.map(m => (
+                                            <div key={m.id} className="flex justify-between items-center p-3 border border-green-900/30 bg-green-900/5">
+                                                <span className="font-bold text-green-400">{m.name}</span>
+                                                {isSL && <button onClick={() => actions.removeMember(m.id)} className="text-red-500 hover:text-red-400"><Icon name="Trash2" size={16}/></button>}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
 
