@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V12.0 (TACTICAL)</title>
+    <title>LOGI-OPS V12.1 (TACTICAL)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -471,6 +471,7 @@
         // 5. APPLICATION PRINCIPALE
         // ==========================================
         function LogiOpsV9() {
+            // ... (States and Logic)
             const [userRole, setUserRole] = useState(null); 
             const [userIdentity, setUserIdentity] = useState(null); 
             const [activeTab, setActiveTab] = useState('dashboard'); 
@@ -799,7 +800,7 @@
                         <div className="flex items-center gap-4">
                             <div className="p-1.5 rounded">{Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}</div>
                             <div>
-                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V12.0</span></h1>
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V11.9</span></h1>
                                 <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
                                     <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}><div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>SL: {slName || "N/A"}</span>
                                     <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
@@ -849,18 +850,10 @@
                                         </button>
                                     )}
 
-                                    {/* STANDARD SL VIEW / LOGI VIEW (FILTERED) */}
+                                    {/* STANDARD SL VIEW */}
                                     <div className="flex-1 overflow-y-auto space-y-2 pr-2">
                                         {Object.keys(CATEGORIES).map(catKey => {
-                                            // Filter logic: Show all for SL, Show assigned for Logi UNLESS operational
-                                            const unitsInCat = activeUnits.filter(u => {
-                                                const isAssignedToMe = u.responsible === userIdentity || (u.crew && u.crew.includes(userIdentity));
-                                                const isOp = u.status === 'operational';
-                                                const matchesFilter = filterStatus === 'ALL' || u.status === filterStatus;
-                                                if(canEdit) return u.cat === catKey && matchesFilter;
-                                                return u.cat === catKey && (isAssignedToMe || isOp) && matchesFilter;
-                                            });
-
+                                            const unitsInCat = activeUnits.filter(u => u.cat === catKey && (filterStatus === 'ALL' || u.status === filterStatus || (filterStatus === 'mission' && (u.status === 'mission_pending' || u.status === 'mission_rtb_request' || u.status === 'mission_rtb_transit'))));
                                             if (unitsInCat.length === 0) return null;
                                             const conf = CATEGORIES[catKey];
                                             const isOpen = expandedCats[catKey];
@@ -894,9 +887,6 @@
                                                                     onValidateRTB={() => validateRTB(unit)}
                                                                     onSitrep={() => openSitrepModal(unit)} 
                                                                     onShowLogs={() => setActionModal({ type: 'logs', unit })}
-                                                                    onTakeDriver={() => selfAssignDriver(unit.uuid)}
-                                                                    onTakePax={() => selfAssignPax(unit.uuid)}
-                                                                    canAssignSelf={false} // Not on main dashboard
                                                                 />
                                                             ))}
                                                         </div>
@@ -908,7 +898,7 @@
                                 </div>
                             )}
 
-                            {/* MISSIONS TAB (NEW LOGIC) */}
+                            {/* MISSIONS TAB (NEW) */}
                             {activeTab === 'missions' && (
                                 <div className="animate-in fade-in h-full flex flex-col">
                                     {!selectedMissionId ? (
@@ -925,46 +915,28 @@
                                                 )}
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                {missions.filter(m => m.status !== 'ended').map(mission => {
-                                                    const isLeader = mission.leader === userIdentity;
-                                                    const hasJoined = mission.participants?.includes(userIdentity);
-                                                    return (
-                                                        <div key={mission.id} className="bg-black border border-purple-900 p-4 relative overflow-hidden group">
-                                                            <div className="absolute top-0 left-0 w-1 h-full bg-purple-600"></div>
-                                                            <div className="flex justify-between items-start mb-2">
-                                                                <h3 className="font-black text-white uppercase text-sm">{mission.title}</h3>
-                                                                <span className={`text-[10px] px-2 py-1 border font-bold rounded ${mission.leader ? 'bg-green-900/30 text-green-400 border-green-800' : 'bg-red-900/30 text-red-400 border-red-800 animate-pulse'}`}>
-                                                                    {mission.leader ? `LEAD: ${mission.leader}` : 'LEADER REQUIS'}
-                                                                </span>
-                                                            </div>
-                                                            <div className="space-y-1 mb-4">
-                                                                <p className="text-xs text-gray-400 font-bold flex items-center gap-2"><Icon name="Target" size={12}/> {mission.objective}</p>
-                                                                <p className="text-[10px] text-gray-500 flex items-center gap-2"><Icon name="Clock" size={12}/> {mission.startTime}</p>
-                                                            </div>
-                                                            
-                                                            {/* ACTIONS DE JOIN/LEAD */}
-                                                            {!canEdit && (
-                                                                <div className="grid grid-cols-2 gap-2 mb-2">
-                                                                    {!mission.leader && (
-                                                                        <button onClick={() => takeMissionCommand(mission.id)} className="col-span-2 py-2 border border-green-500 text-green-400 font-black text-[10px] hover:bg-green-900/30 uppercase">
-                                                                            PRENDRE LE COMMANDEMENT
-                                                                        </button>
-                                                                    )}
-                                                                    {mission.leader && !hasJoined && (
-                                                                        <button onClick={() => joinMission(mission.id)} className="col-span-2 py-2 border border-blue-500 text-blue-400 font-black text-[10px] hover:bg-blue-900/30 uppercase">
-                                                                            REJOINDRE L'UNITÉ
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            )}
-
-                                                            <button onClick={() => setSelectedMissionId(mission.id)} className="w-full py-2 bg-purple-900/20 text-purple-400 font-bold text-xs hover:bg-purple-900/40 flex items-center justify-between px-4 border-t border-purple-900/30">
-                                                                <span>{activeUnits.filter(u => u.missionId === mission.id).length} VÉHICULES</span>
-                                                                <Icon name="ArrowRight" size={16}/>
-                                                            </button>
+                                                {missions.filter(m => m.status !== 'ended').map(mission => (
+                                                    <button key={mission.id} onClick={() => setSelectedMissionId(mission.id)} className="bg-black border border-purple-900 p-4 text-left hover:bg-purple-900/10 hover:border-purple-500 transition-all group relative overflow-hidden">
+                                                        <div className="absolute top-0 left-0 w-1 h-full bg-purple-600"></div>
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <h3 className="font-black text-white uppercase text-sm">{mission.title}</h3>
+                                                            <span className="text-[10px] bg-purple-900/30 text-purple-300 px-2 py-1 border border-purple-800">{mission.startTime}</span>
                                                         </div>
-                                                    );
-                                                })}
+                                                        <div className="space-y-1">
+                                                            <p className="text-xs text-gray-400 font-bold flex items-center gap-2"><Icon name="Target" size={12}/> {mission.objective}</p>
+                                                            {mission.squadTarget && <p className="text-xs text-gray-500 flex items-center gap-2"><Icon name="Users" size={12}/> {mission.squadTarget}</p>}
+                                                        </div>
+                                                        <div className="mt-4 pt-3 border-t border-purple-900/30 flex justify-between items-center">
+                                                            <span className="text-xs font-mono text-purple-500 font-bold">{activeUnits.filter(u => u.missionId === mission.id).length} VÉHICULES</span>
+                                                            <span className="text-purple-400 group-hover:translate-x-1 transition-transform"><Icon name="ArrowRight" size={16}/></span>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                                {missions.filter(m => m.status !== 'ended').length === 0 && (
+                                                    <div className="col-span-full text-center py-12 border border-dashed border-purple-900 bg-purple-900/5">
+                                                        <p className="text-purple-500 font-bold opacity-50">AUCUNE OPÉRATION GROUPÉE ACTIVE</p>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ) : (
@@ -980,16 +952,21 @@
                                                             <span className="text-[10px] font-bold bg-purple-600 text-black px-2 py-0.5 rounded">EN COURS</span>
                                                         </div>
                                                         <div className="flex gap-4 text-xs text-purple-300 mt-1 font-mono">
-                                                            <span>LEAD: {missions.find(m=>m.id===selectedMissionId)?.leader || "N/A"}</span>
+                                                            <span>OBJ: {missions.find(m=>m.id===selectedMissionId)?.objective}</span>
                                                             <span>|</span>
-                                                            <span>PAX: {missions.find(m=>m.id===selectedMissionId)?.participants?.length || 0}</span>
+                                                            <span>DÉBUT: {missions.find(m=>m.id===selectedMissionId)?.startTime}</span>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 {canEdit && (
-                                                    <button onClick={() => endWholeMission(selectedMissionId)} className="px-4 py-2 bg-red-600 text-black font-black text-xs hover:bg-red-500 flex items-center gap-2 shadow-[0_0_10px_rgba(220,38,38,0.4)]">
-                                                        {XCircle && <XCircle size={16}/>} TERMINER MISSION
-                                                    </button>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => setShowGlobalMissionModal(true)} className="px-4 py-2 border border-purple-500 text-purple-400 font-bold text-xs hover:bg-purple-900/30 flex items-center gap-2">
+                                                            {Plus && <Plus size={14}/>} AJOUTER VÉHICULE
+                                                        </button>
+                                                        <button onClick={() => endWholeMission(selectedMissionId)} className="px-4 py-2 bg-red-600 text-black font-black text-xs hover:bg-red-500 flex items-center gap-2 shadow-[0_0_10px_rgba(220,38,38,0.4)]">
+                                                            {XCircle && <XCircle size={16}/>} TERMINER MISSION
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </div>
 
@@ -1000,9 +977,6 @@
                                                     const unitsInMission = activeUnits.filter(u => u.missionId === selectedMissionId && u.cat === catKey);
                                                     if (unitsInMission.length === 0) return null;
                                                     
-                                                    const currentMission = missions.find(m => m.id === selectedMissionId);
-                                                    const hasJoined = currentMission?.participants?.includes(userIdentity);
-
                                                     const conf = CATEGORIES[catKey];
                                                     return (
                                                         <div key={catKey} className="border border-purple-900/30 bg-purple-900/5">
@@ -1022,10 +996,6 @@
                                                                         onValidateRTB={() => validateRTB(unit)}
                                                                         onSitrep={() => openSitrepModal(unit)} 
                                                                         onShowLogs={() => setActionModal({ type: 'logs', unit })}
-                                                                        // Self Assign Logic
-                                                                        canAssignSelf={hasJoined}
-                                                                        onTakeDriver={() => selfAssignDriver(unit.uuid)}
-                                                                        onTakePax={() => selfAssignPax(unit.uuid)}
                                                                     />
                                                                 ))}
                                                             </div>
@@ -1044,7 +1014,6 @@
                             {/* (GARAGE / SQUAD / JMO : Identique au précédent) */}
                             {activeTab === 'garage' && canEdit && (
                                 <div className="space-y-6 animate-in fade-in">
-                                    {/* ... (Contenu Garage identique) ... */}
                                     <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-green-900 pb-4">
                                         <h2 className="text-lg font-black text-green-500 flex items-center gap-2 uppercase tracking-widest">
                                             {Warehouse && <Warehouse size={20}/>} CATALOGUE DÉPLOIEMENT
@@ -1055,6 +1024,7 @@
                                             <ActionButton onClick={()=>setShowStockModal(true)} icon={Settings} label="STOCKS" color="green" />
                                         </div>
                                     </div>
+
                                     {configurations.length > 0 && (
                                         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-green-900/50">
                                             {configurations.map(config => (
@@ -1065,6 +1035,7 @@
                                             ))}
                                         </div>
                                     )}
+
                                     <div className="space-y-8">
                                         {Object.keys(CATEGORIES).map(catKey => {
                                             const models = catalog.filter(m => m.cat === catKey);
@@ -1072,6 +1043,8 @@
                                             const IconComp = Icons[CATEGORIES[catKey].icon];
                                             return (
                                                 <div key={catKey} className="bg-black border border-green-900/50 p-4 relative">
+                                                    <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-green-800"></div>
+                                                    <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-green-800"></div>
                                                     <div className="flex items-center gap-2 mb-4 pb-2 border-b border-green-900/30">
                                                         <span className={CATEGORIES[catKey].color.split(' ')[1]}>{IconComp && <IconComp size={20}/>}</span>
                                                         <span className="font-black text-sm text-gray-400 tracking-wider">{CATEGORIES[catKey].label}</span>
@@ -1148,6 +1121,22 @@
                         <NavButton icon={ScrollText} label="JMO" active={activeTab==='journal'} onClick={()=>canEdit&&setActiveTab('journal')} disabled={!canEdit} />
                     </nav>
 
+                    {/* MODAL: REMINDER (30 MIN) */}
+                    {showReminderModal && (
+                        <Modal title="RAPPEL SITUATION" color="orange" onClose={()=>setShowReminderModal(false)} Icon={AlertOctagon}>
+                            <div className="text-center space-y-4 animate-alert p-4 border border-orange-500/50 bg-orange-900/10 mb-4 rounded">
+                                <h3 className="text-lg font-black text-orange-500">POINT SITUATION (30 MIN)</h3>
+                                <p className="text-xs text-orange-200">IL EST TEMPS DE VÉRIFIER :</p>
+                                <ul className="text-xs font-bold text-left list-disc pl-8 space-y-2 text-orange-400">
+                                    <li>ÉTAT DU PARC VÉHICULES</li>
+                                    <li>NIVEAU DU SUPPLY</li>
+                                    <li>POSITION DES EFFECTIFS</li>
+                                </ul>
+                            </div>
+                            <button onClick={()=>setShowReminderModal(false)} className="w-full py-3 bg-orange-600 text-black font-black text-xs hover:bg-orange-500">REÇU</button>
+                        </Modal>
+                    )}
+
                     {/* MODAL: SHIFT START CHECK */}
                     {showShiftCheckModal && (
                         <Modal title="PRISE DE SERVICE" color="green" onClose={()=>setShowShiftCheckModal(false)} Icon={XCircle}>
@@ -1166,7 +1155,7 @@
                         </Modal>
                     )}
 
-                    {/* NEW: GLOBAL MISSION MODAL (SL ONLY - SIMPLIFIED) */}
+                    {/* NEW: GLOBAL MISSION MODAL */}
                     {showGlobalMissionModal && canEdit && (
                         <Modal title="ORDRE DE MISSION GLOBAL" color="green" onClose={()=>setShowGlobalMissionModal(false)} Icon={XCircle}>
                             <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
@@ -1174,11 +1163,11 @@
                                 <div className="space-y-3 pb-4 border-b border-green-900/30">
                                     <h4 className="text-xs font-black text-green-500 uppercase tracking-widest mb-2">1. DÉTAILS OPÉRATION</h4>
                                     <div>
-                                        <label className="text-[10px] font-bold text-green-800 block mb-1">NOM DE L'OPÉRATION</label>
+                                        <label className="text-[10px] font-bold text-green-800 block mb-1">NOM DE L'OPÉRATION (CONVOI...)</label>
                                         <input type="text" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold uppercase text-sm" 
                                             value={globalMissionData.title} 
                                             onChange={e => setGlobalMissionData({...globalMissionData, title: e.target.value})} 
-                                            placeholder="EX: CONVOI ALPHA..." 
+                                            placeholder="EX: CONVOI ALPHA, DEPLOIEMENT BRAVO..." 
                                         />
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
@@ -1195,41 +1184,49 @@
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="text-[10px] font-bold text-green-800 block mb-1">SQUAD CIBLE</label>
+                                            <label className="text-[10px] font-bold text-green-800 block mb-1">SQUAD SOUTENUE</label>
                                             <input type="text" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold text-xs uppercase" 
                                                 value={globalMissionData.squadTarget} 
                                                 onChange={e => setGlobalMissionData({...globalMissionData, squadTarget: e.target.value})} 
-                                                placeholder="EX: SQUAD 1..." 
+                                                placeholder="EX: SQUAD 1, INF 2..." 
                                             />
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-green-800 block mb-1">OBJECTIF</label>
+                                        <label className="text-[10px] font-bold text-green-800 block mb-1">OBJECTIF / POSITION</label>
                                         <input type="text" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold text-xs" 
                                             value={globalMissionData.objective} 
                                             onChange={e => setGlobalMissionData({...globalMissionData, objective: e.target.value})} 
-                                            placeholder="EX: FOB RUSTY..." 
+                                            placeholder="EX: FOB RUSTY, GRID G5-2..." 
                                         />
                                     </div>
                                 </div>
 
-                                {/* STEP 2: VEHICLE SELECTION (NO DRIVER ASSIGNMENT) */}
+                                {/* STEP 2: VEHICLE SELECTION */}
                                 <div>
-                                    <h4 className="text-xs font-black text-green-500 uppercase tracking-widest mb-2">2. SÉLECTION VÉHICULES</h4>
+                                    <h4 className="text-xs font-black text-green-500 uppercase tracking-widest mb-2">2. VÉHICULES & CHEFS DE BORD</h4>
                                     <div className="space-y-2">
                                         {activeUnits.filter(u => u.status === 'operational').length === 0 && (
-                                            <p className="text-xs text-gray-500 italic">Aucun véhicule opérationnel.</p>
+                                            <p className="text-xs text-gray-500 italic">Aucun véhicule opérationnel disponible au garage.</p>
                                         )}
                                         {activeUnits.filter(u => u.status === 'operational').map(unit => {
-                                            const isSelected = globalMissionData.vehicles.includes(unit.uuid);
+                                            const isSelected = !!globalMissionData.vehicleAssignments[unit.uuid];
                                             return (
-                                                <div key={unit.uuid} onClick={() => toggleGlobalMissionVehicle(unit.uuid)} className={`flex items-center justify-between p-3 border cursor-pointer transition-all ${isSelected ? 'border-green-500 bg-green-900/20' : 'border-green-900/30 bg-black hover:bg-green-900/10'}`}>
+                                                <div key={unit.uuid} className={`flex items-center justify-between p-2 border transition-all ${isSelected ? 'border-green-500 bg-green-900/20' : 'border-green-900/30 bg-black'}`}>
                                                     <div className="flex flex-col">
                                                         <span className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-gray-500'}`}>{unit.name}</span>
                                                         <span className="text-[9px] text-green-800">{CATEGORIES[unit.cat]?.label}</span>
                                                     </div>
-                                                    <div className={`w-6 h-6 rounded border flex items-center justify-center ${isSelected ? 'bg-green-600 border-green-500' : 'border-green-900'}`}>
-                                                        {isSelected && <Check size={14} className="text-black"/>}
+                                                    <div className="w-1/2">
+                                                        <select 
+                                                            className={`w-full text-[10px] font-bold p-1 border outline-none ${isSelected ? 'bg-green-900/40 border-green-500 text-green-300' : 'bg-black border-green-900 text-gray-600'}`}
+                                                            value={globalMissionData.vehicleAssignments[unit.uuid] || ""}
+                                                            onChange={(e) => handleGlobalMissionAssign(unit.uuid, e.target.value)}
+                                                        >
+                                                            <option value="">-- NON ASSIGNÉ --</option>
+                                                            <option value="SL">SL - {slName || "MOI"}</option>
+                                                            {squad.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                                                        </select>
                                                     </div>
                                                 </div>
                                             );
@@ -1239,7 +1236,7 @@
                             </div>
                             <div className="mt-6 pt-4 border-t border-green-900">
                                 <button onClick={submitGlobalMission} className="w-full py-3 bg-green-600 text-black font-black text-sm hover:bg-green-500 uppercase tracking-widest shadow-[0_0_15px_rgba(22,163,74,0.4)]">
-                                    CRÉER L'OPÉRATION
+                                    LANCER L'OPÉRATION
                                 </button>
                             </div>
                         </Modal>
