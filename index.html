@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LOGI-OPS V11.3 (MOBILE FIX)</title>
+    <title>LOGI-OPS V11.4 (MISSION TYPES)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -37,7 +37,6 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
         body { font-family: 'JetBrains Mono', monospace; background-color: #050505; overflow: hidden; }
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #14532d; border-radius: 2px; }
@@ -170,6 +169,17 @@
             'AIR': { label: 'AÉRIEN', icon: 'Plane', color: 'border-cyan-600 text-cyan-300 bg-cyan-900/10' },
         };
 
+        // --- DÉFINITION DES MISSIONS PAR CATÉGORIE ---
+        const MISSION_TYPES = {
+            'LOGI': ['RAVITAILLEMENT (AMMO)', 'RAVITAILLEMENT (BUILD)', 'CONSTRUCTION FOB', 'RÉPARATION SITE', 'RÉCUPÉRATION ÉPAVE'],
+            'TRANS': ['DÉPLOIEMENT INFANTERIE', 'EXTRACTION', 'NAVETTE BASE/FRONT'],
+            'BLINDE': ['APPUI FEU', 'ESCORTE CONVOI', 'PATROUILLE', 'RECONNAISSANCE BLINDÉE'],
+            'VCI': ['ASSAUT MÉCANISÉ', 'TRANSPORT ASSAUT', 'APPUI INFANTERIE'],
+            'SANTE': ['EVASAN (URGENCE)', 'SOUTIEN MÉDICAL', 'VADROUILLE SANITAIRE'],
+            'CHAR': ['ASSAUT BLINDÉ', 'DESTRUCTION OBJECTIF', 'DÉFENSE DE ZONE'],
+            'AIR': ['TRANSPORT AÉRIEN', 'CAS (APPUI FEU)', 'RECONNAISSANCE AÉRIENNE', 'EVASAN AÉRIENNE']
+        };
+
         // --- SYSTÈME D'ICÔNES ---
         const SVG_PATHS = {
             'Power': <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />,
@@ -237,7 +247,7 @@
         });
 
         // ==========================================
-        // 4. SOUS-COMPOSANTS
+        // 4. SOUS-COMPOSANTS (DÉFINIS AVANT USAGE)
         // ==========================================
         const ClockDisplay = () => {
             const [time, setTime] = useState(new Date());
@@ -277,10 +287,10 @@
         };
 
         const ActionButton = ({ onClick, icon: Icon, label, color }) => (<button onClick={onClick} className={`text-[10px] md:text-xs font-bold bg-${color}-900/20 border border-${color}-800 px-3 py-2 md:py-1.5 text-${color}-400 hover:bg-${color}-900/40 hover:border-${color}-500 flex items-center justify-center gap-2 transition-colors rounded`}>{Icon && <Icon size={14} />} {label}</button>);
-        const NavButton = ({ icon: Icon, label, active, onClick, disabled }) => (<button onClick={onClick} disabled={disabled} className={`flex flex-col items-center justify-center gap-1 transition-all border-t-2 ${active?'text-green-400 border-green-500 bg-green-900/20':disabled?'text-green-900 opacity-30':'text-green-900 border-transparent hover:text-green-600'}`}>{Icon && <Icon size={18}/>} <span className="text-[9px] font-black tracking-widest">{label}</span></button>);
+        const NavButton = ({ icon: Icon, label, active, onClick, disabled }) => (<button onClick={onClick} disabled={disabled} className={`flex flex-col items-center justify-center gap-1 transition-all border-t-2 ${active?'text-green-400 border-green-500 bg-green-900/20':disabled?'text-green-900 opacity-30':'text-green-900 border-transparent hover:text-green-600'}`}>{Icon && <Icon size={18}/>} <span className="text-[8px] font-black tracking-widest">{label}</span></button>);
         const NavButtonDesktop = ({ icon: Icon, label, active, onClick, disabled }) => (<button onClick={onClick} disabled={disabled} className={`w-full flex items-center gap-3 px-4 py-3 transition-all border-l-4 text-left ${active?'text-green-400 border-green-500 bg-green-900/20':disabled?'text-green-900 border-transparent opacity-30':'text-gray-500 border-transparent hover:text-green-500 hover:bg-green-900/10'}`}>{Icon && <Icon size={20}/>} <span className="text-xs font-black tracking-widest uppercase">{label}</span></button>);
-        const EmptyState = ({ canEdit, Target }) => (<div className="flex flex-col items-center justify-center h-64 md:h-96 border border-dashed border-green-900 bg-green-900/5 rounded-lg m-2">{Target && <Target size={48} className="mb-4 text-green-900 opacity-50" />}<p className="text-xs font-bold uppercase text-green-800 tracking-widest">AUCUNE UNITÉ</p>{canEdit && <p className="text-[10px] text-green-900 mt-1">ALLEZ AU GARAGE</p>}</div>);
-        const GarageSlot = ({ model, index, activeCount, onDeploy, ArrowUpRight }) => { const isAvailable = index >= activeCount; return (<button disabled={!isAvailable} onClick={isAvailable ? onDeploy : undefined} className={`relative p-1 md:p-3 border flex flex-col items-center justify-center text-center h-20 md:h-32 transition-all rounded ${isAvailable ? 'bg-green-900/10 border-green-800 hover:bg-green-900/30 hover:border-green-500 active:scale-95 group' : 'bg-black border-green-900/30 opacity-30 cursor-default'}`}>{isAvailable ? (<><div className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-500 shadow-[0_0_5px_#22c55e] rounded-full"></div><span className="mt-1 text-[9px] md:text-xs font-black text-green-400 leading-tight uppercase px-1 truncate w-full">{model.name}</span><span className="text-[8px] text-green-800 font-mono mt-1 hidden sm:block">{model.cost} PTS</span></>) : (<div className="flex flex-col items-center">{ArrowUpRight && <ArrowUpRight size={16} className="text-green-900 mb-1"/>}<span className="text-[8px] font-black text-green-900 uppercase tracking-widest">MISS.</span></div>)}<div className="absolute bottom-0.5 left-1 text-[7px] font-mono text-green-900">#{index+1}</div></button>); };
+        const EmptyState = ({ canEdit, Target }) => (<div className="flex flex-col items-center justify-center h-64 md:h-96 border border-dashed border-green-900 bg-green-900/5 rounded-lg m-2">{Target && <Target size={48} className="mb-4 text-green-900 opacity-50" />}<p className="text-sm font-bold uppercase text-green-800 tracking-widest">AUCUNE UNITÉ DÉPLOYÉE</p>{canEdit && <p className="text-xs text-green-900 mt-2">ACCÉDER AU GARAGE POUR DÉPLOIEMENT</p>}</div>);
+        const GarageSlot = ({ model, index, activeCount, onDeploy, ArrowUpRight }) => { const isAvailable = index >= activeCount; return (<button disabled={!isAvailable} onClick={isAvailable ? onDeploy : undefined} className={`relative p-1 md:p-3 border flex flex-col items-center justify-center text-center h-20 md:h-32 transition-all rounded ${isAvailable ? 'bg-green-900/10 border-green-800 hover:bg-green-900/30 hover:border-green-500 active:scale-95 group' : 'bg-black border-green-900/30 opacity-30 cursor-default'}`}>{isAvailable ? (<><div className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-500 shadow-[0_0_5px_#22c55e] rounded-full"></div><span className="mt-1 text-[9px] md:text-xs font-black text-green-400 leading-tight uppercase px-1 truncate w-full">{model.name}</span><span className="text-[8px] text-green-800 font-mono mt-1 hidden sm:block">{model.cost} PTS</span></>) : (<div className="flex flex-col items-center">{ArrowUpRight && <ArrowUpRight size={20} className="text-green-900 mb-1"/>}<span className="text-[9px] font-black text-green-900 uppercase tracking-widest">MISS.</span></div>)}<div className="absolute bottom-0.5 left-1 text-[7px] font-mono text-green-900">#{index+1}</div></button>); };
         const Modal = ({ title, color, onClose, children, Icon }) => (<div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"><div className={`bg-black border border-${color}-800 w-full max-w-lg p-4 md:p-6 relative shadow-[0_0_30px_rgba(0,0,0,0.5)] max-h-[90vh] overflow-y-auto rounded`}><div className="flex justify-between items-center mb-6"><h3 className={`text-lg font-black uppercase text-${color}-500 tracking-widest`}>{title}</h3><button onClick={onClose} className={`text-${color}-700 hover:text-${color}-400`}>{Icon && <Icon size={20} />}</button></div>{children}</div></div>);
         
         function StatusBtn({ label, active, color, onClick }) { const styles = { green: active ? 'bg-green-600 text-black' : 'bg-black text-green-700 border-green-900 hover:text-green-500', blue: active ? 'bg-blue-600 text-black' : 'bg-black text-blue-700 border-blue-900 hover:text-blue-500', orange: active ? 'bg-orange-600 text-black' : 'bg-black text-orange-700 border-orange-900 hover:text-orange-500', red: 'bg-black text-red-800 border-red-900 hover:text-red-500' }; return <button onClick={onClick} className={`text-[9px] font-black py-1 border ${styles[color]} transition-all uppercase rounded`}>{label}</button>; }
@@ -311,10 +321,18 @@
                 </div></div></div><button onClick={onShowLogs} className="text-green-900 hover:text-green-500 p-1 shrink-0">{List && <List size={14} />}</button></div>
                 
                 <div className="mt-auto space-y-2">
+                    {/* MISSION TYPE DISPLAY */}
+                    {unit.missionObjective && unit.status !== 'destroyed' && unit.status !== 'operational' && (
+                        <div className="text-[9px] font-bold text-gray-400 uppercase bg-black/50 px-1 border-l-2 border-blue-500">
+                            OBJ: {unit.missionObjective}
+                        </div>
+                    )}
+
                     {unit.status === 'destroyed' ? (
                         <div className="bg-red-900/10 border border-red-900/50 p-1 text-center mb-2 rounded"><p className="text-[8px] text-red-700 font-bold uppercase">CAUSE: {unit.reasonHS}</p></div>
                     ) : (
                         <>
+                            {/* PENDING */}
                             {unit.status === 'mission_pending' && (
                                 <div>
                                     {isMyUnit ? (
@@ -329,6 +347,7 @@
                                     )}
                                 </div>
                             )}
+                            {/* MISSION */}
                             {unit.status === 'mission' && (
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-1 justify-center">{Clock && <Clock size={10} className="text-blue-600"/>}<MissionTimer startTime={unit.missionStartTime} /></div>
@@ -341,6 +360,7 @@
                                     {isInCrew && <span className="block text-center text-[9px] text-gray-500 font-mono">MISSION EN COURS</span>}
                                 </div>
                             )}
+                            {/* RTB REQUEST */}
                             {unit.status === 'mission_rtb' && (
                                 <div className="text-center">
                                     {isSL ? (
@@ -350,6 +370,7 @@
                                     )}
                                 </div>
                             )}
+                            {/* STANDARD STATUS */}
                             {(unit.status === 'operational' || unit.status === 'damaged') && (
                                 isSL ? (
                                     <div className="grid grid-cols-4 gap-1">
@@ -464,6 +485,7 @@
             const [currentConfigId, setCurrentConfigId] = useState(null);
             const [inputReason, setInputReason] = useState('');
             const [selectedMemberId, setSelectedMemberId] = useState('');
+            const [selectedMissionType, setSelectedMissionType] = useState(''); // NEW STATE
             const [newModelData, setNewModelData] = useState({ name: '', cat: 'LOGI', type: '', cost: 0, stock: 1 });
             const [filterStatus, setFilterStatus] = useState('ALL');
             const [expandedCats, setExpandedCats] = useState(Object.keys(CATEGORIES).reduce((acc, key) => ({...acc, [key]: true}), {}));
@@ -494,7 +516,6 @@
                            if(localData.slName) setSlName(localData.slName);
                            if(typeof localData.isSlActive !== 'undefined') setIsSlActive(localData.isSlActive);
                            if(localData.configurations) setConfigurations(localData.configurations);
-                           if(localData.missions) setMissions(localData.missions); // NEW
                         }
                         setDataLoaded(true);
                     }
@@ -536,7 +557,6 @@
                         if(data.slName) setSlName(data.slName);
                         if(typeof data.isSlActive !== 'undefined') setIsSlActive(data.isSlActive);
                         if(data.configurations) setConfigurations(data.configurations);
-                        if(data.missions) setMissions(data.missions); // NEW
                     }
                     setDataLoaded(true);
                 });
@@ -555,8 +575,93 @@
                 const newLogs = [newLog, ...globalLogs].slice(0, 50); 
                 setGlobalLogs(newLogs); save('globalLogs', newLogs);
             };
-
+            
+            const clearJMO = () => { if(confirm("VIDER JMO ?")) { setGlobalLogs([]); save('globalLogs', []); } };
+            const updateStock = (id, d) => { if(!canEdit)return; const c = catalog.map(m=>m.id===id?{...m,stock:Math.max(0,m.stock+d)}:m); setCatalog(c); save('catalog', c); };
+            const deleteModel = (id) => { if(!canEdit||!confirm("Supprimer ?"))return; const c = catalog.filter(m=>m.id!==id); setCatalog(c); save('catalog', c); };
+            
+            const deployUnit = (id) => {
+                if(!canEdit) return;
+                const model = catalog.find(x=>x.id===id); if(!model) return;
+                if(activeUnits.filter(u=>u.modelId===id).length >= model.stock) return;
+                const source = supplySources[0];
+                if (!source || source.amount < model.cost) { alert(`SUPPLY INSUFFISANT !`); return; }
+                const newSupply = supplySources.map((s, i) => i === 0 ? { ...s, amount: s.amount - model.cost } : s);
+                setSupplySources(newSupply); save('supplySources', newSupply);
+                const u = { uuid: Date.now()+Math.random(), modelId: model.id, name: model.name, cat: model.cat, cost: model.cost, status: 'operational', responsible: 'BASE', crew: [], reasonHS: '', missionStartTime: null, deployTime: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), logs: [] };
+                const nu = [u, ...activeUnits]; setActiveUnits(nu); save('activeUnits', nu); logEvent('GARAGE', `DÉPLOIEMENT: ${model.name}`);
+            };
+            const createModel = () => { if(!canEdit||!newModelData.name)return; const m={id:`custom_${Date.now()}`, cat:newModelData.cat, name:newModelData.name.toUpperCase(), type:newModelData.type.toUpperCase()||'STD', cost:parseInt(newModelData.cost)||0, stock:parseInt(newModelData.stock)||1}; const c=[...catalog, m]; setCatalog(c); save('catalog', c); setShowCreateVehicleModal(false); setNewModelData({name:'',cat:'LOGI',type:'',cost:0,stock:1}); logEvent('GARAGE', `NOUVEAU MODÈLE: ${m.name}`); };
+            const toggleSlShift = () => { if(!canEdit||!slName)return; if (!isSlActive) setShowShiftCheckModal(true); else { const s=!isSlActive; setIsSlActive(s); save('isSlActive', s); save('slName', slName); logEvent('RH', `FIN SERVICE SL: ${slName}`); } };
+            const confirmShiftStart = () => { setIsSlActive(true); setShowShiftCheckModal(false); save('isSlActive', true); save('slName', slName); logEvent('RH', `PRISE POSTE SL: ${slName}`); };
+            const addSquadMember = (n) => { if(!canEdit||!n)return; const s=[...squad, {id:Date.now(), name:n.toUpperCase(), startTime:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}]; setSquad(s); save('squad', s); logEvent('RH', `RENFORT: ${n.toUpperCase()}`); };
+            const removeSquadMember = (id) => { if(!canEdit)return; const m=squad.find(x=>x.id===id); if(m && confirm(`DÉPART ${m.name} ?`)){ const s=squad.filter(x=>x.id!==id); setSquad(s); save('squad', s); logEvent('RH', `DÉPART: ${m.name}`); } };
+            const renameSquadMember = (id) => { if (!canEdit) return; const m = squad.find(x => x.id === id); if (!m) return; const nn = prompt("Nouveau nom :", m.name); if (nn && nn !== m.name) { const ns = squad.map(x => x.id === id ? { ...x, name: nn.toUpperCase() } : x); setSquad(ns); save('squad', ns); logEvent('RH', `NOM MODIFIÉ: ${m.name} -> ${nn.toUpperCase()}`); } };
+            
             const updateUnitData = (uuid, newData) => { const nu = activeUnits.map(u => u.uuid === uuid ? { ...u, ...newData } : u); setActiveUnits(nu); save('activeUnits', nu); };
+            
+            // WORKFLOW MISSION SL
+            const confirmMission = () => {
+                if (!actionModal) return;
+                let respName = "INDÉFINI";
+                let obj = selectedMissionType || "MISSION STANDARD"; // NEW
+                if (selectedMemberId === 'SL') respName = slName || "CHEF LOGI";
+                else { const member = squad.find(m => m.id === parseInt(selectedMemberId)); if (member) respName = member.name; }
+                updateUnitData(actionModal.unit.uuid, { 
+                    status: 'mission_pending', 
+                    responsible: respName,
+                    missionObjective: obj, // NEW
+                    logs: [...(actionModal.unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `ORDRE MISSION [${obj}] -> ${respName}` }]
+                });
+                logEvent('FLOTTE', `${actionModal.unit.name}: ORDRE MISSION (${obj}) POUR ${respName}`);
+                setActionModal(null);
+            };
+            const acceptMission = (unit) => { updateUnitData(unit.uuid, { status: 'mission', missionStartTime: Date.now(), logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DÉPART MISSION` }] }); logEvent('FLOTTE', `${unit.name}: DÉPART MISSION CONFIRMÉ`); };
+            const requestRTB = (unit) => { updateUnitData(unit.uuid, { status: 'mission_rtb', logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DEMANDE RTB` }] }); logEvent('FLOTTE', `${unit.name}: DEMANDE RTB`); };
+            const validateRTB = (unit) => { const durationMs = Date.now() - unit.missionStartTime; const minutes = Math.floor(durationMs / 60000); updateUnitData(unit.uuid, { status: 'operational', missionStartTime: null, responsible: 'BASE', crew: [], missionObjective: null, logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `RETOUR VALIDÉ (${minutes} min)` }] }); logEvent('FLOTTE', `${unit.name}: RETOUR VALIDÉ PAR SL`); };
+            const confirmDestruction = () => { if (!actionModal || !inputReason) return; updateUnitData(actionModal.unit.uuid, { status: 'destroyed', reasonHS: inputReason, missionStartTime: null, logs: [...(actionModal.unit.logs || []), {time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DÉTRUIT: ${inputReason}`}] }); setActionModal(null); };
+            const returnToBase = (uuid) => { if(!canEdit)return; if(confirm("FORCER RTB ?")) { const u=activeUnits.find(x=>x.uuid===uuid); const nu=activeUnits.filter(x=>x.uuid!==uuid); setActiveUnits(nu); save('activeUnits', nu); if(u) logEvent('GARAGE', `RTB FORCÉ: ${u.name}`); } };
+            const updateSupplySource = (id, f, v) => { if(!canEdit)return; const s=supplySources.map(x=>x.id===id?{...x,[f]:v}:x); setSupplySources(s); save('supplySources', s); };
+            const addSupplySource = () => { if(!canEdit)return; const s=[...supplySources, {id:Date.now(), name:'NOUVELLE SOURCE', amount:0}]; setSupplySources(s); save('supplySources', s); };
+            const removeSupplySource = (id) => { if(!canEdit||supplySources.length<=1)return; const s=supplySources.filter(x=>x.id!==id); setSupplySources(s); save('supplySources', s); };
+            const createConfig = () => { if(!canEdit)return; const c=[...configurations, {id:Date.now(), name:`PHASE ${configurations.length+1}`, content:{}}]; setConfigurations(c); setCurrentConfigId(c[c.length-1].id); save('configurations', c); };
+            const updateConfig = (cid, mid, d) => { if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return; const cnt=Math.max(0, (c.content[mid]||0)+d); const nc={...c.content, [mid]:cnt}; if(cnt===0) delete nc[mid]; const ncs=configurations.map(x=>x.id===cid?{...x, content:nc}:x); setConfigurations(ncs); save('configurations', ncs); };
+            const setConfigCount = (cid, mid, val) => { if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return; const cnt=Math.max(0, parseInt(val)||0); const nc={...c.content, [mid]:cnt}; if(cnt===0) delete nc[mid]; const ncs=configurations.map(x=>x.id===cid?{...x, content:nc}:x); setConfigurations(ncs); save('configurations', ncs); };
+            const renameConfig = (cid, val) => { if(!canEdit)return; const ncs=configurations.map(x=>x.id===cid?{...x, name:val.toUpperCase()}:x); setConfigurations(ncs); save('configurations', ncs); };
+            const deleteConfig = (cid) => { if(!canEdit||!confirm("Supprimer ?"))return; const ncs=configurations.filter(x=>x.id!==cid); setConfigurations(ncs); if(currentConfigId===cid) setCurrentConfigId(null); save('configurations', ncs); };
+            const deployConfig = (cid) => {
+                if(!canEdit)return; const config=configurations.find(x=>x.id===cid); if(!config)return;
+                let count=0; let nu=[...activeUnits]; let totalCost = 0; let pendingDeployment = [];
+                Object.entries(config.content).forEach(([mid, target]) => {
+                    const m=catalog.find(x=>x.id===mid); if(!m)return;
+                    const curr=nu.filter(u=>u.modelId===mid).length;
+                    const needed=target-curr;
+                    if(needed>0) {
+                        const avail=m.stock-curr;
+                        const toAdd=Math.min(needed, avail);
+                        if (toAdd > 0) { totalCost += toAdd * m.cost; pendingDeployment.push({ model: m, count: toAdd }); }
+                    }
+                });
+                const source = supplySources[0];
+                if (!source || source.amount < totalCost) { alert(`SUPPLY INSUFFISANT !\nCoût: ${totalCost}`); return; }
+                if(pendingDeployment.length > 0) {
+                    const newSupply = supplySources.map((s, i) => i === 0 ? { ...s, amount: s.amount - totalCost } : s);
+                    setSupplySources(newSupply); save('supplySources', newSupply);
+                    pendingDeployment.forEach(item => { for(let i=0;i<item.count;i++) { nu.push({uuid:Date.now()+Math.random()+i, modelId:item.model.id, name:item.model.name, cat:item.model.cat, cost:item.model.cost, status:'operational', responsible:'BASE', crew:[], reasonHS:'', missionStartTime:null, deployTime:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), logs:[]}); count++; } });
+                    setActiveUnits(nu); save('activeUnits', nu); logEvent('GARAGE', `DÉPLOIEMENT PHASE: ${config.name} (+${count} UNITÉS, -${totalCost} Supply)`); 
+                } else alert("Rien à déployer.");
+            };
+
+            // CREW MANAGEMENT
+            const addToCrew = (member) => {
+                if(!actionModal || !actionModal.unit) return;
+                const u = actionModal.unit;
+                const currentCrew = u.crew || [];
+                if(currentCrew.includes(member)) return;
+                const newCrew = [...currentCrew, member];
+                updateUnitData(u.uuid, { crew: newCrew });
+                setShowCrewModal(false);
+            };
 
             // SITREP LOGIC
             const openSitrepModal = (unit) => { setSitrepData({ unit: unit, location: '', status: 'green', message: '' }); setShowSitrepModal(true); };
@@ -628,77 +733,7 @@
                 }));
             };
 
-            // EXISTING FUNCTIONS (Redéclarées proprement)
-            const clearJMO = () => { if(confirm("VIDER JMO ?")) { setGlobalLogs([]); save('globalLogs', []); } };
-            const updateStock = (id, d) => { if(!canEdit)return; const c = catalog.map(m=>m.id===id?{...m,stock:Math.max(0,m.stock+d)}:m); setCatalog(c); save('catalog', c); };
-            const deleteModel = (id) => { if(!canEdit||!confirm("Supprimer ?"))return; const c = catalog.filter(m=>m.id!==id); setCatalog(c); save('catalog', c); };
-            const deployUnit = (id) => {
-                if(!canEdit) return;
-                const model = catalog.find(x=>x.id===id); if(!model) return;
-                if(activeUnits.filter(u=>u.modelId===id).length >= model.stock) return;
-                const source = supplySources[0];
-                if (!source || source.amount < model.cost) { alert(`SUPPLY INSUFFISANT !`); return; }
-                const newSupply = supplySources.map((s, i) => i === 0 ? { ...s, amount: s.amount - model.cost } : s);
-                setSupplySources(newSupply); save('supplySources', newSupply);
-                const u = { uuid: Date.now()+Math.random(), modelId: model.id, name: model.name, cat: model.cat, cost: model.cost, status: 'operational', responsible: 'BASE', crew: [], reasonHS: '', missionStartTime: null, deployTime: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), logs: [] };
-                const nu = [u, ...activeUnits]; setActiveUnits(nu); save('activeUnits', nu); logEvent('GARAGE', `DÉPLOIEMENT: ${model.name}`);
-            };
-            const createModel = () => { if(!canEdit||!newModelData.name)return; const m={id:`custom_${Date.now()}`, cat:newModelData.cat, name:newModelData.name.toUpperCase(), type:newModelData.type.toUpperCase()||'STD', cost:parseInt(newModelData.cost)||0, stock:parseInt(newModelData.stock)||1}; const c=[...catalog, m]; setCatalog(c); save('catalog', c); setShowCreateVehicleModal(false); setNewModelData({name:'',cat:'LOGI',type:'',cost:0,stock:1}); logEvent('GARAGE', `NOUVEAU MODÈLE: ${m.name}`); };
-            const toggleSlShift = () => { if(!canEdit||!slName)return; if (!isSlActive) setShowShiftCheckModal(true); else { const s=!isSlActive; setIsSlActive(s); save('isSlActive', s); save('slName', slName); logEvent('RH', `FIN SERVICE SL: ${slName}`); } };
-            const confirmShiftStart = () => { setIsSlActive(true); setShowShiftCheckModal(false); save('isSlActive', true); save('slName', slName); logEvent('RH', `PRISE POSTE SL: ${slName}`); };
-            const addSquadMember = (n) => { if(!canEdit||!n)return; const s=[...squad, {id:Date.now(), name:n.toUpperCase(), startTime:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}]; setSquad(s); save('squad', s); logEvent('RH', `RENFORT: ${n.toUpperCase()}`); };
-            const removeSquadMember = (id) => { if(!canEdit)return; const m=squad.find(x=>x.id===id); if(m && confirm(`DÉPART ${m.name} ?`)){ const s=squad.filter(x=>x.id!==id); setSquad(s); save('squad', s); logEvent('RH', `DÉPART: ${m.name}`); } };
-            const renameSquadMember = (id) => { if (!canEdit) return; const m = squad.find(x => x.id === id); if (!m) return; const nn = prompt("Nouveau nom :", m.name); if (nn && nn !== m.name) { const ns = squad.map(x => x.id === id ? { ...x, name: nn.toUpperCase() } : x); setSquad(ns); save('squad', ns); logEvent('RH', `NOM MODIFIÉ: ${m.name} -> ${nn.toUpperCase()}`); } };
-            
-            const confirmMission = () => { if (!actionModal) return; let respName = "INDÉFINI"; if (selectedMemberId === 'SL') respName = slName || "CHEF LOGI"; else { const member = squad.find(m => m.id === parseInt(selectedMemberId)); if (member) respName = member.name; } updateUnitData(actionModal.unit.uuid, { status: 'mission_pending', responsible: respName, logs: [...(actionModal.unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `ORDRE MISSION -> ${respName}` }] }); logEvent('FLOTTE', `${actionModal.unit.name}: ORDRE MISSION POUR ${respName}`); setActionModal(null); };
-            const acceptMission = (unit) => { updateUnitData(unit.uuid, { status: 'mission', missionStartTime: Date.now(), logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DÉPART MISSION` }] }); logEvent('FLOTTE', `${unit.name}: DÉPART MISSION CONFIRMÉ`); };
-            const requestRTB = (unit) => { updateUnitData(unit.uuid, { status: 'mission_rtb', logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DEMANDE RTB` }] }); logEvent('FLOTTE', `${unit.name}: DEMANDE RTB`); };
-            const validateRTB = (unit) => { const durationMs = Date.now() - unit.missionStartTime; const minutes = Math.floor(durationMs / 60000); updateUnitData(unit.uuid, { status: 'operational', missionStartTime: null, responsible: 'BASE', crew: [], logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `RETOUR VALIDÉ (${minutes} min)` }] }); logEvent('FLOTTE', `${unit.name}: RETOUR VALIDÉ PAR SL`); };
-            const confirmDestruction = () => { if (!actionModal || !inputReason) return; updateUnitData(actionModal.unit.uuid, { status: 'destroyed', reasonHS: inputReason, missionStartTime: null, logs: [...(actionModal.unit.logs || []), {time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DÉTRUIT: ${inputReason}`}] }); setActionModal(null); };
-            const returnToBase = (uuid) => { if(!canEdit)return; if(confirm("FORCER RTB ?")) { const u=activeUnits.find(x=>x.uuid===uuid); const nu=activeUnits.filter(x=>x.uuid!==uuid); setActiveUnits(nu); save('activeUnits', nu); if(u) logEvent('GARAGE', `RTB FORCÉ: ${u.name}`); } };
-            const updateSupplySource = (id, f, v) => { if(!canEdit)return; const s=supplySources.map(x=>x.id===id?{...x,[f]:v}:x); setSupplySources(s); save('supplySources', s); };
-            const addSupplySource = () => { if(!canEdit)return; const s=[...supplySources, {id:Date.now(), name:'NOUVELLE SOURCE', amount:0}]; setSupplySources(s); save('supplySources', s); };
-            const removeSupplySource = (id) => { if(!canEdit||supplySources.length<=1)return; const s=supplySources.filter(x=>x.id!==id); setSupplySources(s); save('supplySources', s); };
-            const createConfig = () => { if(!canEdit)return; const c=[...configurations, {id:Date.now(), name:`PHASE ${configurations.length+1}`, content:{}}]; setConfigurations(c); setCurrentConfigId(c[c.length-1].id); save('configurations', c); };
-            const updateConfig = (cid, mid, d) => { if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return; const cnt=Math.max(0, (c.content[mid]||0)+d); const nc={...c.content, [mid]:cnt}; if(cnt===0) delete nc[mid]; const ncs=configurations.map(x=>x.id===cid?{...x, content:nc}:x); setConfigurations(ncs); save('configurations', ncs); };
-            const setConfigCount = (cid, mid, val) => { if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return; const cnt=Math.max(0, parseInt(val)||0); const nc={...c.content, [mid]:cnt}; if(cnt===0) delete nc[mid]; const ncs=configurations.map(x=>x.id===cid?{...x, content:nc}:x); setConfigurations(ncs); save('configurations', ncs); };
-            const renameConfig = (cid, val) => { if(!canEdit)return; const ncs=configurations.map(x=>x.id===cid?{...x, name:val.toUpperCase()}:x); setConfigurations(ncs); save('configurations', ncs); };
-            const deleteConfig = (cid) => { if(!canEdit||!confirm("Supprimer ?"))return; const ncs=configurations.filter(x=>x.id!==cid); setConfigurations(ncs); if(currentConfigId===cid) setCurrentConfigId(null); save('configurations', ncs); };
-            const deployConfig = (cid) => {
-                if(!canEdit)return; const config=configurations.find(x=>x.id===cid); if(!config)return;
-                let count=0; let nu=[...activeUnits]; let totalCost = 0; let pendingDeployment = [];
-                Object.entries(config.content).forEach(([mid, target]) => {
-                    const m=catalog.find(x=>x.id===mid); if(!m)return;
-                    const curr=nu.filter(u=>u.modelId===mid).length;
-                    const needed=target-curr;
-                    if(needed>0) {
-                        const avail=m.stock-curr;
-                        const toAdd=Math.min(needed, avail);
-                        if (toAdd > 0) { totalCost += toAdd * m.cost; pendingDeployment.push({ model: m, count: toAdd }); }
-                    }
-                });
-                const source = supplySources[0];
-                if (!source || source.amount < totalCost) { alert(`SUPPLY INSUFFISANT !\nCoût: ${totalCost}`); return; }
-                if(pendingDeployment.length > 0) {
-                    const newSupply = supplySources.map((s, i) => i === 0 ? { ...s, amount: s.amount - totalCost } : s);
-                    setSupplySources(newSupply); save('supplySources', newSupply);
-                    pendingDeployment.forEach(item => { for(let i=0;i<item.count;i++) { nu.push({uuid:Date.now()+Math.random()+i, modelId:item.model.id, name:item.model.name, cat:item.model.cat, cost:item.model.cost, status:'operational', responsible:'BASE', crew:[], reasonHS:'', missionStartTime:null, deployTime:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), logs:[]}); count++; } });
-                    setActiveUnits(nu); save('activeUnits', nu); logEvent('GARAGE', `DÉPLOIEMENT PHASE: ${config.name} (+${count} UNITÉS, -${totalCost} Supply)`); 
-                } else alert("Rien à déployer.");
-            };
-
-            // CREW MANAGEMENT
-            const addToCrew = (member) => {
-                if(!actionModal || !actionModal.unit) return;
-                const u = actionModal.unit;
-                const currentCrew = u.crew || [];
-                if(currentCrew.includes(member)) return;
-                const newCrew = [...currentCrew, member];
-                updateUnitData(u.uuid, { crew: newCrew });
-                setShowCrewModal(false);
-            };
-
-            const handleStatusClick = (unit, targetStatus) => { if (!canEdit) return; if (unit.status === targetStatus && targetStatus !== 'mission') return; if (targetStatus === 'mission') { setSelectedMemberId(''); setActionModal({ type: 'mission', unit }); } else if (targetStatus === 'destroyed') { setInputReason(''); setActionModal({ type: 'destroy', unit }); } else { updateUnitData(unit.uuid, { status: targetStatus }); } };
+            const handleStatusClick = (unit, targetStatus) => { if (!canEdit) return; if (unit.status === targetStatus && targetStatus !== 'mission') return; if (targetStatus === 'mission') { setSelectedMemberId(''); setSelectedMissionType(''); setActionModal({ type: 'mission', unit }); } else if (targetStatus === 'destroyed') { setInputReason(''); setActionModal({ type: 'destroy', unit }); } else { updateUnitData(unit.uuid, { status: targetStatus }); } };
             const toggleCat = (key) => setExpandedCats(prev => ({...prev, [key]: !prev[key]}));
             const stats = useMemo(() => ({ deployedCost: activeUnits.reduce((s, u) => s + (u.status!=='stored'?u.cost:0), 0), destroyedCount: activeUnits.filter(u => u.status === 'destroyed').length, missionCount: activeUnits.filter(u => u.status === 'mission').length, repairCount: activeUnits.filter(u => u.status === 'damaged').length, operationalCount: activeUnits.filter(u => u.status === 'operational').length, totalVehicles: activeUnits.length, activeCount: activeUnits.length, totalSupply: supplySources.reduce((a, s) => a + (parseInt(s.amount)||0), 0) }), [activeUnits, supplySources]);
             const Activity = Icons['Activity']; const Database = Icons['Database']; const LayoutDashboard = Icons['LayoutDashboard']; const Warehouse = Icons['Warehouse']; const Users = Icons['Users']; const ScrollText = Icons['ScrollText']; const Target = Icons['Target']; const Shield = Icons['Shield']; const Plus = Icons['Plus']; const Wifi = Icons['Wifi']; const LogOut = Icons['LogOut']; const ArrowUpRight = Icons['ArrowUpRight']; const Settings = Icons['Settings']; const XCircle = Icons['XCircle']; const Trash2 = Icons['Trash2']; const RotateCcw = Icons['RotateCcw']; const Clock = Icons['Clock']; const List = Icons['List']; const Play = Icons['Play']; const PlusCircle = Icons['PlusCircle']; const MinusCircle = Icons['MinusCircle']; const Power = Icons['Power']; const ChevronDown = Icons['ChevronDown']; const Edit = Icons['Edit']; const Wrench = Icons['Wrench']; const AlertOctagon = Icons['AlertOctagon']; const Check = Icons['Check']; const Send = Icons['Send']; const MessageSquare = Icons['MessageSquare']; const ClipboardList = Icons['ClipboardList']; const Calendar = Icons['Calendar']; const CheckSquare = Icons['CheckSquare'];
@@ -732,7 +767,7 @@
                         <div className="flex items-center gap-4">
                             <div className="p-1.5 rounded">{Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}</div>
                             <div>
-                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V11.3</span></h1>
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V11.4</span></h1>
                                 <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
                                     <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}><div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>SL: {slName || "N/A"}</span>
                                     <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
@@ -970,7 +1005,6 @@
                                     )}
                                 </div>
                             )}
-
                         </main>
                     </div>
 
@@ -1018,13 +1052,25 @@
                     {/* OTHER MODALS (Mission, Destroy, etc.) same as before */}
                     {actionModal?.type === 'mission' && (
                         <Modal title="ORDRE DE MISSION" color="blue" onClose={()=>setActionModal(null)} Icon={XCircle}>
-                            <div className="mb-6">
-                                <label className="text-[10px] font-bold text-blue-800 block mb-1">CHEF DE BORD</label>
-                                <select value={selectedMemberId} onChange={(e) => setSelectedMemberId(e.target.value)} className="w-full bg-blue-900/10 border border-blue-800 p-3 text-blue-300 text-sm font-bold outline-none"><option value="">-- SÉLECTIONNER --</option>{slName&&<option value="SL">SL - {slName}</option>}{squad.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select>
+                            <div className="mb-6 space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">CHEF DE BORD</label>
+                                    <select value={selectedMemberId} onChange={(e) => setSelectedMemberId(e.target.value)} className="w-full bg-blue-900/10 border border-blue-800 p-3 text-blue-300 text-sm font-bold outline-none"><option value="">-- SÉLECTIONNER --</option>{slName&&<option value="SL">SL - {slName}</option>}{squad.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select>
+                                </div>
+                                {/* NEW: MISSION OBJECTIVE SELECTOR */}
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">OBJECTIF / TYPE DE MISSION</label>
+                                    <select value={selectedMissionType} onChange={(e) => setSelectedMissionType(e.target.value)} className="w-full bg-blue-900/10 border border-blue-800 p-3 text-blue-300 text-sm font-bold outline-none">
+                                        <option value="">-- SÉLECTIONNER TYPE --</option>
+                                        {MISSION_TYPES[actionModal.unit.cat] && MISSION_TYPES[actionModal.unit.cat].map(mission => (
+                                            <option key={mission} value={mission}>{mission}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <button onClick={() => setActionModal(null)} className="py-3 border border-blue-900 text-blue-500 font-bold text-xs">ANNULER</button>
-                                <button onClick={confirmMission} disabled={!selectedMemberId} className="py-3 bg-blue-600 text-black font-black text-xs hover:bg-blue-500">DÉPART</button>
+                                <button onClick={confirmMission} disabled={!selectedMemberId || !selectedMissionType} className="py-3 bg-blue-600 text-black font-black text-xs hover:bg-blue-500 disabled:opacity-50">DÉPART</button>
                             </div>
                         </Modal>
                     )}
