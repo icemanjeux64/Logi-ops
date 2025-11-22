@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V12.3 (TRACKING)</title>
+    <title>LOGI-OPS V12.4 (FINAL)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -38,11 +38,12 @@
             animation: scan 2s linear infinite;
         }
         @keyframes scan { 0% { background-position: 0 0; } 100% { background-position: 0 100%; } }
-        @keyframes flash-red {
-            0%, 100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.8); }
-            50% { box-shadow: 0 0 40px rgba(239, 68, 68, 0.5); border-color: rgba(239, 68, 68, 1); }
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); border-color: rgba(34, 197, 94, 0.6); }
+            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); border-color: rgba(34, 197, 94, 1); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); border-color: rgba(34, 197, 94, 0.6); }
         }
-        .animate-alert { animation: flash-red 2s infinite; }
+        .border-pulse-user { animation: pulse-green 2s infinite; }
     </style>
 </head>
 <body>
@@ -124,7 +125,7 @@
 
         const { useState, useMemo, useEffect } = React;
 
-        // ... (Données Statiques identiques)
+        // ... (Données Statiques - Identiques)
         const INITIAL_CATALOG = [
             { id: 'l1', cat: 'LOGI', name: 'JEEP EM', type: 'TRANSPORT EM', cost: 110, stock: 2 },
             { id: 'l2', cat: 'LOGI', name: 'CAMION RÉPA.', type: 'MAINTENANCE', cost: 175, stock: 1 },
@@ -373,7 +374,7 @@
                                         <div className="text-center space-y-2">
                                             <div className="text-[9px] text-blue-300 font-mono animate-pulse">RETOUR BASE EN COURS</div>
                                             {isMyUnit && (
-                                                <button onClick={onConfirmArrival} className="w-full py-1.5 bg-green-900/30 border border-green-600 text-green-400 font-black text-[10px] hover:bg-green-900/50 rounded flex items-center justify-center gap-1">{Check && <CheckSquare size={12}/>} ARRIVÉE BASE</button>
+                                                <button onClick={onConfirmArrival} className="w-full py-1.5 bg-green-900/30 border border-green-600 text-green-400 font-black text-[10px] hover:bg-green-900/50 rounded flex items-center justify-center gap-1">{CheckSquare && <CheckSquare size={12}/>} ARRIVÉE BASE</button>
                                             )}
                                         </div>
                                     )}
@@ -471,6 +472,7 @@
         // 5. APPLICATION PRINCIPALE
         // ==========================================
         function LogiOpsV9() {
+            // ... (States and Logic)
             const [userRole, setUserRole] = useState(null); 
             const [userIdentity, setUserIdentity] = useState(null); 
             const [activeTab, setActiveTab] = useState('dashboard'); 
@@ -780,6 +782,7 @@
                     
                     {notification && <NotificationToast message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
 
+                    {/* MODAL: INCOMING SITREP (SL VIEW) */}
                     {incomingSitrep && (
                         <Modal title="SITREP REÇU" color="blue" onClose={() => setIncomingSitrep(null)} Icon={MessageSquare}>
                             <div className="text-center mb-4">
@@ -799,7 +802,7 @@
                         <div className="flex items-center gap-4">
                             <div className="p-1.5 rounded">{Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}</div>
                             <div>
-                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V12.0</span></h1>
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V12.2</span></h1>
                                 <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
                                     <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}><div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>SL: {slName || "N/A"}</span>
                                     <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
@@ -984,6 +987,35 @@
                                                             <span>|</span>
                                                             <span>PAX: {missions.find(m=>m.id===selectedMissionId)?.participants?.length || 0}</span>
                                                         </div>
+                                                        
+                                                        {/* ACTIONS EN HAUT A DROITE (FIXED) */}
+                                                        {!canEdit && selectedMissionId && (
+                                                            <div className="flex gap-2 mt-2">
+                                                                {/* Logique "Rejoindre" ou "Prendre Commandement" */}
+                                                                {(() => {
+                                                                    const currentMission = missions.find(m => m.id === selectedMissionId);
+                                                                    if (!currentMission) return null;
+                                                                    const isLeader = currentMission.leader === userIdentity;
+                                                                    const hasJoined = currentMission.participants?.includes(userIdentity);
+                                                                    
+                                                                    if (!currentMission.leader) {
+                                                                        return (
+                                                                            <button onClick={() => takeMissionCommand(currentMission.id)} className="px-4 py-2 border border-green-500 text-green-400 font-black text-[10px] hover:bg-green-900/30 uppercase flex items-center gap-2">
+                                                                                {Star && <Star size={14}/>} PRENDRE LE COMMANDEMENT
+                                                                            </button>
+                                                                        );
+                                                                    }
+                                                                    if (currentMission.leader && !hasJoined) {
+                                                                        return (
+                                                                            <button onClick={() => joinMission(currentMission.id)} className="px-4 py-2 border border-blue-500 text-blue-400 font-black text-[10px] hover:bg-blue-900/30 uppercase flex items-center gap-2">
+                                                                                {UserPlus && <UserPlus size={14}/>} REJOINDRE L'UNITÉ
+                                                                            </button>
+                                                                        );
+                                                                    }
+                                                                    return null;
+                                                                })()}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 {canEdit && (
