@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V9.3 (STABLE)</title>
+    <title>LOGI-OPS V9.4 (STABLE)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -216,7 +216,7 @@
 
             const handleSL = (e) => {
                 e.preventDefault();
-                if (username === 'SLLOGI' && password === 'sllogi') { onLogin('SL'); } else { setError('IDENTIFIANTS INCORRECTS'); }
+                if (username === 'SLLogi' && password === 'sllogie') { onLogin('SL'); } else { setError('IDENTIFIANTS INCORRECTS'); }
             };
 
             return (
@@ -324,6 +324,14 @@
                 setGlobalLogs(newLogs); save('globalLogs', newLogs);
             };
             
+            // NOUVEAU : RESET JMO
+            const clearJMO = () => {
+                if(confirm("ATTENTION : VOUS ÊTES SUR LE POINT D'EFFACER TOUT L'HISTORIQUE.\n\nCONFIRMER LA SUPPRESSION DÉFINITIVE ?")) {
+                    setGlobalLogs([]);
+                    save('globalLogs', []);
+                }
+            };
+
             const updateStock = (id, d) => { if(!canEdit)return; const c = catalog.map(m=>m.id===id?{...m,stock:Math.max(0,m.stock+d)}:m); setCatalog(c); save('catalog', c); };
             const deleteModel = (id) => { if(!canEdit||!confirm("Supprimer ?"))return; const c = catalog.filter(m=>m.id!==id); setCatalog(c); save('catalog', c); };
             const deployUnit = (id) => {
@@ -348,7 +356,6 @@
                 } 
             };
             
-            // NOUVEAU: Fonction pour renommer un membre
             const renameSquadMember = (id) => {
                 if (!canEdit) return;
                 const member = squad.find(m => m.id === id);
@@ -384,7 +391,10 @@
             const createConfig = () => { if(!canEdit)return; const c=[...configurations, {id:Date.now(), name:`PHASE ${configurations.length+1}`, content:{}}]; setConfigurations(c); setCurrentConfigId(c[c.length-1].id); save('configurations', c); };
             const updateConfig = (cid, mid, d) => { if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return; const cnt=Math.max(0, (c.content[mid]||0)+d); const nc={...c.content, [mid]:cnt}; if(cnt===0) delete nc[mid]; const ncs=configurations.map(x=>x.id===cid?{...x, content:nc}:x); setConfigurations(ncs); save('configurations', ncs); };
             const setConfigCount = (cid, mid, val) => { if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return; const cnt=Math.max(0, parseInt(val)||0); const nc={...c.content, [mid]:cnt}; if(cnt===0) delete nc[mid]; const ncs=configurations.map(x=>x.id===cid?{...x, content:nc}:x); setConfigurations(ncs); save('configurations', ncs); };
-            const renameConfig = (cid, val) => { if(!canEdit)return; const ncs=configurations.map(x=>x.id===cid?{...x, name:val.toUpperCase()}:x); setConfigurations(ncs); save('configurations', ncs); };
+            
+            // FIX: RenameConfig logic fix (was renameConfiguration in call)
+            const renameConfiguration = (cid, val) => { if(!canEdit)return; const ncs=configurations.map(x=>x.id===cid?{...x, name:val.toUpperCase()}:x); setConfigurations(ncs); save('configurations', ncs); };
+            
             const deleteConfig = (cid) => { if(!canEdit||!confirm("Supprimer ?"))return; const ncs=configurations.filter(x=>x.id!==cid); setConfigurations(ncs); if(currentConfigId===cid) setCurrentConfigId(null); save('configurations', ncs); };
             const deployConfig = (cid) => {
                 if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return;
@@ -439,7 +449,7 @@
                         <div className="flex items-center gap-4">
                             <div className="p-1.5 rounded">{Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}</div>
                             <div>
-                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V9.3</span></h1>
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V9.4</span></h1>
                                 <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
                                     <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}><div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>SL: {slName || "N/A"}</span>
                                     <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
@@ -494,15 +504,12 @@
 
                                                 return (
                                                     <div key={catKey} className="border border-green-900/30 bg-green-900/5 mb-1">
-                                                        {/* ACCORDION HEADER */}
                                                         <div onClick={() => toggleCat(catKey)} className={`flex items-center justify-between p-3 cursor-pointer hover:bg-green-900/10 transition-colors ${isOpen ? 'border-b border-green-900/30' : ''}`}>
                                                             <div className="flex items-center gap-3">
                                                                 <span className={`text-${conf.color.split('-')[1]}-500`}><Icon name={conf.icon} size={20} /></span>
                                                                 <span className="font-black text-sm text-gray-300 tracking-wider">{conf.label}</span>
                                                                 <span className="text-xs font-mono text-green-600 bg-green-900/20 px-2 py-0.5 rounded ml-2">{unitsInCat.length}</span>
                                                             </div>
-                                                            
-                                                            {/* STATS SUMMARY IN HEADER */}
                                                             <div className="flex items-center gap-4">
                                                                 <div className="flex gap-2 text-[10px] font-bold uppercase mr-4">
                                                                     {stats.mis > 0 && <span className="text-blue-500 bg-blue-900/20 px-1.5 py-0.5 rounded border border-blue-900/30">MIS: {stats.mis}</span>}
@@ -512,8 +519,6 @@
                                                                 {ChevronDown && <ChevronDown size={16} className={`text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />}
                                                             </div>
                                                         </div>
-
-                                                        {/* ACCORDION CONTENT */}
                                                         {isOpen && (
                                                             <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 animate-in fade-in">
                                                                 {unitsInCat.map(unit => (
@@ -626,7 +631,10 @@
                                     )}
                                     {activeTab === 'journal' && canEdit && (
                                         <div className="bg-black border border-green-900/50 p-6">
-                                            <h2 className="text-sm font-black text-green-500 mb-4 flex gap-2 items-center border-b border-green-900 pb-2">{ScrollText && <ScrollText size={16}/>} JMO</h2>
+                                            <div className="flex justify-between items-center border-b border-green-900 pb-2 mb-4">
+                                                <h2 className="text-sm font-black text-green-500 flex gap-2 items-center">{ScrollText && <ScrollText size={16}/>} JMO</h2>
+                                                <button onClick={clearJMO} className="text-red-500 hover:text-red-400" title="Vider le journal">{Trash2 && <Trash2 size={16} />}</button>
+                                            </div>
                                             <div className="space-y-0 font-mono text-xs md:text-sm">
                                                 {globalLogs.map(log => (
                                                     <div key={log.id} className="flex gap-4 py-2 border-b border-green-900/10 text-green-400 hover:bg-green-900/5 px-2">
@@ -651,7 +659,6 @@
                     </nav>
 
                     {/* MODALES */}
-                    
                     {actionModal?.type === 'mission' && (
                         <Modal title="ORDRE DE MISSION" color="blue" onClose={()=>setActionModal(null)} Icon={XCircle}>
                             <div className="mb-6">
@@ -683,10 +690,25 @@
                                 <div className="flex-1 flex overflow-hidden">
                                     <div className="w-1/3 border-r border-blue-900/50 overflow-y-auto p-2 bg-black space-y-2"><button onClick={createConfig} className="w-full py-3 border border-dashed border-blue-700 text-blue-500 text-xs font-bold">NOUVELLE PHASE</button>{configurations.map(c=><div key={c.id} onClick={()=>setCurrentConfigId(c.id)} className={`p-3 border cursor-pointer flex justify-between ${currentConfigId===c.id?'bg-blue-900/20 border-blue-500':'border-blue-900/30 hover:bg-blue-900/10'}`}><span className="text-blue-400 font-bold text-xs">{c.name}</span><button onClick={(e)=>{e.stopPropagation();deleteConfig(c.id)}} className="text-blue-800 hover:text-red-500"><Trash2 size={14}/></button></div>)}</div>
                                     <div className="w-2/3 overflow-y-auto p-4 bg-black">
-                                        {currentConfigId && catalog.map(m => {
-                                            const cnt = configurations.find(x=>x.id===currentConfigId)?.content[m.id]||0;
-                                            return (<div key={m.id} className={`flex justify-between items-center p-2 border mb-2 ${cnt>0?'border-blue-600 bg-blue-900/10':'border-blue-900/20 opacity-50'}`}><span className="text-xs font-bold text-gray-400 w-1/2 truncate">{m.name}</span><div className="flex items-center gap-2"><button onClick={()=>updateConfig(currentConfigId,m.id,-1)} className="text-blue-500"><MinusCircle size={16}/></button><input type="number" value={cnt} onChange={(e)=>setConfigCount(currentConfigId,m.id,e.target.value)} className="w-10 bg-transparent text-center text-blue-400 font-bold border-b border-blue-900" /><button onClick={()=>updateConfig(currentConfigId,m.id,1)} className="text-blue-500"><PlusCircle size={16}/></button></div></div>)
-                                        })}
+                                        {currentConfigId && (
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-2 border-b border-blue-900 pb-2 mb-4">
+                                                    <span className="text-[10px] font-bold text-blue-700">NOM :</span>
+                                                    <input 
+                                                        type="text" 
+                                                        value={configurations.find(c => c.id === currentConfigId)?.name || ''}
+                                                        onChange={(e) => renameConfiguration(currentConfigId, e.target.value)}
+                                                        className="bg-transparent text-blue-400 font-black uppercase outline-none w-full"
+                                                    />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {catalog.map(m => {
+                                                        const cnt = configurations.find(x=>x.id===currentConfigId)?.content[m.id]||0;
+                                                        return (<div key={m.id} className={`flex justify-between items-center p-2 border mb-2 ${cnt>0?'border-blue-600 bg-blue-900/10':'border-blue-900/20 opacity-50'}`}><span className="text-xs font-bold text-gray-400 w-1/2 truncate">{m.name}</span><div className="flex items-center gap-2"><button onClick={()=>updateConfig(currentConfigId,m.id,-1)} className="text-blue-500"><MinusCircle size={16}/></button><input type="number" value={cnt} onChange={(e)=>setConfigCount(currentConfigId,m.id,e.target.value)} className="w-10 bg-transparent text-center text-blue-400 font-bold border-b border-blue-900" /><button onClick={()=>updateConfig(currentConfigId,m.id,1)} className="text-blue-500"><PlusCircle size={16}/></button></div></div>)
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="p-3 border-t border-blue-900 bg-black flex justify-end">
@@ -790,7 +812,6 @@
             );
         };
 
-        // Composant Modal Générique pour simplifier le code
         const Modal = ({ title, color, onClose, children, Icon }) => (
             <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
                 <div className={`bg-black border border-${color}-800 w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(0,0,0,0.5)]`}>
@@ -803,15 +824,13 @@
             </div>
         );
 
-        // --- UnitCard déjà défini plus haut, reprise standard pour Desktop ---
-        // (Note: Je réutilise la fonction UnitCard existante mais adaptée pour les grids larges)
         function UnitCard({ unit, onStatusChange, onEndMission, onRTB, onShowLogs, Icons, readOnly }) {
             let borderColor = 'border-green-600'; let statusText = 'text-green-500';
             if (unit.status === 'mission') { borderColor = 'border-blue-600'; statusText = 'text-blue-500'; }
             else if (unit.status === 'damaged') { borderColor = 'border-orange-600'; statusText = 'text-orange-500'; }
             else if (unit.status === 'destroyed') { borderColor = 'border-red-600'; statusText = 'text-red-600'; }
             
-            const IconComp = Icons[CATEGORIES[unit.cat]?.icon || 'Truck']; // Fallback icon
+            const IconComp = Icons[CATEGORIES[unit.cat]?.icon || 'Truck'];
             const List = Icons['List']; const Clock = Icons['Clock']; const RotateCcw = Icons['RotateCcw']; const XCircle = Icons['XCircle'];
 
             return (
