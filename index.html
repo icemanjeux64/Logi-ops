@@ -15,7 +15,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Lucide Icons (Version Fixe 0.263.1) -->
+    <!-- Lucide Icons (Version FIXÉE à 0.263.1) -->
     <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
 
     <!-- FIREBASE (Base de données) -->
@@ -25,20 +25,19 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
-        body { font-family: 'JetBrains Mono', monospace; background-color: #050505; }
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        body { font-family: 'JetBrains Mono', monospace; background-color: #050505; overflow: hidden; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #14532d; }
         ::-webkit-scrollbar-thumb { background: #14532d; border: 1px solid #000; }
         ::-webkit-scrollbar-thumb:hover { background: #22c55e; }
-        @keyframes scanline { 0% { transform: translateY(0); } 100% { transform: translateY(100vh); } }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
         
-        /* Animation login */
         .login-scan {
             background: linear-gradient(to bottom, transparent 50%, rgba(0, 255, 0, 0.02) 51%, transparent 51%);
             background-size: 100% 4px;
             animation: scan 2s linear infinite;
         }
+        @keyframes scan { 0% { background-position: 0 0; } 100% { background-position: 0 100%; } }
     </style>
 </head>
 <body>
@@ -56,7 +55,7 @@
             measurementId: "G-FFMXKH47M9"
         };
 
-        // --- LOGIQUE DE DÉTECTION & STORAGE ---
+        // --- LOGIQUE STORAGE ---
         let db = null;
         let USE_FIREBASE = false;
         const isConfigured = firebaseConfig.projectId !== "PROJECT_ID";
@@ -82,7 +81,6 @@
                 USE_FIREBASE = false;
             }
         } else {
-            console.log("Mode: LOCAL (Offline)");
             USE_FIREBASE = false;
         }
 
@@ -92,13 +90,19 @@
         const StorageService = {
             save: (data) => {
                 if (USE_FIREBASE && db) {
-                    db.collection('logiops').doc(SESSION_ID).set(data, { merge: true }).catch(err => console.warn("Erreur save cloud:", err));
+                    db.collection('logiops').doc(SESSION_ID).set(data, { merge: true }).catch(err => console.warn(err));
                 } else {
                     try {
                         const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
                         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...existing, ...data }));
-                    } catch (e) { console.warn("Erreur save local:", e); }
+                    } catch (e) { console.warn(e); }
                 }
+            },
+            loadLocal: () => {
+                try {
+                    const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+                    return local ? JSON.parse(local) : null;
+                } catch (e) { return null; }
             },
             loadInitial: (callback) => {
                 if (USE_FIREBASE && db) {
@@ -118,43 +122,47 @@
 
         const { useState, useMemo, useEffect } = React;
 
-        // --- COMPOSANT ICONE UNIVERSEL (Anti-Crash) ---
-        const Icon = ({ name, size = 24, className, ...props }) => {
-            // Sécurité si Lucide n'est pas chargé
-            if (typeof lucide === 'undefined' || !lucide.icons) return null;
-
-            // Normalisation du nom (minuscule/majuscule)
-            const keys = Object.keys(lucide.icons);
-            const key = keys.find(k => k.toLowerCase() === name.toLowerCase());
-            
-            if (!key) return null; // Icône non trouvée
-
-            const iconData = lucide.icons[key];
-            // Sécurité structure données (Version 0.263.1 = Array)
-            if (!Array.isArray(iconData)) return null;
-
-            const [tag, attrs, children] = iconData;
-            
-            return React.createElement(
-                tag,
-                {
-                    ...attrs,
-                    width: size,
-                    height: size,
-                    className: className,
-                    ...props,
-                    stroke: props.color || "currentColor",
-                    strokeWidth: props.strokeWidth || 2,
-                    strokeLinecap: "round",
-                    strokeLinejoin: "round"
-                },
-                Array.isArray(children) 
-                    ? children.map(([childTag, childAttrs], i) => React.createElement(childTag, { ...childAttrs, key: i })) 
-                    : null
-            );
+        // --- SYSTÈME D'ICÔNES HYBRIDE (FALLBACK INTÉGRÉ) ---
+        const SVG_PATHS = {
+            'Power': <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />,
+            'Activity': <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
+            'Shield': <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+            'Lock': <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>,
+            'User': <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
+            'Menu': <><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></>
         };
 
-        // --- DONNÉES & CONFIG ---
+        const Icon = ({ name, size = 24, className, ...props }) => {
+            if (typeof lucide !== 'undefined' && lucide.icons) {
+                const keys = Object.keys(lucide.icons);
+                const key = keys.find(k => k.toLowerCase() === name.toLowerCase());
+                if (key) {
+                    const iconData = lucide.icons[key];
+                    if (Array.isArray(iconData)) {
+                        const [tag, attrs, children] = iconData;
+                        return React.createElement(tag, { ...attrs, width: size, height: size, className, ...props, stroke: props.color || "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }, 
+                            children.map(([childTag, childAttrs], i) => React.createElement(childTag, { ...childAttrs, key: i }))
+                        );
+                    }
+                }
+            }
+            const fallbackContent = SVG_PATHS[name];
+            if (fallbackContent) {
+                return (
+                    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        {fallbackContent}
+                    </svg>
+                );
+            }
+            return null;
+        };
+
+        const Icons = {};
+        ['Truck','Activity','AlertTriangle','Crosshair','Shield','Plane','Package','Plus','ArrowRight','RotateCcw','XCircle','LayoutGrid','List','PlayCircle','CheckCircle','Wrench','Skull','MapPin','User','FileText','Clock','ArrowUpRight','PieChart','BarChart3','Timer','Database','Trash2','Save','Users','UserPlus','UserMinus','LogOut','ScrollText','Warehouse','LayoutDashboard','Settings','Target','Radio','Wifi','PlusCircle','MinusCircle','Edit','Play','Lock','Unlock','Menu','Power'].forEach(name => {
+            Icons[name] = (props) => <Icon name={name} {...props} />;
+        });
+
+        // --- DATA ---
         const INITIAL_CATALOG = [
             { id: 'l1', cat: 'LOGI', name: 'JEEP EM', type: 'TRANSPORT EM', cost: 110, stock: 2 },
             { id: 'l2', cat: 'LOGI', name: 'CAMION RÉPA.', type: 'MAINTENANCE', cost: 175, stock: 1 },
@@ -186,24 +194,23 @@
             'AIR': { label: 'AÉRIEN', icon: 'Plane', color: 'border-cyan-600 text-cyan-300 bg-cyan-900/10' },
         };
 
-        // --- COMPOSANT LOGIN ---
+        // --- LOGIN SCREEN ---
         function LoginScreen({ onLogin }) {
             const [username, setUsername] = useState('');
             const [password, setPassword] = useState('');
             const [error, setError] = useState('');
+            const Shield = Icons['Shield'];
+            const Lock = Icons['Lock'];
+            const User = Icons['User'];
 
             const handleSL = (e) => {
                 e.preventDefault();
-                if (username === 'SLLogi' && password === 'sllogie') {
-                    onLogin('SL');
-                } else {
-                    setError('IDENTIFIANTS INCORRECTS');
-                }
+                if (username === 'SLLogi' && password === 'sllogie') { onLogin('SL'); } else { setError('IDENTIFIANTS INCORRECTS'); }
             };
 
             return (
-                <div className="min-h-screen bg-black flex items-center justify-center p-4 login-scan">
-                    <div className="w-full max-w-md border border-green-800 bg-black relative p-8 shadow-[0_0_50px_rgba(0,255,0,0.1)]">
+                <div className="min-h-screen bg-black flex items-center justify-center p-4 login-scan w-full h-full fixed inset-0 overflow-hidden">
+                    <div className="w-full max-w-md border border-green-800 bg-black relative p-8 shadow-[0_0_50px_rgba(0,255,0,0.1)] z-10">
                         <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-green-500"></div>
                         <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-green-500"></div>
                         <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-green-500"></div>
@@ -211,7 +218,7 @@
 
                         <div className="text-center mb-8">
                             <div className="inline-block p-3 border border-green-700 bg-green-900/10 mb-4">
-                                <Icon name="Shield" size={40} className="text-green-500"/>
+                                {Shield && <Shield size={40} className="text-green-500"/>}
                             </div>
                             <h1 className="text-2xl font-black text-green-500 tracking-[0.3em] mb-1">LOGI-OPS</h1>
                             <p className="text-[10px] text-green-800 uppercase font-mono">Système de Gestion Tactique V9</p>
@@ -220,49 +227,25 @@
                         <div className="space-y-6">
                             <form onSubmit={handleSL} className="space-y-4 border-b border-green-900/50 pb-6">
                                 <h2 className="text-xs font-bold text-green-600 uppercase flex items-center gap-2 mb-4">
-                                    <Icon name="Lock" size={12}/> ACCÈS COMMANDEMENT (SL)
+                                    {Lock && <Lock size={12}/>} ACCÈS COMMANDEMENT (SL)
                                 </h2>
-                                <div>
-                                    <input 
-                                        type="text" 
-                                        placeholder="IDENTIFIANT" 
-                                        value={username}
-                                        onChange={e => setUsername(e.target.value)}
-                                        className="w-full bg-green-900/10 border border-green-800 p-3 text-green-400 text-xs font-bold outline-none focus:border-green-500 placeholder-green-900"
-                                    />
-                                </div>
-                                <div>
-                                    <input 
-                                        type="password" 
-                                        placeholder="MOT DE PASSE" 
-                                        value={password}
-                                        onChange={e => setPassword(e.target.value)}
-                                        className="w-full bg-green-900/10 border border-green-800 p-3 text-green-400 text-xs font-bold outline-none focus:border-green-500 placeholder-green-900"
-                                    />
-                                </div>
+                                <input type="text" placeholder="IDENTIFIANT" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-green-900/10 border border-green-800 p-3 text-green-400 text-xs font-bold outline-none focus:border-green-500 placeholder-green-900" />
+                                <input type="password" placeholder="MOT DE PASSE" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-green-900/10 border border-green-800 p-3 text-green-400 text-xs font-bold outline-none focus:border-green-500 placeholder-green-900" />
                                 {error && <p className="text-red-500 text-[10px] font-bold bg-red-900/10 p-2 border border-red-900 text-center">{error}</p>}
-                                <button type="submit" className="w-full bg-green-600 text-black font-black py-3 text-xs tracking-widest hover:bg-green-500 transition-colors">
-                                    CONNEXION SL
-                                </button>
+                                <button type="submit" className="w-full bg-green-600 text-black font-black py-3 text-xs tracking-widest hover:bg-green-500 transition-colors">CONNEXION SL</button>
                             </form>
-
-                            <div>
-                                <button onClick={() => onLogin('LOGI')} className="w-full border border-dashed border-blue-900 text-blue-500 py-3 text-xs font-bold hover:bg-blue-900/10 transition-colors flex items-center justify-center gap-2 group">
-                                    <Icon name="User" size={14} className="group-hover:text-blue-400"/> 
-                                    ACCÈS LOGISTICIEN (LECTURE SEULE)
-                                </button>
-                            </div>
+                            <button onClick={() => onLogin('LOGI')} className="w-full border border-dashed border-blue-900 text-blue-500 py-3 text-xs font-bold hover:bg-blue-900/10 transition-colors flex items-center justify-center gap-2 group">
+                                {User && <User size={14} className="group-hover:text-blue-400"/>} ACCÈS LOGISTICIEN
+                            </button>
                         </div>
                     </div>
                 </div>
             );
         }
 
-        // --- MAIN APP ---
         function LogiOpsV9() {
             const [userRole, setUserRole] = useState(null); 
             const [activeTab, setActiveTab] = useState('dashboard'); 
-            
             const [activeUnits, setActiveUnits] = useState([]);
             const [catalog, setCatalog] = useState(INITIAL_CATALOG);
             const [squad, setSquad] = useState([]); 
@@ -272,7 +255,6 @@
             const [isSlActive, setIsSlActive] = useState(false);
             const [configurations, setConfigurations] = useState([]);
             const [dataLoaded, setDataLoaded] = useState(false);
-
             const [actionModal, setActionModal] = useState(null);
             const [showSupplyModal, setShowSupplyModal] = useState(false);
             const [showStockModal, setShowStockModal] = useState(false);
@@ -281,14 +263,36 @@
             const [currentConfigId, setCurrentConfigId] = useState(null);
             const [inputReason, setInputReason] = useState('');
             const [selectedMemberId, setSelectedMemberId] = useState('');
-            
             const [newModelData, setNewModelData] = useState({ name: '', cat: 'LOGI', type: '', cost: 0, stock: 1 });
 
             const canEdit = userRole === 'SL';
 
-            // --- CHARGEMENT INITIAL ---
+            // --- CHARGEMENT AVEC TIMEOUT DE SÉCURITÉ ---
             useEffect(() => {
+                let isMounted = true;
+                
+                // Timeout: si Firebase ne répond pas en 2.5s, on bascule sur les données locales
+                const timeout = setTimeout(() => {
+                    if (isMounted && !dataLoaded) {
+                        console.warn("Délai dépassé, chargement local forcé.");
+                        const localData = StorageService.loadLocal();
+                        if (localData) {
+                            if(localData.activeUnits) setActiveUnits(localData.activeUnits);
+                            if(localData.catalog) setCatalog(localData.catalog);
+                            if(localData.squad) setSquad(localData.squad);
+                            if(localData.globalLogs) setGlobalLogs(localData.globalLogs);
+                            if(localData.supplySources) setSupplySources(localData.supplySources);
+                            if(localData.slName) setSlName(localData.slName);
+                            if(typeof localData.isSlActive !== 'undefined') setIsSlActive(localData.isSlActive);
+                            if(localData.configurations) setConfigurations(localData.configurations);
+                        }
+                        setDataLoaded(true);
+                    }
+                }, 2500);
+
                 const unsubscribe = StorageService.loadInitial((data) => {
+                    if (!isMounted) return;
+                    clearTimeout(timeout); // Annule le timeout si Firebase répond à temps
                     if (data) {
                         if(data.activeUnits) setActiveUnits(data.activeUnits);
                         if(data.catalog) setCatalog(data.catalog);
@@ -301,911 +305,482 @@
                     }
                     setDataLoaded(true);
                 });
-                return () => unsubscribe && unsubscribe();
+                
+                return () => { isMounted = false; if(unsubscribe) unsubscribe(); clearTimeout(timeout); };
             }, []);
 
             // --- ACTIONS ---
+            const save = (key, val) => StorageService.save({ [key]: val });
             const logEvent = (type, message) => {
-                const timestamp = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                const newLog = { id: Date.now(), time: timestamp, type, msg: message };
+                const newLog = { id: Date.now(), time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), type, msg: message };
                 const newLogs = [newLog, ...globalLogs].slice(0, 50); 
-                setGlobalLogs(newLogs);
-                StorageService.save({ globalLogs: newLogs });
+                setGlobalLogs(newLogs); save('globalLogs', newLogs);
             };
-
+            
+            const updateStock = (id, d) => { if(!canEdit)return; const c = catalog.map(m=>m.id===id?{...m,stock:Math.max(0,m.stock+d)}:m); setCatalog(c); save('catalog', c); };
+            const deleteModel = (id) => { if(!canEdit||!confirm("Supprimer ?"))return; const c = catalog.filter(m=>m.id!==id); setCatalog(c); save('catalog', c); };
+            const deployUnit = (id) => {
+                if(!canEdit) return;
+                const m = catalog.find(x=>x.id===id); if(!m) return;
+                if(activeUnits.filter(u=>u.modelId===id).length >= m.stock) return;
+                const u = { uuid: Date.now()+Math.random(), modelId: m.id, name: m.name, cat: m.cat, cost: m.cost, status: 'operational', responsible: 'BASE', reasonHS: '', missionStartTime: null, deployTime: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), logs: [] };
+                const nu = [u, ...activeUnits]; setActiveUnits(nu); save('activeUnits', nu); logEvent('GARAGE', `DÉPLOIEMENT: ${m.name}`);
+            };
             const createModel = () => {
+                if(!canEdit||!newModelData.name)return;
+                const m={id:`custom_${Date.now()}`, cat:newModelData.cat, name:newModelData.name.toUpperCase(), type:newModelData.type.toUpperCase()||'STD', cost:parseInt(newModelData.cost)||0, stock:parseInt(newModelData.stock)||1};
+                const c=[...catalog, m]; setCatalog(c); save('catalog', c); setShowCreateVehicleModal(false); setNewModelData({name:'',cat:'LOGI',type:'',cost:0,stock:1}); logEvent('GARAGE', `NOUVEAU MODÈLE: ${m.name}`);
+            };
+            
+            const toggleSlShift = () => { if(!canEdit||!slName)return; const s=!isSlActive; setIsSlActive(s); save('isSlActive', s); save('slName', slName); logEvent('RH', s?`PRISE POSTE: ${slName}`:`FIN SERVICE: ${slName}`); };
+            const addSquadMember = (n) => { if(!canEdit||!n)return; const s=[...squad, {id:Date.now(), name:n.toUpperCase(), startTime:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}]; setSquad(s); save('squad', s); logEvent('RH', `RENFORT: ${n.toUpperCase()}`); };
+            const removeSquadMember = (id) => { if(!canEdit)return; const m=squad.find(x=>x.id===id); if(m){ const s=squad.filter(x=>x.id!==id); setSquad(s); save('squad', s); logEvent('RH', `DÉPART: ${m.name}`); } };
+            const updateUnitStatus = (uuid, st, data={}) => {
                 if(!canEdit) return;
-                if(!newModelData.name || !newModelData.cat) return;
-                const newModel = {
-                    id: `custom_${Date.now()}`,
-                    cat: newModelData.cat,
-                    name: newModelData.name.toUpperCase(),
-                    type: newModelData.type.toUpperCase() || 'STANDARD',
-                    cost: parseInt(newModelData.cost) || 0,
-                    stock: parseInt(newModelData.stock) || 1
-                };
-                const newCatalog = [...catalog, newModel];
-                setCatalog(newCatalog);
-                StorageService.save({ catalog: newCatalog });
-                setShowCreateVehicleModal(false);
-                setNewModelData({ name: '', cat: 'LOGI', type: '', cost: 0, stock: 1 });
-                logEvent('GARAGE', `NOUVEAU MODÈLE AJOUTÉ: ${newModel.name}`);
-            };
-
-            const deleteModel = (modelId) => {
-                if(!canEdit) return;
-                if(!window.confirm("Supprimer définitivement ce modèle du catalogue ?")) return;
-                const newCatalog = catalog.filter(m => m.id !== modelId);
-                setCatalog(newCatalog);
-                StorageService.save({ catalog: newCatalog });
-            };
-
-            const updateStock = (modelId, delta) => {
-                if (!canEdit) return;
-                const newCatalog = catalog.map(m => m.id === modelId ? { ...m, stock: Math.max(0, m.stock + delta) } : m);
-                setCatalog(newCatalog);
-                StorageService.save({ catalog: newCatalog });
-            };
-
-            const deployUnit = (modelId) => {
-                if (!canEdit) return;
-                const model = catalog.find(m => m.id === modelId);
-                if (!model) return;
-                const currentlyDeployed = activeUnits.filter(u => u.modelId === model.id).length;
-                if (currentlyDeployed >= model.stock) return;
-
-                const newUnit = {
-                    uuid: Date.now() + Math.random(),
-                    modelId: model.id,
-                    name: model.name,
-                    cat: model.cat,
-                    cost: model.cost,
-                    status: 'operational', 
-                    responsible: 'BASE',
-                    reasonHS: '',
-                    missionStartTime: null,
-                    deployTime: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                    logs: []
-                };
-                const newUnits = [newUnit, ...activeUnits];
-                setActiveUnits(newUnits);
-                StorageService.save({ activeUnits: newUnits });
-                logEvent('GARAGE', `DÉPLOIEMENT: ${model.name}`);
-            };
-
-            const toggleSlShift = () => {
-                if (!canEdit || !slName) return;
-                const newState = !isSlActive;
-                setIsSlActive(newState);
-                StorageService.save({ isSlActive: newState, slName });
-                logEvent('RH', newState ? `PRISE POSTE SL: ${slName}` : `FIN SERVICE SL: ${slName}`);
-            };
-
-            const addSquadMember = (name) => {
-                if (!canEdit || !name) return;
-                const newMember = { id: Date.now(), name: name.toUpperCase(), role: 'LOGISTICIEN', status: 'active', startTime: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
-                const newSquad = [...squad, newMember];
-                setSquad(newSquad);
-                StorageService.save({ squad: newSquad });
-                logEvent('RH', `RENFORT: ${name.toUpperCase()}`);
-            };
-
-            const removeSquadMember = (id) => {
-                if (!canEdit) return;
-                const member = squad.find(m => m.id === id);
-                if(member) { 
-                    const newSquad = squad.filter(m => m.id !== id);
-                    setSquad(newSquad);
-                    StorageService.save({ squad: newSquad });
-                    logEvent('RH', `DÉPART: ${member.name}`); 
-                }
-            };
-
-            const updateUnitStatus = (uuid, newStatus, additionalData = {}) => {
-                if (!canEdit) return;
-                const newUnits = activeUnits.map(u => {
-                    if (u.uuid !== uuid) return u;
-                    let logMsg = `Statut: ${newStatus.toUpperCase()}`;
-                    if (newStatus === 'mission') logMsg += ` (Chef: ${additionalData.responsible})`;
-                    if (newStatus === 'destroyed') logMsg += ` (Cause: ${additionalData.reasonHS})`;
-                    return { ...u, status: newStatus, ...additionalData, logs: [...(u.logs || []), { time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), msg: logMsg }] };
+                const nu = activeUnits.map(u => {
+                    if(u.uuid!==uuid) return u;
+                    let msg = `Statut: ${st.toUpperCase()}`;
+                    if(st==='mission') msg+=` (Chef: ${data.responsible})`;
+                    if(st==='destroyed') msg+=` (Cause: ${data.reasonHS})`;
+                    return {...u, status:st, ...data, logs:[...(u.logs||[]), {time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg}]};
                 });
-                setActiveUnits(newUnits);
-                StorageService.save({ activeUnits: newUnits });
-                const unit = activeUnits.find(u => u.uuid === uuid);
-                if(unit) logEvent('FLOTTE', `${unit.name}: ${newStatus.toUpperCase()}`);
+                setActiveUnits(nu); save('activeUnits', nu);
             };
-
-            const endMission = (unit) => {
-                if (!canEdit || !unit.missionStartTime) return;
-                const durationMs = Date.now() - unit.missionStartTime;
-                const minutes = Math.floor(durationMs / 60000);
-                const durationStr = `${minutes} min`;
-                const newUnits = activeUnits.map(u => {
-                    if (u.uuid !== unit.uuid) return u;
-                    return { ...u, status: 'operational', missionStartTime: null, responsible: 'BASE', logs: [...(u.logs||[]), { time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), msg: `RETOUR MISSION (${durationStr})` }] };
-                });
-                setActiveUnits(newUnits);
-                StorageService.save({ activeUnits: newUnits });
-                logEvent('FLOTTE', `${unit.name}: RETOUR BASE (${durationStr})`);
-            };
-
-            const returnToBase = (uuid) => {
-                if (!canEdit) return;
-                if (window.confirm("CONFIRMER RTB ?")) {
-                    const unit = activeUnits.find(u => u.uuid === uuid);
-                    const newUnits = activeUnits.filter(u => u.uuid !== uuid);
-                    setActiveUnits(newUnits);
-                    StorageService.save({ activeUnits: newUnits });
-                    if(unit) logEvent('GARAGE', `RTB: ${unit.name}`);
-                }
-            };
-
-            const updateSupplySource = (id, field, value) => {
-                if (!canEdit) return;
-                const newSupply = supplySources.map(s => s.id === id ? { ...s, [field]: value } : s);
-                setSupplySources(newSupply);
-                StorageService.save({ supplySources: newSupply });
-            };
-
-            const addSupplySource = () => { 
-                if (!canEdit) return;
-                const newSupply = [...supplySources, { id: Date.now(), name: 'NOUVELLE SOURCE', amount: 0 }];
-                setSupplySources(newSupply);
-                StorageService.save({ supplySources: newSupply });
-            };
-
-            const removeSupplySource = (id) => { 
-                if (!canEdit || supplySources.length <= 1) return; 
-                const newSupply = supplySources.filter(s => s.id !== id);
-                setSupplySources(newSupply);
-                StorageService.save({ supplySources: newSupply });
-            };
-
-            const createConfiguration = () => {
-                if (!canEdit) return;
-                const newConfig = { id: Date.now(), name: `PHASE ${configurations.length + 1}`, content: {} };
-                const newConfigs = [...configurations, newConfig];
-                setConfigurations(newConfigs);
-                setCurrentConfigId(newConfig.id);
-                StorageService.save({ configurations: newConfigs });
-            };
-
-            const updateConfiguration = (configId, modelId, delta) => {
-                if (!canEdit) return;
-                const config = configurations.find(c => c.id === configId);
-                if(!config) return;
-                const currentCount = config.content[modelId] || 0;
-                const newCount = Math.max(0, currentCount + delta);
-                const newContent = { ...config.content, [modelId]: newCount };
-                if (newCount === 0) delete newContent[modelId];
-                const newConfigs = configurations.map(c => c.id === configId ? { ...c, content: newContent } : c);
-                setConfigurations(newConfigs);
-                StorageService.save({ configurations: newConfigs });
-            };
-
-            const setConfigurationCount = (configId, modelId, value) => {
-                if (!canEdit) return;
-                const config = configurations.find(c => c.id === configId);
-                if(!config) return;
-                const newCount = Math.max(0, parseInt(value) || 0);
-                const newContent = { ...config.content, [modelId]: newCount };
-                if (newCount === 0) delete newContent[modelId];
-                const newConfigs = configurations.map(c => c.id === configId ? { ...c, content: newContent } : c);
-                setConfigurations(newConfigs);
-                StorageService.save({ configurations: newConfigs });
-            };
-
-            const renameConfiguration = (configId, newName) => {
-                if (!canEdit) return;
-                const newConfigs = configurations.map(c => c.id === configId ? { ...c, name: newName.toUpperCase() } : c);
-                setConfigurations(newConfigs);
-                StorageService.save({ configurations: newConfigs });
-            };
-
-            const deleteConfiguration = (configId) => {
-                if (!canEdit) return;
-                if(!window.confirm("Supprimer cette phase ?")) return;
-                const newConfigs = configurations.filter(c => c.id !== configId);
-                setConfigurations(newConfigs);
-                if (currentConfigId === configId) setCurrentConfigId(null);
-                StorageService.save({ configurations: newConfigs });
-            };
-
-            const deployConfiguration = (configId) => {
-                if (!canEdit) return;
-                const config = configurations.find(c => c.id === configId);
-                if (!config) return;
-                let deployedCount = 0;
-                let newActiveUnits = [...activeUnits];
-                Object.entries(config.content).forEach(([modelId, targetCount]) => {
-                    const model = catalog.find(m => m.id === modelId);
-                    if (!model) return;
-                    const currentDeployed = newActiveUnits.filter(u => u.modelId === modelId).length;
-                    const needed = targetCount - currentDeployed;
-                    if (needed > 0) {
-                        const availableSlots = model.stock - currentDeployed;
-                        const toDeploy = Math.min(needed, availableSlots);
-                        for (let i = 0; i < toDeploy; i++) {
-                            newActiveUnits.push({
-                                uuid: Date.now() + Math.random() + i,
-                                modelId: model.id,
-                                name: model.name,
-                                cat: model.cat,
-                                cost: model.cost,
-                                status: 'operational', 
-                                responsible: 'BASE',
-                                reasonHS: '',
-                                missionStartTime: null,
-                                deployTime: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                                logs: []
-                            });
-                            deployedCount++;
+            const endMission = (u) => { if(!canEdit||!u.missionStartTime)return; const d=Math.floor((Date.now()-u.missionStartTime)/60000); const nu=activeUnits.map(x=>x.uuid!==u.uuid?x:{...x, status:'operational', missionStartTime:null, responsible:'BASE', logs:[...(x.logs||[]), {time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg:`RETOUR (${d} min)`}]}); setActiveUnits(nu); save('activeUnits', nu); logEvent('FLOTTE', `${u.name}: RETOUR`); };
+            const returnToBase = (uuid) => { if(!canEdit)return; if(confirm("RTB ?")) { const u=activeUnits.find(x=>x.uuid===uuid); const nu=activeUnits.filter(x=>x.uuid!==uuid); setActiveUnits(nu); save('activeUnits', nu); if(u) logEvent('GARAGE', `RTB: ${u.name}`); } };
+            const updateSupply = (id, f, v) => { if(!canEdit)return; const s=supplySources.map(x=>x.id===id?{...x,[f]:v}:x); setSupplySources(s); save('supplySources', s); };
+            const addSupply = () => { if(!canEdit)return; const s=[...supplySources, {id:Date.now(), name:'NOUVELLE SOURCE', amount:0}]; setSupplySources(s); save('supplySources', s); };
+            const removeSupply = (id) => { if(!canEdit||supplySources.length<=1)return; const s=supplySources.filter(x=>x.id!==id); setSupplySources(s); save('supplySources', s); };
+            
+            // Config Phases logic
+            const createConfig = () => { if(!canEdit)return; const c=[...configurations, {id:Date.now(), name:`PHASE ${configurations.length+1}`, content:{}}]; setConfigurations(c); setCurrentConfigId(c[c.length-1].id); save('configurations', c); };
+            const updateConfig = (cid, mid, d) => { if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return; const cnt=Math.max(0, (c.content[mid]||0)+d); const nc={...c.content, [mid]:cnt}; if(cnt===0) delete nc[mid]; const ncs=configurations.map(x=>x.id===cid?{...x, content:nc}:x); setConfigurations(ncs); save('configurations', ncs); };
+            const setConfigCount = (cid, mid, val) => { if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return; const cnt=Math.max(0, parseInt(val)||0); const nc={...c.content, [mid]:cnt}; if(cnt===0) delete nc[mid]; const ncs=configurations.map(x=>x.id===cid?{...x, content:nc}:x); setConfigurations(ncs); save('configurations', ncs); };
+            const renameConfig = (cid, val) => { if(!canEdit)return; const ncs=configurations.map(x=>x.id===cid?{...x, name:val.toUpperCase()}:x); setConfigurations(ncs); save('configurations', ncs); };
+            const deleteConfig = (cid) => { if(!canEdit||!confirm("Supprimer ?"))return; const ncs=configurations.filter(x=>x.id!==cid); setConfigurations(ncs); if(currentConfigId===cid) setCurrentConfigId(null); save('configurations', ncs); };
+            const deployConfig = (cid) => {
+                if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return;
+                let count=0; let nu=[...activeUnits];
+                Object.entries(c.content).forEach(([mid, target]) => {
+                    const m=catalog.find(x=>x.id===mid); if(!m)return;
+                    const curr=nu.filter(u=>u.modelId===mid).length;
+                    const needed=target-curr;
+                    if(needed>0) {
+                        const avail=m.stock-curr;
+                        const toAdd=Math.min(needed, avail);
+                        for(let i=0;i<toAdd;i++) {
+                            nu.push({uuid:Date.now()+Math.random()+i, modelId:m.id, name:m.name, cat:m.cat, cost:m.cost, status:'operational', responsible:'BASE', reasonHS:'', missionStartTime:null, deployTime:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), logs:[]});
+                            count++;
                         }
                     }
                 });
-                if (deployedCount > 0) {
-                    setActiveUnits(newActiveUnits);
-                    StorageService.save({ activeUnits: newActiveUnits });
-                    logEvent('GARAGE', `DÉPLOIEMENT PHASE: ${config.name} (+${deployedCount} UNITÉS)`);
-                    alert(`${config.name} DÉPLOYÉE : ${deployedCount} véhicules sortis.`);
-                } else {
-                    alert("Configuration déjà complète sur le terrain ou stock insuffisant.");
-                }
+                if(count>0) { setActiveUnits(nu); save('activeUnits', nu); logEvent('GARAGE', `PHASE ${c.name}: +${count}`); alert(`DÉPLOIEMENT: ${count} véhicules.`); } 
+                else alert("Pas de véhicules à déployer (Stock insuffisant ou déjà déployés).");
             };
 
-            // --- HANDLERS MODALES ---
-            const handleStatusClick = (unit, targetStatus) => {
-                if (!canEdit) return; 
-                if (unit.status === targetStatus && targetStatus !== 'mission') return;
-                if (targetStatus === 'mission') { setSelectedMemberId(''); setActionModal({ type: 'mission', unit }); } 
-                else if (targetStatus === 'destroyed') { setInputReason(''); setActionModal({ type: 'destroy', unit }); } 
-                else { updateUnitStatus(unit.uuid, targetStatus); }
-            };
-            const confirmMission = () => {
-                if (!actionModal) return;
-                let respName = "INDÉFINI";
-                if (selectedMemberId === 'SL') respName = slName || "CHEF LOGI";
-                else { const member = squad.find(m => m.id === parseInt(selectedMemberId)); if (member) respName = member.name; }
-                updateUnitStatus(actionModal.unit.uuid, 'mission', { responsible: respName, missionStartTime: Date.now() });
-                setActionModal(null);
-            };
-            const confirmDestruction = () => {
-                if (!actionModal || !inputReason) return;
-                updateUnitStatus(actionModal.unit.uuid, 'destroyed', { reasonHS: inputReason, missionStartTime: null });
-                setActionModal(null);
-            };
+            const stats = useMemo(() => ({
+                deployedCost: activeUnits.reduce((s, u) => s + (u.status!=='stored'?u.cost:0), 0),
+                destroyedCount: activeUnits.filter(u => u.status === 'destroyed').length,
+                missionCount: activeUnits.filter(u => u.status === 'mission').length,
+                activeCount: activeUnits.length,
+                totalSupply: supplySources.reduce((a, s) => a + (parseInt(s.amount)||0), 0)
+            }), [activeUnits, supplySources]);
 
-            const stats = useMemo(() => {
-                const deployedCost = activeUnits.reduce((sum, u) => u.status !== 'stored' ? sum + u.cost : sum, 0);
-                const destroyedCount = activeUnits.filter(u => u.status === 'destroyed').length;
-                const missionCount = activeUnits.filter(u => u.status === 'mission').length;
-                const activeCount = activeUnits.length;
-                const totalSupply = supplySources.reduce((acc, src) => acc + (parseInt(src.amount) || 0), 0);
-                return { deployedCost, destroyedCount, activeCount, missionCount, totalSupply };
-            }, [activeUnits, supplySources]);
-
-            // --- RENDER ---
+            const Activity = Icons['Activity']; const Database = Icons['Database']; const LayoutDashboard = Icons['LayoutDashboard']; const Warehouse = Icons['Warehouse']; const Users = Icons['Users']; const ScrollText = Icons['ScrollText']; const Target = Icons['Target']; const Shield = Icons['Shield']; const Plus = Icons['Plus']; const Wifi = Icons['Wifi']; const LogOut = Icons['LogOut']; const ArrowUpRight = Icons['ArrowUpRight']; const Settings = Icons['Settings']; const XCircle = Icons['XCircle']; const Trash2 = Icons['Trash2']; const RotateCcw = Icons['RotateCcw']; const Clock = Icons['Clock']; const List = Icons['List']; const Play = Icons['Play']; const PlusCircle = Icons['PlusCircle']; const MinusCircle = Icons['MinusCircle']; const Power = Icons['Power'];
 
             if (!userRole) return <LoginScreen onLogin={(role) => setUserRole(role)} />;
-            if (!dataLoaded) return <div className="min-h-screen bg-black flex items-center justify-center text-green-500 font-mono animate-pulse">INITIALISATION SYSTÈME...</div>;
+            if (!dataLoaded) return <div className="min-h-screen bg-black flex items-center justify-center text-green-500 font-mono animate-pulse">CHARGEMENT...</div>;
 
             return (
-                <div className="min-h-screen bg-black text-green-500 flex flex-col selection:bg-green-900 selection:text-white overflow-hidden relative max-w-5xl mx-auto border-x border-green-900/50 shadow-[0_0_50px_rgba(0,255,0,0.05)]">
+                <div className="h-screen w-screen bg-black text-green-500 flex flex-col overflow-hidden relative">
                     <div className="absolute inset-0 pointer-events-none z-0 opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%]"></div>
 
-                    {/* HEADER */}
-                    <header className="bg-black border-b-2 border-green-900 p-3 z-50 flex justify-between items-center shadow-[0_0_20px_rgba(0,255,0,0.1)] relative">
+                    {/* HEADER (Fixe en haut) */}
+                    <header className="bg-black border-b border-green-900 h-16 shrink-0 flex justify-between items-center px-4 z-50 shadow-lg shadow-green-900/10">
                         <div className="flex items-center gap-4">
-                            <div className="border border-green-700 p-1 bg-green-900/20">
-                                <Icon name="Activity" size={24} className="text-green-500 animate-pulse"/>
-                            </div>
+                            {/* Suppression du carré mystère de l'icône Activity pour nettoyage de l'interface */}
                             <div>
-                                <h1 className="font-black text-xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-800">V9.0</span></h1>
-                                <div className="flex items-center gap-3 text-[10px] font-bold text-green-700 mt-1">
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V9</span></h1>
+                                <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
                                     <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}>
                                         <div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>
                                         SL: {slName || "N/A"}
                                     </span>
-                                    <span className="border-l border-green-900 pl-3">SQD: {squad.length} PAX</span>
-                                    <span className={`ml-2 ${USE_FIREBASE ? 'text-blue-500' : 'text-orange-500'}`}>
-                                        [{USE_FIREBASE ? 'ONLINE' : 'LOCAL'}]
-                                    </span>
+                                    <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
+                                    <span className={`ml-2 ${USE_FIREBASE ? 'text-blue-500' : 'text-orange-500'}`}>[{USE_FIREBASE ? 'ONLINE' : 'LOCAL'}]</span>
                                 </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="text-right">
-                                <div className="text-[9px] font-bold text-green-800 uppercase mb-1 flex items-center justify-end gap-1">
-                                    <Icon name="Database" size={10}/> GLOBAL SUPPLY
-                                </div>
-                                <button onClick={() => canEdit && setShowSupplyModal(true)} className={`text-xl font-black bg-green-900/10 px-3 py-1 border border-green-800 transition-all flex items-center gap-2 ${canEdit ? 'text-green-400 hover:bg-green-900/30 hover:border-green-500' : 'text-gray-500 cursor-default'}`}>
+                        <div className="flex items-center gap-4">
+                            <div className="text-right hidden sm:block">
+                                <div className="text-[9px] font-bold text-green-800 uppercase mb-1 flex items-center justify-end gap-1">{Database && <Database size={10}/>} SUPPLY</div>
+                                <button onClick={() => canEdit && setShowSupplyModal(true)} className={`text-xl font-black bg-green-900/10 px-3 py-1 border border-green-800 flex items-center gap-2 ${canEdit?'hover:bg-green-900/30 hover:border-green-500 text-green-400':'text-gray-500'}`}>
                                     {stats.totalSupply.toLocaleString()}
                                 </button>
                             </div>
+                            {/* BOUTON DECONNEXION AVEC SYMBOLE POWER */}
                             <button 
-                                onClick={() => { if(window.confirm("CHANGER D'UTILISATEUR ?")) setUserRole(null); }}
-                                className="h-10 w-10 flex items-center justify-center border border-red-900/50 bg-red-900/10 text-red-600 hover:bg-red-900/30 hover:text-red-400 hover:border-red-500 transition-all"
-                                title="Changer d'utilisateur"
+                                onClick={() => setUserRole(null)} 
+                                className="h-10 w-10 flex items-center justify-center border border-red-900/50 bg-red-900/10 text-red-600 hover:bg-red-900/30 hover:text-red-400 hover:border-red-500 transition-all rounded" 
+                                title="Déconnexion"
                             >
-                                <Icon name="LogOut" size={18} />
+                                {Power && <Power size={18} />}
                             </button>
                         </div>
                     </header>
 
-                    {/* MAIN CONTENT */}
-                    <main className="flex-1 overflow-y-auto p-3 pb-20 scrollbar-thin scrollbar-thumb-green-900 scrollbar-track-black relative z-10">
-                        {/* DASHBOARD */}
-                        {activeTab === 'dashboard' && (
-                            <div className="space-y-4 animate-in fade-in duration-300">
-                                <div className="grid grid-cols-3 gap-2 mb-4">
-                                    <div className="bg-green-900/10 border border-green-800 p-2 text-center relative overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-green-500"></div>
-                                        <span className="text-2xl font-black text-green-500 block leading-none">{activeUnits.filter(u => u.status === 'operational').length}</span>
-                                        <span className="text-[9px] font-bold text-green-800 uppercase tracking-widest">DISPO</span>
-                                    </div>
-                                    <div className="bg-blue-900/10 border border-blue-800 p-2 text-center relative overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-blue-500"></div>
-                                        <span className="text-2xl font-black text-blue-500 block leading-none">{stats.missionCount}</span>
-                                        <span className="text-[9px] font-bold text-blue-800 uppercase tracking-widest">MISSION</span>
-                                    </div>
-                                    <div className="bg-red-900/10 border border-red-800 p-2 text-center relative overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-red-500"></div>
-                                        <span className="text-2xl font-black text-red-500 block leading-none">{stats.destroyedCount}</span>
-                                        <span className="text-[9px] font-bold text-red-800 uppercase tracking-widest">PERTES</span>
-                                    </div>
-                                </div>
-
-                                {activeUnits.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-64 border border-dashed border-green-900 bg-green-900/5">
-                                        <Icon name="Target" size={48} className="mb-4 text-green-900 opacity-50" />
-                                        <p className="text-xs font-bold uppercase text-green-800 tracking-widest">AUCUNE UNITÉ DÉPLOYÉE</p>
-                                        {canEdit && <p className="text-[10px] text-green-900 mt-1">ACCÉDER AU GARAGE POUR DÉPLOIEMENT</p>}
-                                    </div>
-                                ) : (
-                                    Object.keys(CATEGORIES).map(catKey => {
-                                        const unitsInCat = activeUnits.filter(u => u.cat === catKey);
-                                        if (unitsInCat.length === 0) return null;
-                                        const conf = CATEGORIES[catKey];
-                                        return (
-                                            <div key={catKey} className="mb-4">
-                                                <div className={`flex items-center gap-2 mb-2 px-2 border-l-2 ${conf.color.split(' ')[0]} bg-black`}>
-                                                    <span className="font-black text-[10px] tracking-[0.2em] uppercase text-gray-500">{conf.label}</span>
-                                                </div>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                                    {unitsInCat.map(unit => (
-                                                        <UnitCard 
-                                                            key={unit.uuid} 
-                                                            unit={unit} 
-                                                            onStatusChange={(s) => handleStatusClick(unit, s)}
-                                                            onEndMission={() => endMission(unit)}
-                                                            onRTB={() => returnToBase(unit.uuid)}
-                                                            onShowLogs={() => setActionModal({ type: 'logs', unit })}
-                                                            readOnly={!canEdit} // Mode lecture seule
-                                                        />
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                )}
+                    {/* LAYOUT PRINCIPAL: Flex Row pour Desktop */}
+                    <div className="flex flex-1 overflow-hidden">
+                        
+                        {/* SIDEBAR (Desktop Only >= md) */}
+                        <aside className="hidden md:flex w-64 bg-black border-r border-green-900 flex-col shrink-0">
+                            <nav className="flex-1 p-2 space-y-2">
+                                <NavButtonDesktop icon={LayoutDashboard} label="OPÉRATIONS" active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')} />
+                                <NavButtonDesktop icon={Warehouse} label="GARAGE" active={activeTab==='garage'} onClick={()=>setActiveTab('garage')} disabled={!canEdit} />
+                                <NavButtonDesktop icon={Users} label="ESCOUADE" active={activeTab==='squad'} onClick={()=>setActiveTab('squad')} />
+                                <NavButtonDesktop icon={ScrollText} label="JOURNAL (JMO)" active={activeTab==='journal'} onClick={()=>setActiveTab('journal')} disabled={!canEdit} />
+                            </nav>
+                            <div className="p-4 border-t border-green-900 text-center">
+                                <p className="text-[10px] text-green-900 font-mono">ROLE: {userRole}</p>
                             </div>
-                        )}
+                        </aside>
 
-                        {/* GARAGE (Seulement si SL) */}
-                        {activeTab === 'garage' && canEdit && (
-                            <div className="space-y-6 animate-in fade-in duration-300">
-                                <div className="flex flex-col gap-2 border-b border-green-900 pb-4">
-                                    <div className="flex justify-between items-center">
-                                        <h2 className="text-sm font-black text-green-500 flex items-center gap-2 uppercase tracking-widest">
-                                            <Icon name="Warehouse" size={16}/> CATALOGUE DÉPLOIEMENT
+                        {/* CONTENT AREA */}
+                        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-black/90 relative scrollbar-thin scrollbar-thumb-green-900 pb-20 md:pb-6">
+                            
+                            {/* DASHBOARD VIEW */}
+                            {activeTab === 'dashboard' && (
+                                <div className="space-y-6 animate-in fade-in">
+                                    {/* HUD Stats Grids */}
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <StatCard color="green" value={activeUnits.filter(u=>u.status==='operational').length} label="DISPO" />
+                                        <StatCard color="blue" value={stats.missionCount} label="MISSION" />
+                                        <StatCard color="red" value={stats.destroyedCount} label="PERTES" />
+                                    </div>
+
+                                    {/* Unit Grid */}
+                                    {activeUnits.length === 0 ? (
+                                        <EmptyState canEdit={canEdit} Target={Target} />
+                                    ) : (
+                                        Object.keys(CATEGORIES).map(catKey => {
+                                            const unitsInCat = activeUnits.filter(u => u.cat === catKey);
+                                            if (unitsInCat.length === 0) return null;
+                                            const conf = CATEGORIES[catKey];
+                                            return (
+                                                <div key={catKey} className="mb-6">
+                                                    <div className={`flex items-center gap-2 mb-3 px-3 py-1 border-l-4 ${conf.color.split(' ')[0]} bg-green-900/5`}>
+                                                        <span className="font-black text-xs md:text-sm tracking-[0.2em] uppercase text-gray-400">{conf.label}</span>
+                                                    </div>
+                                                    {/* RESPONSIVE GRID : 1 col mobile -> 5 cols large desktop */}
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+                                                        {unitsInCat.map(unit => (
+                                                            <UnitCard 
+                                                                key={unit.uuid} unit={unit} Icons={Icons} readOnly={!canEdit}
+                                                                onStatusChange={(s) => handleStatusClick(unit, s)}
+                                                                onEndMission={() => endMission(unit)}
+                                                                onRTB={() => returnToBase(unit.uuid)}
+                                                                onShowLogs={() => setActionModal({ type: 'logs', unit })}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            )}
+
+                            {/* GARAGE VIEW */}
+                            {activeTab === 'garage' && canEdit && (
+                                <div className="space-y-6 animate-in fade-in">
+                                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-green-900 pb-4">
+                                        <h2 className="text-lg font-black text-green-500 flex items-center gap-2 uppercase tracking-widest">
+                                            {Warehouse && <Warehouse size={20}/>} CATALOGUE DÉPLOIEMENT
                                         </h2>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => setShowConfigModal(true)} className="text-[9px] font-bold bg-blue-900/20 border border-blue-800 px-3 py-1 text-blue-400 hover:bg-blue-900/40 hover:border-blue-500 flex items-center gap-2 transition-colors">
-                                                <Icon name="List" size={12} /> CONFIG PHASES
-                                            </button>
-                                            <button onClick={() => setShowCreateVehicleModal(true)} className="text-[9px] font-bold bg-green-900/20 border border-green-800 px-3 py-1 hover:bg-green-900/40 hover:text-green-300 flex items-center gap-2 transition-colors">
-                                                <Icon name="Plus" size={12} /> CRÉER MODÈLE
-                                            </button>
-                                            <button onClick={() => setShowStockModal(true)} className="text-[9px] font-bold bg-green-900/20 border border-green-800 px-3 py-1 hover:bg-green-900/40 hover:text-green-300 flex items-center gap-2 transition-colors">
-                                                <Icon name="Settings" size={12} /> ÉDITER STOCKS
-                                            </button>
+                                        <div className="flex flex-wrap gap-2">
+                                            <ActionButton onClick={()=>setShowConfigModal(true)} icon={List} label="PHASES" color="blue" />
+                                            <ActionButton onClick={()=>setShowCreateVehicleModal(true)} icon={Plus} label="CRÉER" color="green" />
+                                            <ActionButton onClick={()=>setShowStockModal(true)} icon={Settings} label="STOCKS" color="green" />
                                         </div>
                                     </div>
-                                    {/* ZONE DEPLOIEMENT RAPIDE DES PHASES */}
+
+                                    {/* Quick Deploy Phases */}
                                     {configurations.length > 0 && (
-                                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-green-900">
+                                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-green-900/50">
                                             {configurations.map(config => (
-                                                <button 
-                                                    key={config.id}
-                                                    onClick={() => deployConfiguration(config.id)}
-                                                    className="flex items-center gap-2 px-3 py-2 bg-black border border-green-900 hover:border-green-500 hover:bg-green-900/20 whitespace-nowrap group transition-all"
-                                                >
-                                                    <Icon name="Play" size={12} className="text-green-700 group-hover:text-green-400"/>
-                                                    <span className="text-[10px] font-black text-green-600 group-hover:text-green-400 uppercase">{config.name}</span>
+                                                <button key={config.id} onClick={() => deployConfiguration(config.id)} className="flex items-center gap-2 px-4 py-3 bg-black border border-green-900 hover:border-green-500 hover:bg-green-900/10 whitespace-nowrap group transition-all min-w-[120px] justify-center">
+                                                    {Play && <Play size={14} className="text-green-700 group-hover:text-green-400"/>}
+                                                    <span className="text-xs font-black text-green-600 group-hover:text-green-400 uppercase">{config.name}</span>
                                                 </button>
                                             ))}
                                         </div>
                                     )}
-                                </div>
 
-                                <div className="space-y-6">
-                                    {Object.keys(CATEGORIES).map(catKey => {
-                                        const models = catalog.filter(m => m.cat === catKey);
-                                        if(models.length === 0) return null;
-                                        return (
-                                            <div key={catKey} className="bg-black border border-green-900 p-3 relative">
-                                                <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-green-700"></div>
-                                                <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-green-700"></div>
-                                                <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-green-700"></div>
-                                                <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-green-700"></div>
-
-                                                <div className="flex items-center gap-2 mb-3 pb-1 border-b border-green-900/50">
-                                                    <span className={CATEGORIES[catKey].color.split(' ')[1]}><Icon name={CATEGORIES[catKey].icon} size={16}/></span>
-                                                    <span className="font-black text-xs text-gray-400 tracking-wider">{CATEGORIES[catKey].label}</span>
-                                                </div>
-                                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                                                    {models.map(model => {
-                                                        const activeCount = activeUnits.filter(u => u.modelId === model.id).length;
-                                                        const totalSlots = model.stock;
-                                                        return Array.from({ length: totalSlots }).map((_, index) => {
-                                                            const isVehicleInGarage = index >= activeCount; 
-                                                            return (
-                                                                <button
-                                                                    key={`${model.id}-${index}`}
-                                                                    disabled={!isVehicleInGarage}
-                                                                    onClick={() => isVehicleInGarage && deployUnit(model.id)}
-                                                                    className={`relative p-2 border flex flex-col items-center justify-center text-center h-20 transition-all ${isVehicleInGarage ? 'bg-green-900/10 border-green-800 hover:bg-green-900/30 hover:border-green-500 active:scale-95 group' : 'bg-black border-green-900/30 opacity-30 cursor-default'}`}
-                                                                >
-                                                                    {isVehicleInGarage ? (
-                                                                        <>
-                                                                            <div className="absolute top-1 right-1 w-1 h-1 bg-green-500 shadow-[0_0_5px_#22c55e]"></div>
-                                                                            <span className="mt-1 text-[9px] font-black text-green-400 leading-tight uppercase">{model.name}</span>
-                                                                            <span className="text-[8px] text-green-800 font-mono">{model.cost} PTS</span>
-                                                                        </>
-                                                                    ) : (
-                                                                        <div className="flex flex-col items-center">
-                                                                            <Icon name="ArrowUpRight" size={16} className="text-green-900 mb-1"/>
-                                                                            <span className="text-[8px] font-black text-green-900 uppercase tracking-widest">EN MISSION</span>
-                                                                        </div>
-                                                                    )}
-                                                                    <div className="absolute bottom-1 left-1 text-[7px] font-mono text-green-900">SLOT {index+1}</div>
-                                                                </button>
-                                                            );
-                                                        });
-                                                    })}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* SQUAD */}
-                        {activeTab === 'squad' && (
-                            <div className="space-y-4 animate-in fade-in duration-300">
-                                <div className="bg-black border border-green-800 p-4 relative">
-                                    <div className="absolute top-0 left-0 w-full h-1 bg-green-900/30"></div>
-                                    <h3 className="text-[10px] font-black text-green-600 uppercase mb-3 flex items-center gap-2 tracking-widest">
-                                        <Icon name="Shield" size={12}/> COMMANDEMENT LOGISTIQUE
-                                    </h3>
-                                    <div className="flex gap-2">
-                                        <input 
-                                            type="text" 
-                                            placeholder="NOM DU SL..." 
-                                            value={slName}
-                                            disabled={!canEdit || isSlActive}
-                                            onChange={(e) => setSlName(e.target.value)}
-                                            className="flex-1 bg-green-900/10 border border-green-800 px-3 text-sm font-bold text-green-400 uppercase focus:border-green-500 outline-none placeholder-green-900 disabled:opacity-50"
-                                        />
-                                        {canEdit && (
-                                            <button onClick={toggleSlShift} disabled={!slName} className={`px-4 border font-bold text-[10px] transition-all ${isSlActive ? 'bg-red-900/20 text-red-500 border-red-800 hover:bg-red-900/40' : 'bg-green-900/20 text-green-400 border-green-600 hover:bg-green-900/40'}`}>
-                                                {isSlActive ? 'FIN SERVICE' : 'PRISE POSTE'}
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="bg-black border border-green-900/50 p-4">
-                                    <h3 className="text-[10px] font-black text-gray-500 uppercase mb-3 flex items-center gap-2 tracking-widest">
-                                        <Icon name="Users" size={12}/> ESCUADE LOGISTIQUE ({squad.length})
-                                    </h3>
-                                    <div className="space-y-2 mb-4">
-                                        {squad.length === 0 && <p className="text-center text-[10px] text-green-900 italic py-4 border border-dashed border-green-900/30">AUCUN EFFECTIF</p>}
-                                        {squad.map(member => (
-                                            <div key={member.id} className="flex justify-between items-center bg-green-900/5 p-2 border border-green-900/30">
-                                                <div>
-                                                    <div className="font-bold text-xs text-green-400 flex items-center gap-2">
-                                                        <Icon name="Wifi" size={10} className="text-green-600 animate-pulse"/>
-                                                        {member.name}
+                                    <div className="space-y-8">
+                                        {Object.keys(CATEGORIES).map(catKey => {
+                                            const models = catalog.filter(m => m.cat === catKey);
+                                            if(models.length === 0) return null;
+                                            const IconComp = Icons[CATEGORIES[catKey].icon];
+                                            return (
+                                                <div key={catKey} className="bg-black border border-green-900/50 p-4 relative">
+                                                    <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-green-800"></div>
+                                                    <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-green-800"></div>
+                                                    
+                                                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-green-900/30">
+                                                        <span className={CATEGORIES[catKey].color.split(' ')[1]}>{IconComp && <IconComp size={20}/>}</span>
+                                                        <span className="font-black text-sm text-gray-400 tracking-wider">{CATEGORIES[catKey].label}</span>
                                                     </div>
-                                                    <div className="text-[9px] text-green-800 font-mono">T-IN: {member.startTime}</div>
+                                                    
+                                                    {/* Garage Grid: Up to 6 cols on large screens */}
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+                                                        {models.map(model => {
+                                                            const activeCount = activeUnits.filter(u => u.modelId === model.id).length;
+                                                            return Array.from({ length: model.stock }).map((_, index) => (
+                                                                <GarageSlot 
+                                                                    key={`${model.id}-${index}`} 
+                                                                    model={model} 
+                                                                    index={index} 
+                                                                    activeCount={activeCount} 
+                                                                    onDeploy={() => deployUnit(model.id)} 
+                                                                    ArrowUpRight={ArrowUpRight}
+                                                                />
+                                                            ));
+                                                        })}
+                                                    </div>
                                                 </div>
-                                                {canEdit && (
-                                                    <button onClick={() => removeSquadMember(member.id)} className="text-green-800 hover:text-red-500 p-1">
-                                                        <Icon name="LogOut" size={14}/>
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
-                                    {canEdit && (
-                                        <div className="flex gap-2 border-t border-green-900/30 pt-3">
-                                            <input type="text" id="newMemberName" placeholder="NOUVEAU MEMBRE..." className="flex-1 bg-black border border-green-900 px-3 py-2 text-xs font-bold text-green-400 uppercase focus:border-green-600 outline-none placeholder-green-900" onKeyDown={(e) => { if(e.key === 'Enter') { addSquadMember(e.target.value); e.target.value = ''; } }} />
-                                            <button onClick={() => { const el = document.getElementById('newMemberName'); addSquadMember(el.value); el.value = ''; }} className="bg-green-900/20 hover:bg-green-900/40 text-green-500 border border-green-800 px-3">
-                                                <Icon name="Plus" size={16}/>
-                                            </button>
+                                </div>
+                            )}
+
+                            {/* SQUAD & JMO : Utilisation du composant existant mais avec meilleur padding */}
+                            {(activeTab === 'squad' || activeTab === 'journal') && (
+                                <div className="max-w-3xl mx-auto">
+                                    {/* Squad Logic (Simplifiée pour gain place, même logique que V9.0) */}
+                                    {activeTab === 'squad' && (
+                                        <div className="space-y-6">
+                                            <div className="bg-black border border-green-800 p-6 relative">
+                                                <h3 className="text-sm font-black text-green-500 mb-4 flex items-center gap-2">{Shield && <Shield size={16}/>} COMMANDEMENT</h3>
+                                                <div className="flex gap-4">
+                                                    <input type="text" placeholder="NOM DU SL..." value={slName} disabled={!canEdit || isSlActive} onChange={(e) => setSlName(e.target.value)} className="flex-1 bg-green-900/10 border border-green-800 px-4 py-2 text-sm font-bold text-green-400 outline-none focus:border-green-500 disabled:opacity-50" />
+                                                    {canEdit && <button onClick={toggleSlShift} disabled={!slName} className={`px-6 py-2 border font-bold text-xs tracking-widest ${isSlActive?'bg-red-900/20 border-red-800 text-red-500':'bg-green-900/20 border-green-800 text-green-400'}`}>{isSlActive?'FIN':'PRISE'}</button>}
+                                                </div>
+                                            </div>
+                                            <div className="bg-black border border-green-900/50 p-6">
+                                                <h3 className="text-sm font-black text-gray-400 mb-4 flex items-center gap-2">{Users && <Users size={16}/>} EFFECTIFS ({squad.length})</h3>
+                                                <div className="space-y-2 mb-4">
+                                                    {squad.map(m => (
+                                                        <div key={m.id} className="flex justify-between items-center bg-green-900/5 p-3 border border-green-900/30">
+                                                            <div><div className="font-bold text-sm text-green-400">{m.name}</div><div className="text-[10px] text-green-800">IN: {m.startTime}</div></div>
+                                                            {canEdit && <button onClick={()=>removeSquadMember(m.id)} className="text-red-800 hover:text-red-500"><LogOut size={16}/></button>}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {canEdit && <div className="flex gap-2"><input id="newMemberName" type="text" placeholder="NOUVEAU..." className="flex-1 bg-black border border-green-900 px-3 py-2 text-sm text-green-400 uppercase" onKeyDown={(e)=>{if(e.key==='Enter'){addSquadMember(e.target.value);e.target.value='';}}} /><button onClick={()=>{const e=document.getElementById('newMemberName');addSquadMember(e.value);e.value='';}} className="bg-green-900/20 px-4 border border-green-800 text-green-500"><Plus size={18}/></button></div>}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Journal Logic */}
+                                    {activeTab === 'journal' && canEdit && (
+                                        <div className="bg-black border border-green-900/50 p-6">
+                                            <h2 className="text-sm font-black text-green-500 mb-4 flex gap-2 items-center border-b border-green-900 pb-2">{ScrollText && <ScrollText size={16}/>} JMO</h2>
+                                            <div className="space-y-0 font-mono text-xs md:text-sm">
+                                                {globalLogs.map(log => (
+                                                    <div key={log.id} className="flex gap-4 py-2 border-b border-green-900/10 text-green-400 hover:bg-green-900/5 px-2">
+                                                        <span className="text-green-800 font-bold w-16 shrink-0">{log.time}</span>
+                                                        <div><span className="font-black text-green-700 mr-2">[{log.type}]</span><span className="text-gray-300">{log.msg}</span></div>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {/* JOURNAL (Caché pour Logi) */}
-                        {activeTab === 'journal' && canEdit && (
-                            <div className="space-y-4 animate-in fade-in duration-300">
-                                <h2 className="text-xs font-black text-green-600 flex items-center gap-2 uppercase tracking-widest border-b border-green-900 pb-2">
-                                    <Icon name="ScrollText" size={14}/> JOURNAL DE MARCHE ET OPÉRATIONS
-                                </h2>
-                                <div className="space-y-0 font-mono text-xs">
-                                    {globalLogs.length === 0 && <p className="text-[10px] text-green-900 italic">Aucune entrée.</p>}
-                                    {globalLogs.map(log => (
-                                        <div key={log.id} className="flex gap-3 py-2 border-b border-green-900/20 text-green-400">
-                                            <span className="text-green-800 font-bold w-12 shrink-0">{log.time}</span>
-                                            <div>
-                                                <span className="text-[9px] font-black bg-green-900/20 px-1 rounded text-green-600 mr-2">{log.type}</span>
-                                                <span className="text-gray-400">{log.msg}</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </main>
+                        </main>
+                    </div>
 
-                    {/* NAVIGATION */}
-                    <nav className="fixed bottom-0 w-full max-w-5xl left-1/2 -translate-x-1/2 bg-black border-t border-green-900 grid grid-cols-4 h-14 z-50 pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
-                        <NavButton icon={<Icon name="LayoutDashboard" size={18}/>} label="OPS" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-                        
-                        <NavButton 
-                            icon={<Icon name="Warehouse" size={18}/>} 
-                            label="GARAGE" 
-                            active={activeTab === 'garage'} 
-                            onClick={() => canEdit && setActiveTab('garage')} 
-                            disabled={!canEdit}
-                        />
-                        
-                        <NavButton icon={<Icon name="Users" size={18}/>} label="SQUAD" active={activeTab === 'squad'} onClick={() => setActiveTab('squad')} />
-                        
-                        <NavButton 
-                            icon={<Icon name="ScrollText" size={18}/>} 
-                            label="JMO" 
-                            active={activeTab === 'journal'} 
-                            onClick={() => canEdit && setActiveTab('journal')} 
-                            disabled={!canEdit}
-                        />
+                    {/* MOBILE NAV (Bottom - Hidden on Desktop) */}
+                    <nav className="md:hidden fixed bottom-0 w-full bg-black border-t border-green-900 grid grid-cols-4 h-14 z-50 pb-safe">
+                        <NavButton icon={LayoutDashboard} label="OPS" active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')} />
+                        <NavButton icon={Warehouse} label="GARAGE" active={activeTab==='garage'} onClick={()=>canEdit&&setActiveTab('garage')} disabled={!canEdit} />
+                        <NavButton icon={Users} label="SQUAD" active={activeTab==='squad'} onClick={()=>setActiveTab('squad')} />
+                        <NavButton icon={ScrollText} label="JMO" active={activeTab==='journal'} onClick={()=>canEdit&&setActiveTab('journal')} disabled={!canEdit} />
                     </nav>
 
-                    {/* MODALES */}
+                    {/* MODALES (Code simplifié pour lisibilité, inclut logique existante) */}
                     
-                    {/* NOUVEAU : MODAL CRÉATION VÉHICULE */}
-                    {showCreateVehicleModal && canEdit && (
-                        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                            <div className="bg-black border border-green-800 w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(34,197,94,0.2)]">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-lg font-black uppercase text-green-500 tracking-widest">NOUVEAU MODÈLE</h3>
-                                    <button onClick={() => setShowCreateVehicleModal(false)}><Icon name="XCircle" size={18} className="text-green-700 hover:text-green-400"/></button>
-                                </div>
-                                <div className="space-y-4 mb-6">
-                                    <div>
-                                        <label className="text-[9px] font-bold text-green-800 uppercase block mb-1">NOM DU VÉHICULE</label>
-                                        <input type="text" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 text-xs font-bold outline-none focus:border-green-500 uppercase" value={newModelData.name} onChange={(e) => setNewModelData({...newModelData, name: e.target.value})} />
-                                    </div>
-                                    <div>
-                                        <label className="text-[9px] font-bold text-green-800 uppercase block mb-1">CATÉGORIE</label>
-                                        <select className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 text-xs font-bold outline-none focus:border-green-500 uppercase" value={newModelData.cat} onChange={(e) => setNewModelData({...newModelData, cat: e.target.value})}>
-                                            {Object.entries(CATEGORIES).map(([key, val]) => (
-                                                <option key={key} value={key}>{val.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-[9px] font-bold text-green-800 uppercase block mb-1">TYPE TACTIQUE</label>
-                                        <input type="text" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 text-xs font-bold outline-none focus:border-green-500 uppercase" value={newModelData.type} onChange={(e) => setNewModelData({...newModelData, type: e.target.value})} placeholder="EX: TRANSPORT LOURD" />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <label className="text-[9px] font-bold text-green-800 uppercase block mb-1">COÛT (PTS)</label>
-                                            <input type="number" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 text-xs font-bold outline-none focus:border-green-500" value={newModelData.cost} onChange={(e) => setNewModelData({...newModelData, cost: e.target.value})} />
-                                        </div>
-                                        <div>
-                                            <label className="text-[9px] font-bold text-green-800 uppercase block mb-1">STOCK INITIAL</label>
-                                            <input type="number" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 text-xs font-bold outline-none focus:border-green-500" value={newModelData.stock} onChange={(e) => setNewModelData({...newModelData, stock: e.target.value})} />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button onClick={() => setShowCreateVehicleModal(false)} className="py-3 border border-gray-800 text-gray-500 font-bold text-xs hover:text-white">ANNULER</button>
-                                    <button onClick={createModel} disabled={!newModelData.name} className="py-3 bg-green-600 text-black font-black text-xs hover:bg-green-500 disabled:opacity-50">AJOUTER</button>
-                                </div>
+                    {actionModal?.type === 'mission' && (
+                        <Modal title="ORDRE DE MISSION" color="blue" onClose={()=>setActionModal(null)} Icon={XCircle}>
+                            <div className="mb-6">
+                                <label className="text-[10px] font-bold text-blue-800 block mb-1">CHEF DE BORD</label>
+                                <select value={selectedMemberId} onChange={(e) => setSelectedMemberId(e.target.value)} className="w-full bg-blue-900/10 border border-blue-800 p-3 text-blue-300 text-sm font-bold outline-none"><option value="">-- SÉLECTIONNER --</option>{slName&&<option value="SL">SL - {slName}</option>}{squad.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select>
                             </div>
-                        </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button onClick={() => setActionModal(null)} className="py-3 border border-blue-900 text-blue-500 font-bold text-xs">ANNULER</button>
+                                <button onClick={confirmMission} disabled={!selectedMemberId} className="py-3 bg-blue-600 text-black font-black text-xs hover:bg-blue-500">DÉPART</button>
+                            </div>
+                        </Modal>
                     )}
 
-                    {/* GESTIONNAIRE DE PHASES (NOUVEAU) */}
+                    {actionModal?.type === 'destroy' && (
+                        <Modal title="RAPPORT DE PERTE" color="red" onClose={()=>setActionModal(null)} Icon={XCircle}>
+                            <input autoFocus type="text" value={inputReason} onChange={(e)=>setInputReason(e.target.value)} className="w-full bg-red-900/10 border border-red-800 p-3 text-red-200 mb-6 outline-none font-bold" placeholder="CAUSE..." />
+                            <div className="grid grid-cols-2 gap-3"><button onClick={()=>setActionModal(null)} className="py-3 border border-red-900 text-red-500 text-xs font-bold">ANNULER</button><button onClick={confirmDestruction} disabled={!inputReason} className="py-3 bg-red-700 text-black font-black text-xs">CONFIRMER</button></div>
+                        </Modal>
+                    )}
+                    
+                    {showSupplyModal && canEdit && <Modal title="INVENTAIRE" color="green" onClose={()=>setShowSupplyModal(false)} Icon={XCircle}><div className="space-y-2">{supplySources.map(s=><div key={s.id} className="flex justify-between bg-black p-2 border border-green-900/50"><span className="text-green-500 font-bold">{s.name}</span><div className="flex gap-2"><input type="number" value={s.amount} onChange={(e)=>updateSupplySource(s.id,'amount',parseInt(e.target.value)||0)} className="w-20 bg-green-900/10 text-right text-green-400 border border-green-900"/><button onClick={()=>removeSupplySource(s.id)} className="text-red-500"><Trash2 size={14}/></button></div></div>)}<button onClick={addSupplySource} className="w-full border border-dashed border-green-700 text-green-500 py-2 text-xs font-bold mt-4">AJOUTER</button></div></Modal>}
+
+                    {showCreateVehicleModal && canEdit && <Modal title="NOUVEAU MODÈLE" color="green" onClose={()=>setShowCreateVehicleModal(false)} Icon={XCircle}><div className="space-y-3 mb-4"><div><label className="text-[10px] text-green-800 font-bold block">NOM</label><input type="text" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold uppercase" value={newModelData.name} onChange={e=>setNewModelData({...newModelData,name:e.target.value})}/></div><div><label className="text-[10px] text-green-800 font-bold block">CATÉGORIE</label><select className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold" value={newModelData.cat} onChange={e=>setNewModelData({...newModelData,cat:e.target.value})}>{Object.entries(CATEGORIES).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}</select></div></div><button onClick={createModel} className="w-full bg-green-600 text-black font-black py-3 text-xs">CRÉER</button></Modal>}
+                    
                     {showConfigModal && canEdit && (
                         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
                             <div className="bg-black border border-blue-800 w-full max-w-4xl h-[80vh] flex flex-col shadow-[0_0_50px_rgba(30,64,175,0.2)]">
-                                <div className="p-3 border-b border-blue-900 bg-blue-900/10 flex justify-between items-center">
-                                    <h3 className="font-black text-blue-500 text-sm tracking-widest flex items-center gap-2">
-                                        <Icon name="List" size={16}/> CONFIGURATEUR DE PHASES
-                                    </h3>
-                                    <button onClick={() => { setShowConfigModal(false); setCurrentConfigId(null); }}>
-                                        <Icon name="XCircle" size={18} className="text-blue-700 hover:text-blue-400"/>
-                                    </button>
-                                </div>
+                                <div className="p-4 border-b border-blue-900 bg-blue-900/10 flex justify-between items-center"><h3 className="font-black text-blue-500">PHASES</h3><button onClick={()=>setShowConfigModal(false)}><XCircle size={20} className="text-blue-500"/></button></div>
                                 <div className="flex-1 flex overflow-hidden">
-                                    {/* LISTE DES PHASES (GAUCHE) */}
-                                    <div className="w-1/3 border-r border-blue-900/50 overflow-y-auto p-2 space-y-2 bg-black">
-                                        <button onClick={createConfiguration} className="w-full py-2 border border-dashed border-blue-700 text-blue-500 text-[10px] font-bold hover:bg-blue-900/20 flex items-center justify-center gap-2">
-                                            <Icon name="Plus" size={12}/> NOUVELLE PHASE
-                                        </button>
-                                        {configurations.map(config => (
-                                            <div key={config.id} className={`flex items-center justify-between p-3 border transition-all cursor-pointer ${currentConfigId === config.id ? 'border-blue-500 bg-blue-900/20' : 'border-blue-900/30 hover:bg-blue-900/10'}`} onClick={() => setCurrentConfigId(config.id)}>
-                                                <span className="text-xs font-bold text-blue-400">{config.name}</span>
-                                                <button onClick={(e) => { e.stopPropagation(); deleteConfiguration(config.id); }} className="text-blue-800 hover:text-red-500">
-                                                    <Icon name="Trash2" size={12}/>
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    
-                                    {/* CONTENU EDITEUR (DROITE) */}
+                                    <div className="w-1/3 border-r border-blue-900/50 overflow-y-auto p-2 bg-black space-y-2"><button onClick={createConfig} className="w-full py-3 border border-dashed border-blue-700 text-blue-500 text-xs font-bold">NOUVELLE PHASE</button>{configurations.map(c=><div key={c.id} onClick={()=>setCurrentConfigId(c.id)} className={`p-3 border cursor-pointer flex justify-between ${currentConfigId===c.id?'bg-blue-900/20 border-blue-500':'border-blue-900/30 hover:bg-blue-900/10'}`}><span className="text-blue-400 font-bold text-xs">{c.name}</span><button onClick={(e)=>{e.stopPropagation();deleteConfig(c.id)}} className="text-blue-800 hover:text-red-500"><Trash2 size={14}/></button></div>)}</div>
                                     <div className="w-2/3 overflow-y-auto p-4 bg-black">
-                                        {currentConfigId ? (
-                                            <div className="space-y-4">
-                                                <div className="flex items-center gap-2 border-b border-blue-900 pb-2 mb-4">
-                                                    <span className="text-[10px] font-bold text-blue-700">NOM :</span>
-                                                    <input 
-                                                        type="text" 
-                                                        value={configurations.find(c => c.id === currentConfigId)?.name}
-                                                        onChange={(e) => renameConfiguration(currentConfigId, e.target.value)}
-                                                        className="bg-transparent text-blue-400 font-black uppercase outline-none w-full"
-                                                    />
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    {catalog.map(model => {
-                                                        const count = configurations.find(c => c.id === currentConfigId)?.content[model.id] || 0;
-                                                        return (
-                                                            <div key={model.id} className={`flex justify-between items-center p-2 border ${count > 0 ? 'border-blue-600 bg-blue-900/10' : 'border-blue-900/30 opacity-60'}`}>
-                                                                <span className="text-[9px] font-bold text-gray-400 truncate max-w-[100px]">{model.name}</span>
-                                                                <div className="flex items-center gap-1">
-                                                                    <button onClick={() => updateConfiguration(currentConfigId, model.id, -1)} className="text-blue-700 hover:text-blue-400 px-1"><Icon name="MinusCircle" size={14}/></button>
-                                                                    
-                                                                    {/* INPUT QUANTITÉ SAISISSABLE */}
-                                                                    <input 
-                                                                        type="number" 
-                                                                        value={count} 
-                                                                        onChange={(e) => setConfigurationCount(currentConfigId, model.id, e.target.value)}
-                                                                        className="w-10 bg-black text-blue-400 font-mono font-bold text-center text-xs border border-blue-900/50 focus:border-blue-500 outline-none p-1"
-                                                                        onClick={(e) => e.target.select()} 
-                                                                    />
-
-                                                                    <button onClick={() => updateConfiguration(currentConfigId, model.id, 1)} className="text-blue-700 hover:text-blue-400 px-1"><Icon name="PlusCircle" size={14}/></button>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="h-full flex items-center justify-center text-blue-900 text-xs font-bold italic">
-                                                SÉLECTIONNEZ OU CRÉEZ UNE PHASE
-                                            </div>
-                                        )}
+                                        {currentConfigId && catalog.map(m => {
+                                            const cnt = configurations.find(x=>x.id===currentConfigId)?.content[m.id]||0;
+                                            return (<div key={m.id} className={`flex justify-between items-center p-2 border mb-2 ${cnt>0?'border-blue-600 bg-blue-900/10':'border-blue-900/20 opacity-50'}`}><span className="text-xs font-bold text-gray-400 w-1/2 truncate">{m.name}</span><div className="flex items-center gap-2"><button onClick={()=>updateConfig(currentConfigId,m.id,-1)} className="text-blue-500"><MinusCircle size={16}/></button><input type="number" value={cnt} onChange={(e)=>setConfigCount(currentConfigId,m.id,e.target.value)} className="w-10 bg-transparent text-center text-blue-400 font-bold border-b border-blue-900" /><button onClick={()=>updateConfig(currentConfigId,m.id,1)} className="text-blue-500"><PlusCircle size={16}/></button></div></div>)
+                                        })}
                                     </div>
-                                </div>
-                                <div className="p-3 border-t border-blue-900 bg-black flex justify-end">
-                                    <button onClick={() => { setShowConfigModal(false); setCurrentConfigId(null); }} className="px-6 py-2 bg-blue-900/20 border border-blue-800 text-blue-500 text-[10px] font-bold hover:bg-blue-900/40">TERMINER</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* AUTRES MODALES EXISTANTES (Mission, Destroy, Stock, Supply, Logs) */}
-                    {actionModal?.type === 'mission' && canEdit && (
-                        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                            <div className="bg-black border border-blue-700 w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(29,78,216,0.2)]">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-lg font-black uppercase text-blue-500 tracking-widest">ORDRE DE MISSION</h3>
-                                    <button onClick={() => setActionModal(null)} className="text-blue-700 hover:text-blue-400"><Icon name="XCircle" size={20} /></button>
-                                </div>
-                                <div className="mb-6">
-                                    <label className="text-[9px] font-bold text-blue-800 uppercase block mb-1">CHEF DE BORD / PILOTE</label>
-                                    <select value={selectedMemberId} onChange={(e) => setSelectedMemberId(e.target.value)} className="w-full bg-blue-900/10 border border-blue-800 p-3 text-blue-300 focus:border-blue-500 outline-none font-bold uppercase text-xs appearance-none">
-                                        <option value="">-- SÉLECTIONNER PERSONNEL --</option>
-                                        {slName && <option value="SL">SL - {slName}</option>}
-                                        {squad.map(m => (<option key={m.id} value={m.id}>{m.name}</option>))}
-                                    </select>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button onClick={() => setActionModal(null)} className="py-3 border border-gray-800 text-gray-500 font-bold text-xs hover:text-white hover:border-gray-500 transition-colors">ANNULER</button>
-                                    <button onClick={confirmMission} disabled={!selectedMemberId} className="py-3 bg-blue-600 text-black font-black text-xs hover:bg-blue-500 disabled:opacity-50">DÉPART</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {actionModal?.type === 'destroy' && canEdit && (
-                        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                            <div className="bg-black border-2 border-red-700 w-full max-w-sm p-6 relative shadow-[0_0_50px_rgba(185,28,28,0.3)]">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-xl font-black uppercase text-red-600 tracking-widest animate-pulse">RAPPORT DE PERTE</h3>
-                                    <button onClick={() => setActionModal(null)} className="text-red-700 hover:text-red-400"><Icon name="XCircle" size={20} /></button>
-                                </div>
-                                <input autoFocus type="text" value={inputReason} onChange={(e) => setInputReason(e.target.value)} className="w-full bg-red-900/10 border border-red-800 p-3 text-red-200 mb-6 font-bold uppercase outline-none focus:border-red-500 text-sm" placeholder="CAUSE (EX: IED, ROQUETTE...)" />
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button onClick={() => setActionModal(null)} className="py-3 border border-gray-800 text-gray-500 font-bold text-xs hover:text-white">ANNULER</button>
-                                    <button onClick={confirmDestruction} disabled={!inputReason} className="py-3 bg-red-700 text-white font-black text-xs hover:bg-red-600">CONFIRMER</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
                     {showStockModal && canEdit && (
-                        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                            <div className="bg-black border border-green-800 w-full max-w-md flex flex-col max-h-[80vh]">
-                                <div className="p-3 border-b border-green-900 bg-green-900/20 flex justify-between items-center">
-                                    <h3 className="font-black text-green-500 text-sm tracking-widest">GESTION STOCKS</h3>
-                                    <button onClick={() => setShowStockModal(false)}><Icon name="XCircle" size={18} className="text-green-700 hover:text-green-400"/></button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                    {Object.keys(CATEGORIES).map(catKey => {
-                                        const models = catalog.filter(m => m.cat === catKey);
-                                        if(models.length === 0) return null;
-                                        return (
-                                            <div key={catKey}>
-                                                <h4 className={`text-[10px] font-black mb-2 uppercase ${CATEGORIES[catKey].color.split(' ')[1]}`}>{CATEGORIES[catKey].label}</h4>
-                                                <div className="space-y-1">
-                                                    {models.map(model => (
-                                                        <div key={model.id} className="flex items-center justify-between bg-green-900/5 p-2 border border-green-900/30">
-                                                            <div className="flex-1">
-                                                                <div className="text-[10px] font-bold text-gray-400">{model.name}</div>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                {/* BOUTON SUPPRESSION */}
-                                                                <button onClick={() => deleteModel(model.id)} className="text-green-800 hover:text-red-500 mr-2">
-                                                                    <Icon name="Trash2" size={12}/>
-                                                                </button>
-                                                                <button onClick={() => updateStock(model.id, -1)} className="w-5 h-5 flex items-center justify-center bg-black border border-red-900 text-red-500 hover:bg-red-900/20 font-mono text-xs">-</button>
-                                                                <span className="w-6 text-center font-mono font-bold text-green-400 text-xs">{model.stock}</span>
-                                                                <button onClick={() => updateStock(model.id, 1)} className="w-5 h-5 flex items-center justify-center bg-black border border-green-900 text-green-500 hover:bg-green-900/20 font-mono text-xs">+</button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                                <div className="p-3 border-t border-green-900/20 bg-black">
-                                    <button onClick={() => setShowStockModal(false)} className="w-full py-2 bg-green-900/20 border border-green-800 text-green-500 text-[10px] font-bold hover:bg-green-900/40 flex items-center justify-center gap-2">FERMER</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {showSupplyModal && canEdit && (
-                        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                            <div className="bg-black border border-green-800 w-full max-w-md">
-                                <div className="p-3 border-b border-green-900 bg-green-900/20 flex justify-between items-center">
-                                    <h3 className="font-black text-green-500 text-sm tracking-widest">INVENTAIRE LOGISTIQUE</h3>
-                                    <button onClick={() => setShowSupplyModal(false)}><Icon name="XCircle" size={18} className="text-green-700 hover:text-green-400"/></button>
-                                </div>
-                                <div className="p-4 space-y-2">
-                                    {supplySources.map((src, idx) => (
-                                        <div key={src.id} className="flex items-center justify-between bg-black p-2 border border-green-900/50">
-                                            <span className="text-xs font-bold text-green-600 uppercase">{src.name}</span>
-                                            <div className="flex items-center gap-2">
-                                                <input type="number" value={src.amount} onChange={(e) => updateSupplySource(src.id, 'amount', parseInt(e.target.value) || 0)} className="w-20 bg-green-900/10 text-green-400 font-mono font-bold text-right p-1 outline-none border border-green-900 focus:border-green-500 text-xs" />
-                                                <button onClick={() => removeSupplySource(src.id)} className="text-green-800 hover:text-red-500"><Icon name="Trash2" size={14}/></button>
+                         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                            <div className="bg-black border border-green-800 w-full max-w-4xl h-[80vh] flex flex-col">
+                                <div className="p-4 border-b border-green-900 bg-green-900/20 flex justify-between items-center"><h3 className="font-black text-green-500">STOCKS</h3><button onClick={()=>setShowStockModal(false)}><XCircle size={20} className="text-green-500"/></button></div>
+                                <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {catalog.map(m => (
+                                        <div key={m.id} className="flex justify-between items-center p-3 border border-green-900/30 bg-green-900/5">
+                                            <div className="overflow-hidden"><div className="font-bold text-xs text-gray-300 truncate">{m.name}</div><div className="text-[10px] text-green-800">{CATEGORIES[m.cat]?.label}</div></div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <button onClick={()=>deleteModel(m.id)} className="text-green-900 hover:text-red-500 mr-2"><Trash2 size={14}/></button>
+                                                <button onClick={()=>updateStock(m.id,-1)} className="w-6 h-6 border border-red-900 text-red-500 flex items-center justify-center">-</button>
+                                                <span className="w-6 text-center font-mono text-green-400 font-bold">{m.stock}</span>
+                                                <button onClick={()=>updateStock(m.id,1)} className="w-6 h-6 border border-green-900 text-green-500 flex items-center justify-center">+</button>
                                             </div>
                                         </div>
                                     ))}
-                                    <button onClick={addSupplySource} className="w-full py-2 border border-dashed border-green-900 text-green-700 text-[10px] font-bold hover:border-green-500 hover:text-green-500 flex items-center justify-center gap-2 mt-4">AJOUTER SOURCE</button>
-                                    <button onClick={() => setShowSupplyModal(false)} className="w-full py-2 bg-green-900/20 border border-green-800 text-green-500 text-[10px] font-bold hover:bg-green-900/40 flex items-center justify-center gap-2 mt-2">FERMER</button>
                                 </div>
                             </div>
-                        </div>
+                         </div>
                     )}
+                    
+                    {actionModal?.type === 'logs' && <Modal title="HISTORIQUE" color="green" onClose={()=>setActionModal(null)} Icon={XCircle}><div className="h-64 overflow-y-auto space-y-2 font-mono text-xs text-gray-400">{actionModal.unit.logs?.slice().reverse().map((l,i)=><div key={i} className="border-l border-green-900 pl-2"><span className="text-green-700">{l.time}</span> {l.msg}</div>)}</div></Modal>}
 
-                    {actionModal?.type === 'logs' && (
-                        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in">
-                            <div className="bg-black border border-green-800 w-full max-w-md h-[60vh] flex flex-col relative">
-                                <div className="p-3 border-b border-green-900 bg-green-900/20 flex justify-between items-center">
-                                    <h3 className="font-black text-green-500 text-sm tracking-widest">HISTORIQUE VÉHICULE</h3>
-                                    <button onClick={() => setActionModal(null)}><Icon name="XCircle" size={18} className="text-green-700 hover:text-green-400"/></button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto p-4 space-y-4 font-mono text-xs">
-                                    {actionModal.unit.logs?.slice().reverse().map((log, i) => (
-                                        <div key={i} className="border-l border-green-900 pl-3 text-green-400">
-                                            <span className="text-green-800 font-bold block text-[9px]">{log.time}</span>
-                                            <p className="text-gray-400 uppercase">{log.msg}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
             );
         }
 
-        function NavButton({ icon, label, active, onClick, disabled }) {
+        // --- SOUS-COMPOSANTS ---
+        const StatCard = ({ color, value, label }) => {
+            const colors = {
+                green: "border-green-800 bg-green-900/10 text-green-500",
+                blue: "border-blue-800 bg-blue-900/10 text-blue-500",
+                red: "border-red-800 bg-red-900/10 text-red-500"
+            };
             return (
-                <button 
-                    onClick={onClick} 
-                    disabled={disabled}
-                    className={`flex flex-col items-center justify-center gap-1 transition-all border-t-2 ${active ? 'text-green-400 border-green-500 bg-green-900/20' : disabled ? 'text-green-900 opacity-30 cursor-not-allowed border-transparent' : 'text-green-900 border-transparent hover:text-green-600'}`}
-                >
-                    {icon}
-                    <span className="text-[8px] font-black tracking-widest">{label}</span>
+                <div className={`border p-3 md:p-4 text-center relative overflow-hidden ${colors[color]}`}>
+                    <div className={`absolute top-0 left-0 w-2 h-2 border-t border-l border-${color}-500`}></div>
+                    <span className="text-3xl md:text-4xl font-black block leading-none">{value}</span>
+                    <span className="text-[10px] md:text-xs font-bold opacity-70 uppercase tracking-widest">{label}</span>
+                </div>
+            );
+        };
+
+        const ActionButton = ({ onClick, icon: Icon, label, color }) => (
+            <button onClick={onClick} className={`text-[9px] md:text-xs font-bold bg-${color}-900/20 border border-${color}-800 px-3 py-1.5 text-${color}-400 hover:bg-${color}-900/40 hover:border-${color}-500 flex items-center gap-2 transition-colors`}>
+                {Icon && <Icon size={14} />} {label}
+            </button>
+        );
+
+        const NavButton = ({ icon: Icon, label, active, onClick, disabled }) => (
+            <button onClick={onClick} disabled={disabled} className={`flex flex-col items-center justify-center gap-1 transition-all border-t-2 ${active?'text-green-400 border-green-500 bg-green-900/20':disabled?'text-green-900 opacity-30':'text-green-900 border-transparent hover:text-green-600'}`}>
+                {Icon && <Icon size={18}/>} <span className="text-[8px] font-black tracking-widest">{label}</span>
+            </button>
+        );
+
+        const NavButtonDesktop = ({ icon: Icon, label, active, onClick, disabled }) => (
+            <button onClick={onClick} disabled={disabled} className={`w-full flex items-center gap-3 px-4 py-3 transition-all border-l-4 text-left ${active?'text-green-400 border-green-500 bg-green-900/20':disabled?'text-green-900 border-transparent opacity-30':'text-gray-500 border-transparent hover:text-green-500 hover:bg-green-900/10'}`}>
+                {Icon && <Icon size={20}/>} <span className="text-xs font-black tracking-widest uppercase">{label}</span>
+            </button>
+        );
+
+        const EmptyState = ({ canEdit, Target }) => (
+            <div className="flex flex-col items-center justify-center h-64 md:h-96 border border-dashed border-green-900 bg-green-900/5 rounded-lg">
+                {Target && <Target size={64} className="mb-4 text-green-900 opacity-50" />}
+                <p className="text-sm font-bold uppercase text-green-800 tracking-widest">AUCUNE UNITÉ DÉPLOYÉE</p>
+                {canEdit && <p className="text-xs text-green-900 mt-2">ACCÉDER AU GARAGE POUR DÉPLOIEMENT</p>}
+            </div>
+        );
+
+        const GarageSlot = ({ model, index, activeCount, onDeploy, ArrowUpRight }) => {
+            const isAvailable = index >= activeCount;
+            return (
+                <button disabled={!isAvailable} onClick={isAvailable ? onDeploy : undefined} 
+                    className={`relative p-2 md:p-3 border flex flex-col items-center justify-center text-center h-24 md:h-32 transition-all ${isAvailable ? 'bg-green-900/10 border-green-800 hover:bg-green-900/30 hover:border-green-500 active:scale-95 group' : 'bg-black border-green-900/30 opacity-30 cursor-default'}`}>
+                    {isAvailable ? (
+                        <>
+                            <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-500 shadow-[0_0_5px_#22c55e]"></div>
+                            <span className="mt-1 text-[10px] md:text-xs font-black text-green-400 leading-tight uppercase px-1">{model.name}</span>
+                            <span className="text-[9px] text-green-800 font-mono mt-1">{model.cost} PTS</span>
+                        </>
+                    ) : (
+                        <div className="flex flex-col items-center">
+                            {ArrowUpRight && <ArrowUpRight size={20} className="text-green-900 mb-1"/>}
+                            <span className="text-[9px] font-black text-green-900 uppercase tracking-widest">MISSION</span>
+                        </div>
+                    )}
+                    <div className="absolute bottom-1 left-1 text-[8px] font-mono text-green-900">SLOT {index+1}</div>
                 </button>
             );
-        }
+        };
 
-        function MissionTimer({ startTime }) {
-            const [duration, setDuration] = useState('00:00:00');
-            useEffect(() => {
-                const timer = setInterval(() => {
-                    const diff = Date.now() - startTime;
-                    const hrs = Math.floor(diff / 3600000).toString().padStart(2, '0');
-                    const mins = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-                    const secs = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                    setDuration(`${hrs}:${mins}:${secs}`);
-                }, 1000);
-                return () => clearInterval(timer);
-            }, [startTime]);
-            return <span className="font-mono text-blue-400 font-bold bg-blue-900/30 px-2 py-0.5 text-[10px] border border-blue-900">T+{duration}</span>;
-        }
+        // Composant Modal Générique pour simplifier le code
+        const Modal = ({ title, color, onClose, children, Icon }) => (
+            <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                <div className={`bg-black border border-${color}-800 w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(0,0,0,0.5)]`}>
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className={`text-lg font-black uppercase text-${color}-500 tracking-widest`}>{title}</h3>
+                        <button onClick={onClose} className={`text-${color}-700 hover:text-${color}-400`}>{Icon && <Icon size={20} />}</button>
+                    </div>
+                    {children}
+                </div>
+            </div>
+        );
 
-        function UnitCard({ unit, onStatusChange, onEndMission, onRTB, onShowLogs, readOnly }) {
-            let borderColor = 'border-green-600';
-            let statusText = 'text-green-500';
+        // --- UnitCard déjà défini plus haut, reprise standard pour Desktop ---
+        // (Note: Je réutilise la fonction UnitCard existante mais adaptée pour les grids larges)
+        function UnitCard({ unit, onStatusChange, onEndMission, onRTB, onShowLogs, Icons, readOnly }) {
+            let borderColor = 'border-green-600'; let statusText = 'text-green-500';
             if (unit.status === 'mission') { borderColor = 'border-blue-600'; statusText = 'text-blue-500'; }
             else if (unit.status === 'damaged') { borderColor = 'border-orange-600'; statusText = 'text-orange-500'; }
             else if (unit.status === 'destroyed') { borderColor = 'border-red-600'; statusText = 'text-red-600'; }
+            
+            const IconComp = Icons[CATEGORIES[unit.cat]?.icon || 'Truck']; // Fallback icon
+            const List = Icons['List']; const Clock = Icons['Clock']; const RotateCcw = Icons['RotateCcw']; const XCircle = Icons['XCircle'];
 
             return (
-                <div className={`relative border-l-2 ${borderColor} bg-green-900/5 p-2 flex flex-col h-full border-t border-r border-b border-green-900/30 hover:bg-green-900/10 transition-all`}>
+                <div className={`relative border-l-2 ${borderColor} bg-green-900/5 p-3 flex flex-col h-32 md:h-36 border-t border-r border-b border-green-900/30 hover:bg-green-900/10 transition-all`}>
                     <div className="flex justify-between items-start mb-2">
                         <div className="flex gap-2 overflow-hidden">
-                            <div className={`p-1.5 bg-black border border-green-900 flex items-center justify-center h-8 w-8 shrink-0 ${statusText}`}>
-                                <Icon name={CATEGORIES[unit.cat].icon} size={16}/>
-                            </div>
+                            <div className={`p-1.5 bg-black border border-green-900 flex items-center justify-center h-8 w-8 shrink-0 ${statusText}`}>{IconComp && <IconComp size={16}/>}</div>
                             <div className="min-w-0">
-                                <h3 className={`font-black text-xs text-gray-300 truncate uppercase leading-tight ${unit.status === 'destroyed' && 'line-through opacity-50'}`}>{unit.name}</h3>
-                                <div className="flex items-center gap-1 mt-0.5">
-                                    <span className="text-[8px] text-green-800 font-mono">{unit.cost} PTS</span>
-                                    {unit.responsible !== 'BASE' && (
-                                        <span className="text-[8px] bg-blue-900/20 px-1 text-blue-400 border border-blue-900/50 truncate max-w-[80px]">{unit.responsible}</span>
-                                    )}
-                                </div>
+                                <h3 className={`font-black text-xs md:text-sm text-gray-300 truncate uppercase leading-tight ${unit.status === 'destroyed' && 'line-through opacity-50'}`}>{unit.name}</h3>
+                                <div className="flex items-center gap-1 mt-0.5"><span className="text-[9px] text-green-800 font-mono">{unit.cost} PTS</span>{unit.responsible !== 'BASE' && (<span className="text-[8px] bg-blue-900/20 px-1 text-blue-400 border border-blue-900/50 truncate max-w-[80px]">{unit.responsible}</span>)}</div>
                             </div>
                         </div>
-                        <button onClick={onShowLogs} className="text-green-900 hover:text-green-500 p-1 shrink-0"><Icon name="List" size={14} /></button>
+                        <button onClick={onShowLogs} className="text-green-900 hover:text-green-500 p-1 shrink-0">{List && <List size={14} />}</button>
                     </div>
-                    {unit.status === 'mission' && (
-                        <div className="mb-2 flex items-center gap-1 justify-center">
-                            <Icon name="Clock" size={10} className="text-blue-600"/>
-                            <MissionTimer startTime={unit.missionStartTime} />
-                        </div>
-                    )}
-                    {unit.status === 'destroyed' ? (
-                        <div className="bg-red-900/10 border border-red-900/50 p-1 text-center mb-2">
-                            <p className="text-[8px] text-red-700 font-bold uppercase">CAUSE: {unit.reasonHS}</p>
-                        </div>
-                    ) : (
+                    {unit.status === 'mission' && (<div className="mb-2 flex items-center gap-1 justify-center">{Clock && <Clock size={10} className="text-blue-600"/>}<MissionTimer startTime={unit.missionStartTime} /></div>)}
+                    {unit.status === 'destroyed' ? (<div className="bg-red-900/10 border border-red-900/50 p-1 text-center mb-2 mt-auto"><p className="text-[8px] text-red-700 font-bold uppercase">CAUSE: {unit.reasonHS}</p></div>) : (
                         <div className="grid grid-cols-4 gap-1 mb-2 mt-auto">
                             <StatusBtn label="OPS" active={unit.status === 'operational'} color="green" onClick={() => !readOnly && onStatusChange('operational')} />
                             <StatusBtn label="MIS" active={unit.status === 'mission'} color="blue" onClick={() => !readOnly && (unit.status === 'mission' ? onEndMission() : onStatusChange('mission'))} />
@@ -1215,35 +790,22 @@
                     )}
                     <div className="flex justify-end pt-1 border-t border-green-900/20 mt-auto">
                         {unit.status !== 'destroyed' ? (
-                            !readOnly && (
-                                <button onClick={onRTB} className="text-[8px] font-bold text-green-800 hover:text-green-500 uppercase flex items-center gap-1">
-                                    <Icon name="RotateCcw" size={8} /> RENTRER
-                                </button>
-                            )
+                            !readOnly && (<button onClick={onRTB} className="text-[9px] font-bold text-green-800 hover:text-green-500 uppercase flex items-center gap-1">{RotateCcw && <RotateCcw size={10} />} RENTRER</button>)
                         ) : (
-                            !readOnly && (
-                                <button onClick={onRTB} className="text-[8px] font-bold text-red-800 hover:text-red-500 uppercase flex items-center gap-1">
-                                    <Icon name="XCircle" size={8} /> ARCHIVER
-                                </button>
-                            )
+                            !readOnly && (<button onClick={onRTB} className="text-[9px] font-bold text-red-800 hover:text-red-500 uppercase flex items-center gap-1">{XCircle && <XCircle size={10} />} ARCHIVER</button>)
                         )}
                     </div>
                 </div>
             );
         }
-
         function StatusBtn({ label, active, color, onClick }) {
-            const styles = {
-                green: active ? 'bg-green-600 text-black' : 'bg-black text-green-700 border-green-900 hover:text-green-500',
-                blue: active ? 'bg-blue-600 text-black' : 'bg-black text-blue-700 border-blue-900 hover:text-blue-500',
-                orange: active ? 'bg-orange-600 text-black' : 'bg-black text-orange-700 border-orange-900 hover:text-orange-500',
-                red: 'bg-black text-red-800 border-red-900 hover:text-red-500'
-            };
-            return (
-                <button onClick={onClick} className={`text-[8px] font-black py-1 border ${styles[color]} transition-all uppercase`}>
-                {label}
-                </button>
-            );
+            const styles = { green: active ? 'bg-green-600 text-black' : 'bg-black text-green-700 border-green-900 hover:text-green-500', blue: active ? 'bg-blue-600 text-black' : 'bg-black text-blue-700 border-blue-900 hover:text-blue-500', orange: active ? 'bg-orange-600 text-black' : 'bg-black text-orange-700 border-orange-900 hover:text-orange-500', red: 'bg-black text-red-800 border-red-900 hover:text-red-500' };
+            return <button onClick={onClick} className={`text-[9px] font-black py-1 border ${styles[color]} transition-all uppercase`}>{label}</button>;
+        }
+        function MissionTimer({ startTime }) {
+            const [d, sD] = useState('00:00:00');
+            useEffect(() => { const t = setInterval(() => { const df = Date.now() - startTime; const h = Math.floor(df / 3600000).toString().padStart(2, '0'); const m = Math.floor((df % 3600000) / 60000).toString().padStart(2, '0'); const s = Math.floor((df % 60000) / 1000).toString().padStart(2, '0'); sD(`${h}:${m}:${s}`); }, 1000); return () => clearInterval(t); }, [startTime]);
+            return <span className="font-mono text-blue-400 font-bold bg-blue-900/30 px-2 py-0.5 text-[10px] border border-blue-900">T+{d}</span>;
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
