@@ -489,7 +489,19 @@
             const [showCrewModal, setShowCrewModal] = useState(false); 
             const [showSitrepModal, setShowSitrepModal] = useState(false); 
             const [showMissionManagerModal, setShowMissionManagerModal] = useState(false); 
-            const [showPostMissionModal, setShowPostMissionModal] = useState(false); // NEW POST MISSION
+            const [showPostMissionModal, setShowPostMissionModal] = useState(false);
+            
+            // --- NOUVEAU STATE POUR MISSION GLOBALE ---
+            const [showGlobalMissionModal, setShowGlobalMissionModal] = useState(false);
+            const [globalMissionData, setGlobalMissionData] = useState({
+                title: '',
+                type: 'TRANS',
+                objective: '',
+                squadTarget: '',
+                vehicleAssignments: {} // { unitUuid: memberName }
+            });
+            // ------------------------------------------
+
             const [currentConfigId, setCurrentConfigId] = useState(null);
             const [inputReason, setInputReason] = useState('');
             const [selectedMemberId, setSelectedMemberId] = useState('');
@@ -558,6 +570,54 @@
                 setShowPostMissionModal(false);
                 setActionModal(null);
             };
+
+            // --- LOGIQUE MISSION GLOBALE (NOUVEAU) ---
+            const handleGlobalMissionAssign = (unitUuid, memberName) => {
+                setGlobalMissionData(prev => {
+                    const newAssignments = { ...prev.vehicleAssignments };
+                    if (memberName === "") {
+                        delete newAssignments[unitUuid];
+                    } else {
+                        newAssignments[unitUuid] = memberName;
+                    }
+                    return { ...prev, vehicleAssignments: newAssignments };
+                });
+            };
+
+            const submitGlobalMission = () => {
+                // Validation
+                if (!globalMissionData.title || Object.keys(globalMissionData.vehicleAssignments).length === 0) {
+                    alert("Veuillez remplir le titre et assigner au moins un véhicule.");
+                    return;
+                }
+
+                const timestamp = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+                const missionLog = `MISSION GLOBALE: ${globalMissionData.title} (OBJ: ${globalMissionData.objective})`;
+
+                // Mise à jour des unités concernées
+                const nu = activeUnits.map(u => {
+                    const assignedMember = globalMissionData.vehicleAssignments[u.uuid];
+                    if (assignedMember) {
+                        return {
+                            ...u,
+                            status: 'mission_pending',
+                            responsible: assignedMember,
+                            missionObjective: globalMissionData.objective + (globalMissionData.squadTarget ? ` [${globalMissionData.squadTarget}]` : ''),
+                            logs: [...(u.logs || []), { time: timestamp, msg: `ORDRE MISSION (GROUPE): ${globalMissionData.title} -> ${assignedMember}` }]
+                        };
+                    }
+                    return u;
+                });
+
+                setActiveUnits(nu);
+                save('activeUnits', nu);
+                logEvent('OPS', missionLog);
+                
+                // Reset et fermeture
+                setGlobalMissionData({ title: '', type: 'TRANS', objective: '', squadTarget: '', vehicleAssignments: {} });
+                setShowGlobalMissionModal(false);
+            };
+            // -----------------------------------------
 
             useEffect(() => {
                 let isMounted = true;
@@ -846,6 +906,13 @@
                                         <StatCard color="red" value={stats.destroyedCount} label="PERTES" active={filterStatus === 'destroyed'} onClick={() => setFilterStatus('destroyed')} />
                                     </div>
 
+                                    {/* NEW: GLOBAL MISSION BUTTON (SL ONLY) */}
+                                    {canEdit && (
+                                        <button onClick={() => setShowGlobalMissionModal(true)} className="w-full py-4 border-2 border-green-600 bg-green-900/20 text-green-400 font-black text-sm hover:bg-green-900/40 hover:text-green-300 hover:border-green-400 transition-all flex items-center justify-center gap-3 mb-4 uppercase tracking-widest shadow-[0_0_15px_rgba(22,163,74,0.2)]">
+                                            <Icon name="PlusCircle" size={20} /> CRÉER MISSION GROUPE (CONVOI / OP)
+                                        </button>
+                                    )}
+
                                     {/* LOGISTICIAN FILTERED VIEW */}
                                     {!canEdit && userIdentity ? (
                                         <div className="space-y-6">
@@ -1086,6 +1153,93 @@
                             <div className="grid grid-cols-2 gap-3">
                                 <button onClick={()=>setShowShiftCheckModal(false)} className="py-3 border border-green-900 text-green-500 font-bold text-xs">ANNULER</button>
                                 <button onClick={confirmShiftStart} className="py-3 bg-green-600 text-black font-black text-xs hover:bg-green-500">VALIDER</button>
+                            </div>
+                        </Modal>
+                    )}
+
+                    {/* NEW: GLOBAL MISSION MODAL */}
+                    {showGlobalMissionModal && canEdit && (
+                        <Modal title="ORDRE DE MISSION GLOBAL" color="green" onClose={()=>setShowGlobalMissionModal(false)} Icon={XCircle}>
+                            <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+                                {/* STEP 1: INFO MISSION */}
+                                <div className="space-y-3 pb-4 border-b border-green-900/30">
+                                    <h4 className="text-xs font-black text-green-500 uppercase tracking-widest mb-2">1. DÉTAILS OPÉRATION</h4>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-green-800 block mb-1">NOM DE L'OPÉRATION (CONVOI...)</label>
+                                        <input type="text" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold uppercase text-sm" 
+                                            value={globalMissionData.title} 
+                                            onChange={e => setGlobalMissionData({...globalMissionData, title: e.target.value})} 
+                                            placeholder="EX: CONVOI ALPHA, DEPLOIEMENT BRAVO..." 
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-green-800 block mb-1">TYPE</label>
+                                            <select className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold text-xs"
+                                                value={globalMissionData.type}
+                                                onChange={e => setGlobalMissionData({...globalMissionData, type: e.target.value})}
+                                            >
+                                                <option value="TRANS">TRANSPORT</option>
+                                                <option value="LOGI">LOGISTIQUE / SUPPLY</option>
+                                                <option value="BLINDE">ESCORTE BLINDÉE</option>
+                                                <option value="ASSAUT">ASSAUT / COMBAT</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-green-800 block mb-1">SQUAD SOUTENUE</label>
+                                            <input type="text" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold text-xs uppercase" 
+                                                value={globalMissionData.squadTarget} 
+                                                onChange={e => setGlobalMissionData({...globalMissionData, squadTarget: e.target.value})} 
+                                                placeholder="EX: SQUAD 1, INF 2..." 
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-green-800 block mb-1">OBJECTIF / POSITION</label>
+                                        <input type="text" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold text-xs" 
+                                            value={globalMissionData.objective} 
+                                            onChange={e => setGlobalMissionData({...globalMissionData, objective: e.target.value})} 
+                                            placeholder="EX: FOB RUSTY, GRID G5-2..." 
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* STEP 2: VEHICLE SELECTION */}
+                                <div>
+                                    <h4 className="text-xs font-black text-green-500 uppercase tracking-widest mb-2">2. VÉHICULES & CHEFS DE BORD</h4>
+                                    <div className="space-y-2">
+                                        {activeUnits.filter(u => u.status === 'operational').length === 0 && (
+                                            <p className="text-xs text-gray-500 italic">Aucun véhicule opérationnel disponible au garage.</p>
+                                        )}
+                                        {activeUnits.filter(u => u.status === 'operational').map(unit => {
+                                            const isSelected = !!globalMissionData.vehicleAssignments[unit.uuid];
+                                            return (
+                                                <div key={unit.uuid} className={`flex items-center justify-between p-2 border transition-all ${isSelected ? 'border-green-500 bg-green-900/20' : 'border-green-900/30 bg-black'}`}>
+                                                    <div className="flex flex-col">
+                                                        <span className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-gray-500'}`}>{unit.name}</span>
+                                                        <span className="text-[9px] text-green-800">{CATEGORIES[unit.cat]?.label}</span>
+                                                    </div>
+                                                    <div className="w-1/2">
+                                                        <select 
+                                                            className={`w-full text-[10px] font-bold p-1 border outline-none ${isSelected ? 'bg-green-900/40 border-green-500 text-green-300' : 'bg-black border-green-900 text-gray-600'}`}
+                                                            value={globalMissionData.vehicleAssignments[unit.uuid] || ""}
+                                                            onChange={(e) => handleGlobalMissionAssign(unit.uuid, e.target.value)}
+                                                        >
+                                                            <option value="">-- NON ASSIGNÉ --</option>
+                                                            <option value="SL">SL - {slName || "MOI"}</option>
+                                                            {squad.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="mt-6 pt-4 border-t border-green-900">
+                                <button onClick={submitGlobalMission} className="w-full py-3 bg-green-600 text-black font-black text-sm hover:bg-green-500 uppercase tracking-widest shadow-[0_0_15px_rgba(22,163,74,0.4)]">
+                                    LANCER L'OPÉRATION
+                                </button>
                             </div>
                         </Modal>
                     )}
