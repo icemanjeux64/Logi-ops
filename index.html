@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V16.0 (COMMANDER)</title>
+    <title>LOGI-OPS V16.0 (COMMANDER + FIREBASE)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -17,6 +17,11 @@
     
     <!-- Lucide Icons (Backup) -->
     <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+
+    <!-- FIREBASE (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
@@ -37,24 +42,103 @@
     <script type="text/babel">
         const { useState, useMemo, useEffect } = React;
 
-        // --- CONFIGURATION & STOCKAGE ---
-        const LOCAL_STORAGE_KEY = "logiops_v16_commander";
+        // --- CONFIGURATION FIREBASE & STOCKAGE ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
+            authDomain: "logiops-data.firebaseapp.com",
+            projectId: "logiops-data",
+            storageBucket: "logiops-data.firebasestorage.app",
+            messagingSenderId: "791163499354",
+            appId: "1:791163499354:web:2bb76506331db9d240b963",
+            measurementId: "G-FFMXKH47M9"
+        };
+
+        let db = null;
+        let USE_FIREBASE = false;
+        const isConfigured = firebaseConfig.projectId !== "PROJECT_ID";
+
+        if (typeof __firebase_config !== 'undefined') {
+            try {
+                const envConfig = JSON.parse(__firebase_config);
+                if (!firebase.apps.length) firebase.initializeApp(envConfig);
+                db = firebase.firestore();
+                USE_FIREBASE = true;
+            } catch (e) { console.warn("Erreur init Canvas config", e); }
+        } else if (isConfigured) {
+            try {
+                if (!firebase.apps.length) {
+                    const app = firebase.initializeApp(firebaseConfig);
+                    if (firebase.analytics) { firebase.analytics(); }
+                }
+                db = firebase.firestore();
+                USE_FIREBASE = true;
+            } catch (e) {
+                USE_FIREBASE = false;
+            }
+        } else {
+            USE_FIREBASE = false;
+        }
+
+        const SESSION_ID = typeof __app_id !== 'undefined' ? __app_id : "operation_actuelle";
+        const LOCAL_STORAGE_KEY = "logiops_data_v16_cmd";
+
+        // Helper pour le chemin sécurisé (Adaptation pour l'environnement)
+        const getCollectionRef = () => {
+            // Utilise le chemin strict requis par l'environnement si disponible
+            if (typeof __app_id !== 'undefined') {
+                return db.collection('artifacts').doc(__app_id).collection('public').doc('data').collection('logiops').doc('global');
+            }
+            // Sinon fallback sur la racine (pour usage externe)
+            return db.collection('logiops').doc(SESSION_ID);
+        };
+
         const StorageService = {
             save: (data) => {
-                try {
-                    const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
-                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...existing, ...data }));
-                } catch (e) { console.warn(e); }
+                if (USE_FIREBASE && db) {
+                    // Auth anonyme requise pour écrire si non connecté
+                    const auth = firebase.auth();
+                    if (!auth.currentUser) auth.signInAnonymously().catch(e => console.warn("Auth error", e));
+                    
+                    getCollectionRef().set(data, { merge: true }).catch(err => console.warn(err));
+                } else {
+                    try {
+                        const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
+                        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...existing, ...data }));
+                    } catch (e) { console.warn(e); }
+                }
             },
-            loadInitial: (callback) => {
+            loadLocal: () => {
                 try {
                     const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-                    callback(local ? JSON.parse(local) : null);
-                } catch (e) { callback(null); }
+                    return local ? JSON.parse(local) : null;
+                } catch (e) { return null; }
             },
-            clear: () => {
-                localStorage.removeItem(LOCAL_STORAGE_KEY);
-                window.location.reload();
+            loadInitial: async (callback) => {
+                if (USE_FIREBASE && db) {
+                    // Auth avant lecture
+                    const auth = firebase.auth();
+                    if (!auth.currentUser) {
+                        try {
+                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                await auth.signInWithCustomToken(__initial_auth_token);
+                            } else {
+                                await auth.signInAnonymously();
+                            }
+                        } catch (e) { console.warn("Auth failed", e); }
+                    }
+
+                    return getCollectionRef().onSnapshot((doc) => {
+                        if (doc.exists) callback(doc.data()); else callback(null);
+                    }, err => {
+                        console.warn("Firestore error, falling back to local", err);
+                        const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+                        if (local) callback(JSON.parse(local));
+                    });
+                } else {
+                    const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+                    if (local) callback(JSON.parse(local)); else callback(null);
+                    return () => {};
+                }
             }
         };
 
@@ -317,6 +401,7 @@
 
             const isSL = userRole === 'SL';
 
+            // Init Data
             useEffect(() => {
                 StorageService.loadInitial((data) => {
                     if (data) {
@@ -328,7 +413,12 @@
                 });
             }, []);
 
-            useEffect(() => { if (userIdentity) StorageService.save({ units, logs, supply, missions }); }, [units, logs, supply, missions]);
+            // Auto-Save (Seulement si connecté et données valides)
+            useEffect(() => { 
+                if (userIdentity && units.length >= 0) {
+                    StorageService.save({ units, logs, supply, missions }); 
+                }
+            }, [units, logs, supply, missions, userIdentity]);
 
             const addLog = (msg, type='INFO') => {
                 setLogs(prev => [{ id: Date.now(), time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), type, msg }, ...prev].slice(0, 50));
@@ -345,7 +435,7 @@
                         responsible: 'BASE',
                         fuel: 100, ammo: 100, health: 100, cargo: [], logs: []
                     };
-                    setUnits([newUnit, ...units]);
+                    setUnits(prev => [newUnit, ...prev]);
                     setSupply(s => s - model.cost);
                     addLog(`ACHAT ${model.name}`, 'GARAGE');
                 },
