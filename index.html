@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V9.0 (STABLE)</title>
+    <title>LOGI-OPS V9.2 (STABLE)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -15,7 +15,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Lucide Icons (Version FIXÉE à 0.263.1) -->
+    <!-- Lucide Icons (Version FIXÉE à 0.263.1 pour éviter le crash "Element type is invalid") -->
     <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
 
     <!-- FIREBASE (Base de données) -->
@@ -25,11 +25,12 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
-        body { font-family: 'JetBrains Mono', monospace; background-color: #050505; overflow: hidden; }
+        body { font-family: 'JetBrains Mono', monospace; background-color: #050505; overflow: hidden; } /* Overflow hidden pour gérer le scroll dans l'app */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #14532d; }
         ::-webkit-scrollbar-thumb { background: #14532d; border: 1px solid #000; }
         ::-webkit-scrollbar-thumb:hover { background: #22c55e; }
+        @keyframes scanline { 0% { transform: translateY(0); } 100% { transform: translateY(100vh); } }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
         
         .login-scan {
@@ -37,7 +38,6 @@
             background-size: 100% 4px;
             animation: scan 2s linear infinite;
         }
-        @keyframes scan { 0% { background-position: 0 0; } 100% { background-position: 0 100%; } }
     </style>
 </head>
 <body>
@@ -129,7 +129,19 @@
             'Shield': <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
             'Lock': <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>,
             'User': <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
-            'Menu': <><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></>
+            'Menu': <><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></>,
+            'XCircle': <><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></>,
+            'Trash2': <><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></>,
+            'Plus': <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
+            'Play': <polygon points="5 3 19 12 5 21 5 3" />,
+            'Settings': <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.18-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.18-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.18.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.18.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />,
+            'ChevronDown': <polyline points="6 9 12 15 18 9" />,
+            
+            // CATÉGORIES
+            'Truck': <><rect x="1" y="3" width="15" height="13" rx="2" ry="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></>,
+            'Package': <><path d="M16.5 9.4 7.55 4.24" /><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></>,
+            'Crosshair': <><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></>,
+            'Plane': <path d="M20.38 3.4a1.6 1.6 0 0 1 2.36 2.26L20 8.4l-6.6 1.3-5.7-5.7-1.4 1.4 5 5.7-7.7 2.7-2.8-2.9L0 12.4l6.4 3.2 3.2 6.4 1.4-1.4-2.9-2.8 2.7-7.7 5.7 5 1.4-1.4-5.7-5.7 2.7-2.7z" />
         };
 
         const Icon = ({ name, size = 24, className, ...props }) => {
@@ -140,7 +152,7 @@
                     const iconData = lucide.icons[key];
                     if (Array.isArray(iconData)) {
                         const [tag, attrs, children] = iconData;
-                        return React.createElement(tag, { ...attrs, width: size, height: size, className, ...props, stroke: props.color || "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }, 
+                        return React.createElement(tag, { ...attrs, width: size, height: size, className: className, ...props, stroke: props.color || "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }, 
                             children.map(([childTag, childAttrs], i) => React.createElement(childTag, { ...childAttrs, key: i }))
                         );
                     }
@@ -158,7 +170,7 @@
         };
 
         const Icons = {};
-        ['Truck','Activity','AlertTriangle','Crosshair','Shield','Plane','Package','Plus','ArrowRight','RotateCcw','XCircle','LayoutGrid','List','PlayCircle','CheckCircle','Wrench','Skull','MapPin','User','FileText','Clock','ArrowUpRight','PieChart','BarChart3','Timer','Database','Trash2','Save','Users','UserPlus','UserMinus','LogOut','ScrollText','Warehouse','LayoutDashboard','Settings','Target','Radio','Wifi','PlusCircle','MinusCircle','Edit','Play','Lock','Unlock','Menu','Power'].forEach(name => {
+        ['Truck','Activity','AlertTriangle','Crosshair','Shield','Plane','Package','Plus','ArrowRight','RotateCcw','XCircle','LayoutGrid','List','PlayCircle','CheckCircle','Wrench','Skull','MapPin','User','FileText','Clock','ArrowUpRight','PieChart','BarChart3','Timer','Database','Trash2','Save','Users','UserPlus','UserMinus','LogOut','ScrollText','Warehouse','LayoutDashboard','Settings','Target','Radio','Wifi','PlusCircle','MinusCircle','Edit','Play','Lock','Unlock','Menu','Power','ChevronDown'].forEach(name => {
             Icons[name] = (props) => <Icon name={name} {...props} />;
         });
 
@@ -264,14 +276,15 @@
             const [inputReason, setInputReason] = useState('');
             const [selectedMemberId, setSelectedMemberId] = useState('');
             const [newModelData, setNewModelData] = useState({ name: '', cat: 'LOGI', type: '', cost: 0, stock: 1 });
+            
+            // NOUVEAU STATE POUR L'ACCORDÉON
+            // Initialise tout ouvert par défaut
+            const [expandedCats, setExpandedCats] = useState(Object.keys(CATEGORIES).reduce((acc, key) => ({...acc, [key]: true}), {}));
 
             const canEdit = userRole === 'SL';
 
-            // --- CHARGEMENT AVEC TIMEOUT DE SÉCURITÉ ---
             useEffect(() => {
                 let isMounted = true;
-                
-                // Timeout: si Firebase ne répond pas en 2.5s, on bascule sur les données locales
                 const timeout = setTimeout(() => {
                     if (isMounted && !dataLoaded) {
                         console.warn("Délai dépassé, chargement local forcé.");
@@ -289,10 +302,9 @@
                         setDataLoaded(true);
                     }
                 }, 2500);
-
                 const unsubscribe = StorageService.loadInitial((data) => {
                     if (!isMounted) return;
-                    clearTimeout(timeout); // Annule le timeout si Firebase répond à temps
+                    clearTimeout(timeout);
                     if (data) {
                         if(data.activeUnits) setActiveUnits(data.activeUnits);
                         if(data.catalog) setCatalog(data.catalog);
@@ -305,11 +317,9 @@
                     }
                     setDataLoaded(true);
                 });
-                
                 return () => { isMounted = false; if(unsubscribe) unsubscribe(); clearTimeout(timeout); };
             }, []);
 
-            // --- ACTIONS ---
             const save = (key, val) => StorageService.save({ [key]: val });
             const logEvent = (type, message) => {
                 const newLog = { id: Date.now(), time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), type, msg: message };
@@ -317,6 +327,7 @@
                 setGlobalLogs(newLogs); save('globalLogs', newLogs);
             };
             
+            // ... Toutes les fonctions actions (identiques V9) ...
             const updateStock = (id, d) => { if(!canEdit)return; const c = catalog.map(m=>m.id===id?{...m,stock:Math.max(0,m.stock+d)}:m); setCatalog(c); save('catalog', c); };
             const deleteModel = (id) => { if(!canEdit||!confirm("Supprimer ?"))return; const c = catalog.filter(m=>m.id!==id); setCatalog(c); save('catalog', c); };
             const deployUnit = (id) => {
@@ -331,7 +342,6 @@
                 const m={id:`custom_${Date.now()}`, cat:newModelData.cat, name:newModelData.name.toUpperCase(), type:newModelData.type.toUpperCase()||'STD', cost:parseInt(newModelData.cost)||0, stock:parseInt(newModelData.stock)||1};
                 const c=[...catalog, m]; setCatalog(c); save('catalog', c); setShowCreateVehicleModal(false); setNewModelData({name:'',cat:'LOGI',type:'',cost:0,stock:1}); logEvent('GARAGE', `NOUVEAU MODÈLE: ${m.name}`);
             };
-            
             const toggleSlShift = () => { if(!canEdit||!slName)return; const s=!isSlActive; setIsSlActive(s); save('isSlActive', s); save('slName', slName); logEvent('RH', s?`PRISE POSTE: ${slName}`:`FIN SERVICE: ${slName}`); };
             const addSquadMember = (n) => { if(!canEdit||!n)return; const s=[...squad, {id:Date.now(), name:n.toUpperCase(), startTime:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}]; setSquad(s); save('squad', s); logEvent('RH', `RENFORT: ${n.toUpperCase()}`); };
             const removeSquadMember = (id) => { if(!canEdit)return; const m=squad.find(x=>x.id===id); if(m){ const s=squad.filter(x=>x.id!==id); setSquad(s); save('squad', s); logEvent('RH', `DÉPART: ${m.name}`); } };
@@ -345,14 +355,15 @@
                     return {...u, status:st, ...data, logs:[...(u.logs||[]), {time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg}]};
                 });
                 setActiveUnits(nu); save('activeUnits', nu);
+                const unit = activeUnits.find(u => u.uuid === uuid);
+                if(unit) logEvent('FLOTTE', `${unit.name}: ${st.toUpperCase()}`);
             };
             const endMission = (u) => { if(!canEdit||!u.missionStartTime)return; const d=Math.floor((Date.now()-u.missionStartTime)/60000); const nu=activeUnits.map(x=>x.uuid!==u.uuid?x:{...x, status:'operational', missionStartTime:null, responsible:'BASE', logs:[...(x.logs||[]), {time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg:`RETOUR (${d} min)`}]}); setActiveUnits(nu); save('activeUnits', nu); logEvent('FLOTTE', `${u.name}: RETOUR`); };
             const returnToBase = (uuid) => { if(!canEdit)return; if(confirm("RTB ?")) { const u=activeUnits.find(x=>x.uuid===uuid); const nu=activeUnits.filter(x=>x.uuid!==uuid); setActiveUnits(nu); save('activeUnits', nu); if(u) logEvent('GARAGE', `RTB: ${u.name}`); } };
-            const updateSupply = (id, f, v) => { if(!canEdit)return; const s=supplySources.map(x=>x.id===id?{...x,[f]:v}:x); setSupplySources(s); save('supplySources', s); };
-            const addSupply = () => { if(!canEdit)return; const s=[...supplySources, {id:Date.now(), name:'NOUVELLE SOURCE', amount:0}]; setSupplySources(s); save('supplySources', s); };
-            const removeSupply = (id) => { if(!canEdit||supplySources.length<=1)return; const s=supplySources.filter(x=>x.id!==id); setSupplySources(s); save('supplySources', s); };
+            const updateSupplySource = (id, f, v) => { if(!canEdit)return; const s=supplySources.map(x=>x.id===id?{...x,[f]:v}:x); setSupplySources(s); save('supplySources', s); };
+            const addSupplySource = () => { if(!canEdit)return; const s=[...supplySources, {id:Date.now(), name:'NOUVELLE SOURCE', amount:0}]; setSupplySources(s); save('supplySources', s); };
+            const removeSupplySource = (id) => { if(!canEdit||supplySources.length<=1)return; const s=supplySources.filter(x=>x.id!==id); setSupplySources(s); save('supplySources', s); };
             
-            // Config Phases logic
             const createConfig = () => { if(!canEdit)return; const c=[...configurations, {id:Date.now(), name:`PHASE ${configurations.length+1}`, content:{}}]; setConfigurations(c); setCurrentConfigId(c[c.length-1].id); save('configurations', c); };
             const updateConfig = (cid, mid, d) => { if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return; const cnt=Math.max(0, (c.content[mid]||0)+d); const nc={...c.content, [mid]:cnt}; if(cnt===0) delete nc[mid]; const ncs=configurations.map(x=>x.id===cid?{...x, content:nc}:x); setConfigurations(ncs); save('configurations', ncs); };
             const setConfigCount = (cid, mid, val) => { if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return; const cnt=Math.max(0, parseInt(val)||0); const nc={...c.content, [mid]:cnt}; if(cnt===0) delete nc[mid]; const ncs=configurations.map(x=>x.id===cid?{...x, content:nc}:x); setConfigurations(ncs); save('configurations', ncs); };
@@ -378,6 +389,19 @@
                 else alert("Pas de véhicules à déployer (Stock insuffisant ou déjà déployés).");
             };
 
+            const handleStatusClick = (unit, targetStatus) => {
+                if (!canEdit) return; 
+                if (unit.status === targetStatus && targetStatus !== 'mission') return;
+                if (targetStatus === 'mission') { setSelectedMemberId(''); setActionModal({ type: 'mission', unit }); } 
+                else if (targetStatus === 'destroyed') { setInputReason(''); setActionModal({ type: 'destroy', unit }); } 
+                else { updateUnitStatus(unit.uuid, targetStatus); }
+            };
+            const confirmMission = () => { if (!actionModal) return; let respName = "INDÉFINI"; if (selectedMemberId === 'SL') respName = slName || "CHEF LOGI"; else { const member = squad.find(m => m.id === parseInt(selectedMemberId)); if (member) respName = member.name; } updateUnitStatus(actionModal.unit.uuid, 'mission', { responsible: respName, missionStartTime: Date.now() }); setActionModal(null); };
+            const confirmDestruction = () => { if (!actionModal || !inputReason) return; updateUnitStatus(actionModal.unit.uuid, 'destroyed', { reasonHS: inputReason, missionStartTime: null }); setActionModal(null); };
+
+            // NOUVEAU: Toggle Accordion
+            const toggleCat = (key) => setExpandedCats(prev => ({...prev, [key]: !prev[key]}));
+
             const stats = useMemo(() => ({
                 deployedCost: activeUnits.reduce((s, u) => s + (u.status!=='stored'?u.cost:0), 0),
                 destroyedCount: activeUnits.filter(u => u.status === 'destroyed').length,
@@ -386,7 +410,7 @@
                 totalSupply: supplySources.reduce((a, s) => a + (parseInt(s.amount)||0), 0)
             }), [activeUnits, supplySources]);
 
-            const Activity = Icons['Activity']; const Database = Icons['Database']; const LayoutDashboard = Icons['LayoutDashboard']; const Warehouse = Icons['Warehouse']; const Users = Icons['Users']; const ScrollText = Icons['ScrollText']; const Target = Icons['Target']; const Shield = Icons['Shield']; const Plus = Icons['Plus']; const Wifi = Icons['Wifi']; const LogOut = Icons['LogOut']; const ArrowUpRight = Icons['ArrowUpRight']; const Settings = Icons['Settings']; const XCircle = Icons['XCircle']; const Trash2 = Icons['Trash2']; const RotateCcw = Icons['RotateCcw']; const Clock = Icons['Clock']; const List = Icons['List']; const Play = Icons['Play']; const PlusCircle = Icons['PlusCircle']; const MinusCircle = Icons['MinusCircle']; const Power = Icons['Power'];
+            const Activity = Icons['Activity']; const Database = Icons['Database']; const LayoutDashboard = Icons['LayoutDashboard']; const Warehouse = Icons['Warehouse']; const Users = Icons['Users']; const ScrollText = Icons['ScrollText']; const Target = Icons['Target']; const Shield = Icons['Shield']; const Plus = Icons['Plus']; const Wifi = Icons['Wifi']; const LogOut = Icons['LogOut']; const ArrowUpRight = Icons['ArrowUpRight']; const Settings = Icons['Settings']; const XCircle = Icons['XCircle']; const Trash2 = Icons['Trash2']; const RotateCcw = Icons['RotateCcw']; const Clock = Icons['Clock']; const List = Icons['List']; const Play = Icons['Play']; const PlusCircle = Icons['PlusCircle']; const MinusCircle = Icons['MinusCircle']; const Power = Icons['Power']; const ChevronDown = Icons['ChevronDown'];
 
             if (!userRole) return <LoginScreen onLogin={(role) => setUserRole(role)} />;
             if (!dataLoaded) return <div className="min-h-screen bg-black flex items-center justify-center text-green-500 font-mono animate-pulse">CHARGEMENT...</div>;
@@ -395,17 +419,13 @@
                 <div className="h-screen w-screen bg-black text-green-500 flex flex-col overflow-hidden relative">
                     <div className="absolute inset-0 pointer-events-none z-0 opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%]"></div>
 
-                    {/* HEADER (Fixe en haut) */}
                     <header className="bg-black border-b border-green-900 h-16 shrink-0 flex justify-between items-center px-4 z-50 shadow-lg shadow-green-900/10">
                         <div className="flex items-center gap-4">
-                            {/* Suppression du carré mystère de l'icône Activity pour nettoyage de l'interface */}
+                            <div className="p-1.5 rounded">{Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}</div>
                             <div>
-                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V9</span></h1>
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V9.2</span></h1>
                                 <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
-                                    <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}>
-                                        <div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>
-                                        SL: {slName || "N/A"}
-                                    </span>
+                                    <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}><div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>SL: {slName || "N/A"}</span>
                                     <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
                                     <span className={`ml-2 ${USE_FIREBASE ? 'text-blue-500' : 'text-orange-500'}`}>[{USE_FIREBASE ? 'ONLINE' : 'LOCAL'}]</span>
                                 </div>
@@ -414,25 +434,13 @@
                         <div className="flex items-center gap-4">
                             <div className="text-right hidden sm:block">
                                 <div className="text-[9px] font-bold text-green-800 uppercase mb-1 flex items-center justify-end gap-1">{Database && <Database size={10}/>} SUPPLY</div>
-                                <button onClick={() => canEdit && setShowSupplyModal(true)} className={`text-xl font-black bg-green-900/10 px-3 py-1 border border-green-800 flex items-center gap-2 ${canEdit?'hover:bg-green-900/30 hover:border-green-500 text-green-400':'text-gray-500'}`}>
-                                    {stats.totalSupply.toLocaleString()}
-                                </button>
+                                <button onClick={() => canEdit && setShowSupplyModal(true)} className={`text-xl font-black bg-green-900/10 px-3 py-1 border border-green-800 flex items-center gap-2 ${canEdit?'hover:bg-green-900/30 hover:border-green-500 text-green-400':'text-gray-500'}`}>{stats.totalSupply.toLocaleString()}</button>
                             </div>
-                            {/* BOUTON DECONNEXION AVEC SYMBOLE POWER */}
-                            <button 
-                                onClick={() => setUserRole(null)} 
-                                className="h-10 w-10 flex items-center justify-center border border-red-900/50 bg-red-900/10 text-red-600 hover:bg-red-900/30 hover:text-red-400 hover:border-red-500 transition-all rounded" 
-                                title="Déconnexion"
-                            >
-                                {Power && <Power size={18} />}
-                            </button>
+                            <button onClick={() => setUserRole(null)} className="h-10 w-10 flex items-center justify-center border border-red-900/50 bg-red-900/10 text-red-600 hover:bg-red-900/30 hover:text-red-400 hover:border-red-500 transition-all rounded" title="Déconnexion">{Power && <Power size={18} />}</button>
                         </div>
                     </header>
 
-                    {/* LAYOUT PRINCIPAL: Flex Row pour Desktop */}
                     <div className="flex flex-1 overflow-hidden">
-                        
-                        {/* SIDEBAR (Desktop Only >= md) */}
                         <aside className="hidden md:flex w-64 bg-black border-r border-green-900 flex-col shrink-0">
                             <nav className="flex-1 p-2 space-y-2">
                                 <NavButtonDesktop icon={LayoutDashboard} label="OPÉRATIONS" active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')} />
@@ -440,57 +448,77 @@
                                 <NavButtonDesktop icon={Users} label="ESCOUADE" active={activeTab==='squad'} onClick={()=>setActiveTab('squad')} />
                                 <NavButtonDesktop icon={ScrollText} label="JOURNAL (JMO)" active={activeTab==='journal'} onClick={()=>setActiveTab('journal')} disabled={!canEdit} />
                             </nav>
-                            <div className="p-4 border-t border-green-900 text-center">
-                                <p className="text-[10px] text-green-900 font-mono">ROLE: {userRole}</p>
-                            </div>
+                            <div className="p-4 border-t border-green-900 text-center"><p className="text-[10px] text-green-900 font-mono">ROLE: {userRole}</p></div>
                         </aside>
 
-                        {/* CONTENT AREA */}
                         <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-black/90 relative scrollbar-thin scrollbar-thumb-green-900 pb-20 md:pb-6">
                             
-                            {/* DASHBOARD VIEW */}
                             {activeTab === 'dashboard' && (
-                                <div className="space-y-6 animate-in fade-in">
-                                    {/* HUD Stats Grids */}
-                                    <div className="grid grid-cols-3 gap-4">
+                                <div className="space-y-6 animate-in fade-in flex flex-col h-full">
+                                    <div className="grid grid-cols-3 gap-4 shrink-0 mb-4">
                                         <StatCard color="green" value={activeUnits.filter(u=>u.status==='operational').length} label="DISPO" />
                                         <StatCard color="blue" value={stats.missionCount} label="MISSION" />
                                         <StatCard color="red" value={stats.destroyedCount} label="PERTES" />
                                     </div>
 
-                                    {/* Unit Grid */}
                                     {activeUnits.length === 0 ? (
                                         <EmptyState canEdit={canEdit} Target={Target} />
                                     ) : (
-                                        Object.keys(CATEGORIES).map(catKey => {
-                                            const unitsInCat = activeUnits.filter(u => u.cat === catKey);
-                                            if (unitsInCat.length === 0) return null;
-                                            const conf = CATEGORIES[catKey];
-                                            return (
-                                                <div key={catKey} className="mb-6">
-                                                    <div className={`flex items-center gap-2 mb-3 px-3 py-1 border-l-4 ${conf.color.split(' ')[0]} bg-green-900/5`}>
-                                                        <span className="font-black text-xs md:text-sm tracking-[0.2em] uppercase text-gray-400">{conf.label}</span>
+                                        <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                                            {Object.keys(CATEGORIES).map(catKey => {
+                                                const unitsInCat = activeUnits.filter(u => u.cat === catKey);
+                                                if (unitsInCat.length === 0) return null;
+                                                const conf = CATEGORIES[catKey];
+                                                const isOpen = expandedCats[catKey];
+                                                const stats = {
+                                                    mis: unitsInCat.filter(u=>u.status==='mission').length,
+                                                    rep: unitsInCat.filter(u=>u.status==='damaged').length,
+                                                    hs: unitsInCat.filter(u=>u.status==='destroyed').length
+                                                };
+
+                                                return (
+                                                    <div key={catKey} className="border border-green-900/30 bg-green-900/5 mb-1">
+                                                        {/* ACCORDION HEADER */}
+                                                        <div onClick={() => toggleCat(catKey)} className={`flex items-center justify-between p-3 cursor-pointer hover:bg-green-900/10 transition-colors ${isOpen ? 'border-b border-green-900/30' : ''}`}>
+                                                            <div className="flex items-center gap-3">
+                                                                <span className={`text-${conf.color.split('-')[1]}-500`}><Icon name={conf.icon} size={20} /></span>
+                                                                <span className="font-black text-sm text-gray-300 tracking-wider">{conf.label}</span>
+                                                                <span className="text-xs font-mono text-green-600 bg-green-900/20 px-2 py-0.5 rounded ml-2">{unitsInCat.length}</span>
+                                                            </div>
+                                                            
+                                                            {/* STATS SUMMARY IN HEADER */}
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="flex gap-2 text-[10px] font-bold uppercase mr-4">
+                                                                    {stats.mis > 0 && <span className="text-blue-500 bg-blue-900/20 px-1.5 py-0.5 rounded border border-blue-900/30">MIS: {stats.mis}</span>}
+                                                                    {stats.rep > 0 && <span className="text-orange-500 bg-orange-900/20 px-1.5 py-0.5 rounded border border-orange-900/30">RÉP: {stats.rep}</span>}
+                                                                    {stats.hs > 0 && <span className="text-red-500 bg-red-900/20 px-1.5 py-0.5 rounded border border-red-900/30">HS: {stats.hs}</span>}
+                                                                </div>
+                                                                {ChevronDown && <ChevronDown size={16} className={`text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* ACCORDION CONTENT */}
+                                                        {isOpen && (
+                                                            <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 animate-in fade-in">
+                                                                {unitsInCat.map(unit => (
+                                                                    <UnitCard 
+                                                                        key={unit.uuid} unit={unit} Icons={Icons} readOnly={!canEdit}
+                                                                        onStatusChange={(s) => handleStatusClick(unit, s)}
+                                                                        onEndMission={() => endMission(unit)}
+                                                                        onRTB={() => returnToBase(unit.uuid)}
+                                                                        onShowLogs={() => setActionModal({ type: 'logs', unit })}
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    {/* RESPONSIVE GRID : 1 col mobile -> 5 cols large desktop */}
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-                                                        {unitsInCat.map(unit => (
-                                                            <UnitCard 
-                                                                key={unit.uuid} unit={unit} Icons={Icons} readOnly={!canEdit}
-                                                                onStatusChange={(s) => handleStatusClick(unit, s)}
-                                                                onEndMission={() => endMission(unit)}
-                                                                onRTB={() => returnToBase(unit.uuid)}
-                                                                onShowLogs={() => setActionModal({ type: 'logs', unit })}
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })
+                                                );
+                                            })}
+                                        </div>
                                     )}
                                 </div>
                             )}
 
-                            {/* GARAGE VIEW */}
                             {activeTab === 'garage' && canEdit && (
                                 <div className="space-y-6 animate-in fade-in">
                                     <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-green-900 pb-4">
@@ -504,7 +532,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Quick Deploy Phases */}
                                     {configurations.length > 0 && (
                                         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-green-900/50">
                                             {configurations.map(config => (
@@ -525,24 +552,17 @@
                                                 <div key={catKey} className="bg-black border border-green-900/50 p-4 relative">
                                                     <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-green-800"></div>
                                                     <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-green-800"></div>
-                                                    
                                                     <div className="flex items-center gap-2 mb-4 pb-2 border-b border-green-900/30">
                                                         <span className={CATEGORIES[catKey].color.split(' ')[1]}>{IconComp && <IconComp size={20}/>}</span>
                                                         <span className="font-black text-sm text-gray-400 tracking-wider">{CATEGORIES[catKey].label}</span>
                                                     </div>
-                                                    
-                                                    {/* Garage Grid: Up to 6 cols on large screens */}
                                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
                                                         {models.map(model => {
                                                             const activeCount = activeUnits.filter(u => u.modelId === model.id).length;
                                                             return Array.from({ length: model.stock }).map((_, index) => (
                                                                 <GarageSlot 
-                                                                    key={`${model.id}-${index}`} 
-                                                                    model={model} 
-                                                                    index={index} 
-                                                                    activeCount={activeCount} 
-                                                                    onDeploy={() => deployUnit(model.id)} 
-                                                                    ArrowUpRight={ArrowUpRight}
+                                                                    key={`${model.id}-${index}`} model={model} index={index} activeCount={activeCount} 
+                                                                    onDeploy={() => deployUnit(model.id)} ArrowUpRight={ArrowUpRight}
                                                                 />
                                                             ));
                                                         })}
@@ -554,10 +574,8 @@
                                 </div>
                             )}
 
-                            {/* SQUAD & JMO : Utilisation du composant existant mais avec meilleur padding */}
                             {(activeTab === 'squad' || activeTab === 'journal') && (
                                 <div className="max-w-3xl mx-auto">
-                                    {/* Squad Logic (Simplifiée pour gain place, même logique que V9.0) */}
                                     {activeTab === 'squad' && (
                                         <div className="space-y-6">
                                             <div className="bg-black border border-green-800 p-6 relative">
@@ -581,7 +599,6 @@
                                             </div>
                                         </div>
                                     )}
-                                    {/* Journal Logic */}
                                     {activeTab === 'journal' && canEdit && (
                                         <div className="bg-black border border-green-900/50 p-6">
                                             <h2 className="text-sm font-black text-green-500 mb-4 flex gap-2 items-center border-b border-green-900 pb-2">{ScrollText && <ScrollText size={16}/>} JMO</h2>
@@ -601,7 +618,6 @@
                         </main>
                     </div>
 
-                    {/* MOBILE NAV (Bottom - Hidden on Desktop) */}
                     <nav className="md:hidden fixed bottom-0 w-full bg-black border-t border-green-900 grid grid-cols-4 h-14 z-50 pb-safe">
                         <NavButton icon={LayoutDashboard} label="OPS" active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')} />
                         <NavButton icon={Warehouse} label="GARAGE" active={activeTab==='garage'} onClick={()=>canEdit&&setActiveTab('garage')} disabled={!canEdit} />
@@ -609,7 +625,7 @@
                         <NavButton icon={ScrollText} label="JMO" active={activeTab==='journal'} onClick={()=>canEdit&&setActiveTab('journal')} disabled={!canEdit} />
                     </nav>
 
-                    {/* MODALES (Code simplifié pour lisibilité, inclut logique existante) */}
+                    {/* MODALES */}
                     
                     {actionModal?.type === 'mission' && (
                         <Modal title="ORDRE DE MISSION" color="blue" onClose={()=>setActionModal(null)} Icon={XCircle}>
@@ -638,7 +654,7 @@
                     {showConfigModal && canEdit && (
                         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
                             <div className="bg-black border border-blue-800 w-full max-w-4xl h-[80vh] flex flex-col shadow-[0_0_50px_rgba(30,64,175,0.2)]">
-                                <div className="p-4 border-b border-blue-900 bg-blue-900/10 flex justify-between items-center"><h3 className="font-black text-blue-500">PHASES</h3><button onClick={()=>setShowConfigModal(false)}><XCircle size={20} className="text-blue-500"/></button></div>
+                                <div className="p-4 border-b border-blue-900 bg-blue-900/10 flex justify-between items-center"><h3 className="font-black text-blue-500">PHASES</h3><button onClick={()=>{setShowConfigModal(false); setCurrentConfigId(null);}}><XCircle size={20} className="text-blue-500"/></button></div>
                                 <div className="flex-1 flex overflow-hidden">
                                     <div className="w-1/3 border-r border-blue-900/50 overflow-y-auto p-2 bg-black space-y-2"><button onClick={createConfig} className="w-full py-3 border border-dashed border-blue-700 text-blue-500 text-xs font-bold">NOUVELLE PHASE</button>{configurations.map(c=><div key={c.id} onClick={()=>setCurrentConfigId(c.id)} className={`p-3 border cursor-pointer flex justify-between ${currentConfigId===c.id?'bg-blue-900/20 border-blue-500':'border-blue-900/30 hover:bg-blue-900/10'}`}><span className="text-blue-400 font-bold text-xs">{c.name}</span><button onClick={(e)=>{e.stopPropagation();deleteConfig(c.id)}} className="text-blue-800 hover:text-red-500"><Trash2 size={14}/></button></div>)}</div>
                                     <div className="w-2/3 overflow-y-auto p-4 bg-black">
@@ -647,6 +663,9 @@
                                             return (<div key={m.id} className={`flex justify-between items-center p-2 border mb-2 ${cnt>0?'border-blue-600 bg-blue-900/10':'border-blue-900/20 opacity-50'}`}><span className="text-xs font-bold text-gray-400 w-1/2 truncate">{m.name}</span><div className="flex items-center gap-2"><button onClick={()=>updateConfig(currentConfigId,m.id,-1)} className="text-blue-500"><MinusCircle size={16}/></button><input type="number" value={cnt} onChange={(e)=>setConfigCount(currentConfigId,m.id,e.target.value)} className="w-10 bg-transparent text-center text-blue-400 font-bold border-b border-blue-900" /><button onClick={()=>updateConfig(currentConfigId,m.id,1)} className="text-blue-500"><PlusCircle size={16}/></button></div></div>)
                                         })}
                                     </div>
+                                </div>
+                                <div className="p-3 border-t border-blue-900 bg-black flex justify-end">
+                                    <button onClick={() => { setShowConfigModal(false); setCurrentConfigId(null); }} className="px-6 py-2 bg-blue-900/20 border border-blue-800 text-blue-500 text-[10px] font-bold hover:bg-blue-900/40">FERMER</button>
                                 </div>
                             </div>
                         </div>
@@ -668,6 +687,9 @@
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                                <div className="p-3 border-t border-green-900/20 bg-black">
+                                    <button onClick={() => setShowStockModal(false)} className="w-full py-2 bg-green-900/20 border border-green-800 text-green-500 text-[10px] font-bold hover:bg-green-900/40 flex items-center justify-center gap-2">FERMER</button>
                                 </div>
                             </div>
                          </div>
@@ -768,7 +790,7 @@
             const List = Icons['List']; const Clock = Icons['Clock']; const RotateCcw = Icons['RotateCcw']; const XCircle = Icons['XCircle'];
 
             return (
-                <div className={`relative border-l-2 ${borderColor} bg-green-900/5 p-3 flex flex-col h-32 md:h-36 border-t border-r border-b border-green-900/30 hover:bg-green-900/10 transition-all`}>
+                <div className={`relative border-l-2 ${borderColor} bg-green-900/5 p-3 flex flex-col h-32 md:h-auto border-t border-r border-b border-green-900/30 hover:bg-green-900/10 transition-all`}>
                     <div className="flex justify-between items-start mb-2">
                         <div className="flex gap-2 overflow-hidden">
                             <div className={`p-1.5 bg-black border border-green-900 flex items-center justify-center h-8 w-8 shrink-0 ${statusText}`}>{IconComp && <IconComp size={16}/>}</div>
