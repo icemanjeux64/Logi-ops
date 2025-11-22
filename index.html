@@ -509,6 +509,56 @@
 
             const canEdit = userRole === 'SL';
 
+            // SITREP LOGIC (DÉPLACÉ ICI POUR ÉVITER LES ERREURS DE RÉFÉRENCE)
+            const openSitrepModal = (unit) => { 
+                setSitrepData({ unit: unit, location: '', status: 'green', message: '' }); 
+                setShowSitrepModal(true); 
+            };
+
+            const submitSitrep = () => {
+                if (!sitrepData.unit) return;
+                const msg = `SITREP [${sitrepData.status.toUpperCase()}] LOC: ${sitrepData.location} // ${sitrepData.message}`;
+                updateUnitData(sitrepData.unit.uuid, {
+                    logs: [...(sitrepData.unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: msg }]
+                });
+                logEvent('FLOTTE', `SITREP ${sitrepData.unit.name}: ${sitrepData.status.toUpperCase()}`);
+                setShowSitrepModal(false);
+            };
+
+            // POST MISSION LOGIC (DÉPLACÉ)
+            const confirmArrival = (unit) => {
+                if (!canEdit && unit.responsible !== userIdentity) return; // Basic check
+                setActionModal({ type: 'post_mission', unit });
+                setShowPostMissionModal(true);
+            };
+
+            const endMission = (unit) => {
+                confirmArrival(unit);
+            };
+
+            const finalizeMission = (finalStatus) => {
+                if (!actionModal || !actionModal.unit) return;
+                const unit = actionModal.unit;
+                const logMsg = finalStatus === 'operational' 
+                    ? 'MISSION TERMINÉE: RETOUR DISPO (RAS)' 
+                    : 'MISSION TERMINÉE: ENVOI ATELIER (DOMMAGES)';
+
+                updateUnitData(unit.uuid, {
+                    status: finalStatus, // 'operational' ou 'damaged'
+                    responsible: 'BASE', // Le véhicule revient à la base
+                    crew: [], // On vide l'équipage
+                    missionStartTime: null,
+                    logs: [...(unit.logs || []), { 
+                        time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 
+                        msg: logMsg 
+                    }]
+                });
+
+                logEvent('OPS', `${unit.name}: ${logMsg}`);
+                setShowPostMissionModal(false);
+                setActionModal(null);
+            };
+
             useEffect(() => {
                 let isMounted = true;
                 const timeout = setTimeout(() => {
@@ -618,43 +668,6 @@
             const requestRTB = (unit) => { updateUnitData(unit.uuid, { status: 'mission_rtb_request', logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DEMANDE RTB` }] }); logEvent('FLOTTE', `${unit.name}: DEMANDE RTB`); };
             const validateRTB = (unit) => { const durationMs = Date.now() - unit.missionStartTime; const minutes = Math.floor(durationMs / 60000); updateUnitData(unit.uuid, { status: 'mission_rtb_transit', logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `RETOUR AUTORISÉ` }] }); logEvent('FLOTTE', `${unit.name}: RETOUR AUTORISÉ PAR SL`); };
 
-            // --- CORRECTIONS AJOUTÉES ---
-            const confirmArrival = (unit) => {
-                if (!canEdit && unit.responsible !== userIdentity) return; // Basic check
-                // On prépare l'unité dans le modal d'action pour la suite
-                setActionModal({ type: 'post_mission', unit });
-                setShowPostMissionModal(true);
-            };
-
-            const endMission = (unit) => {
-                confirmArrival(unit);
-            };
-
-            const finalizeMission = (finalStatus) => {
-                if (!actionModal || !actionModal.unit) return;
-                
-                const unit = actionModal.unit;
-                const logMsg = finalStatus === 'operational' 
-                    ? 'MISSION TERMINÉE: RETOUR DISPO (RAS)' 
-                    : 'MISSION TERMINÉE: ENVOI ATELIER (DOMMAGES)';
-
-                updateUnitData(unit.uuid, {
-                    status: finalStatus, // 'operational' ou 'damaged'
-                    responsible: 'BASE', // Le véhicule revient à la base
-                    crew: [], // On vide l'équipage
-                    missionStartTime: null,
-                    logs: [...(unit.logs || []), { 
-                        time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 
-                        msg: logMsg 
-                    }]
-                });
-
-                logEvent('OPS', `${unit.name}: ${logMsg}`);
-                setShowPostMissionModal(false);
-                setActionModal(null);
-            };
-            // ----------------------------
-
             const confirmDestruction = () => { if (!actionModal || !inputReason) return; updateUnitData(actionModal.unit.uuid, { status: 'destroyed', reasonHS: inputReason, missionStartTime: null, logs: [...(actionModal.unit.logs || []), {time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DÉTRUIT: ${inputReason}`}] }); setActionModal(null); };
             const returnToBase = (uuid) => { if(!canEdit)return; if(confirm("FORCER RTB ?")) { const u=activeUnits.find(x=>x.uuid===uuid); const nu=activeUnits.filter(x=>x.uuid!==uuid); setActiveUnits(nu); save('activeUnits', nu); if(u) logEvent('GARAGE', `RTB FORCÉ: ${u.name}`); } };
             const updateSupplySource = (id, f, v) => { if(!canEdit)return; const s=supplySources.map(x=>x.id===id?{...x,[f]:v}:x); setSupplySources(s); save('supplySources', s); };
@@ -699,17 +712,6 @@
                 setShowCrewModal(false);
             };
 
-            // SITREP LOGIC
-            const openSitrepModal = (unit) => { setSitrepData({ unit: unit, location: '', status: 'green', message: '' }); setShowSitrepModal(true); };
-            const submitSitrep = () => {
-                if (!sitrepData.unit) return;
-                const msg = `SITREP [${sitrepData.status.toUpperCase()}] LOC: ${sitrepData.location} // ${sitrepData.message}`;
-                updateUnitData(sitrepData.unit.uuid, {
-                    logs: [...(sitrepData.unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: msg }]
-                });
-                logEvent('FLOTTE', `SITREP ${sitrepData.unit.name}: ${sitrepData.status.toUpperCase()}`);
-                setShowSitrepModal(false);
-            };
             // ACK SITREP (SL)
             const acknowledgeSitrep = () => {
                 if (incomingSitrep && incomingSitrep.unitUuid) {
@@ -930,6 +932,7 @@
                                                                         onEndMission={() => endMission(unit)}
                                                                         onRTB={() => returnToBase(unit.uuid)}
                                                                         onValidateRTB={() => validateRTB(unit)}
+                                                                        onSitrep={() => openSitrepModal(unit)} 
                                                                         onShowLogs={() => setActionModal({ type: 'logs', unit })}
                                                                     />
                                                                 ))}
