@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V11.9 (COMMAND)</title>
+    <title>LOGI-OPS V12.0 (TACTICAL)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -15,10 +15,10 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Lucide Icons (Version FIXÉE) -->
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
 
-    <!-- FIREBASE -->
+    <!-- FIREBASE (Compat) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
@@ -49,9 +49,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // ==========================================
-        // 1. CONFIGURATION & OUTILS
-        // ==========================================
+        // ... (Configuration Firebase identique)
         const firebaseConfig = {
             apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
             authDomain: "logiops-data.firebaseapp.com",
@@ -81,9 +79,7 @@
                 }
                 db = firebase.firestore();
                 USE_FIREBASE = true;
-                console.log("Mode: PROD (Online)");
             } catch (e) {
-                console.error("Erreur connexion Firebase:", e);
                 USE_FIREBASE = false;
             }
         } else {
@@ -91,7 +87,7 @@
         }
 
         const SESSION_ID = typeof __app_id !== 'undefined' ? __app_id : "operation_actuelle";
-        const LOCAL_STORAGE_KEY = "logiops_data_v9";
+        const LOCAL_STORAGE_KEY = "logiops_data_v12";
 
         const StorageService = {
             save: (data) => {
@@ -128,9 +124,7 @@
 
         const { useState, useMemo, useEffect } = React;
 
-        // ==========================================
-        // 2. DONNÉES STATIQUES
-        // ==========================================
+        // ... (Données Statiques identiques)
         const INITIAL_CATALOG = [
             { id: 'l1', cat: 'LOGI', name: 'JEEP EM', type: 'TRANSPORT EM', cost: 110, stock: 2 },
             { id: 'l2', cat: 'LOGI', name: 'CAMION RÉPA.', type: 'MAINTENANCE', cost: 175, stock: 1 },
@@ -172,9 +166,7 @@
             'AIR': ['TRANSPORT AÉRIEN', 'CAS (APPUI FEU)', 'RECONNAISSANCE AÉRIENNE', 'EVASAN AÉRIENNE']
         };
 
-        // ==========================================
-        // 3. SYSTÈME D'ICÔNES
-        // ==========================================
+        // ... (Icons setup - same as before)
         const SVG_PATHS = {
             'Power': <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />,
             'Activity': <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
@@ -210,7 +202,9 @@
             'CheckSquare': <><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>,
             'Map': <><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></>,
             'Target': <><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>,
-            'Briefcase': <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+            'Briefcase': <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />,
+            'Users': <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
+            'SteeringWheel': <><circle cx="12" cy="12" r="10"/><path d="M12 2v20"/><path d="M2 12h20"/></> // Fallback representation
         };
 
         const Icon = ({ name, size = 24, className, ...props }) => {
@@ -239,13 +233,11 @@
         };
 
         const Icons = {};
-        ['Truck','Activity','AlertTriangle','Crosshair','Shield','Plane','Package','Plus','ArrowRight','RotateCcw','XCircle','LayoutGrid','List','PlayCircle','CheckCircle','Wrench','Skull','MapPin','User','FileText','Clock','ArrowUpRight','PieChart','BarChart3','Timer','Database','Trash2','Save','Users','UserPlus','UserMinus','LogOut','ScrollText','Warehouse','LayoutDashboard','Settings','Target','Radio','Wifi','PlusCircle','MinusCircle','Edit','Play','Lock','Unlock','Menu','Power','ChevronDown','AlertOctagon','Check','Send','Bell','Flag','MessageSquare','ClipboardList','Calendar','CheckSquare','Map','Briefcase'].forEach(name => {
+        ['Truck','Activity','AlertTriangle','Crosshair','Shield','Plane','Package','Plus','ArrowRight','RotateCcw','XCircle','LayoutGrid','List','PlayCircle','CheckCircle','Wrench','Skull','MapPin','User','FileText','Clock','ArrowUpRight','PieChart','BarChart3','Timer','Database','Trash2','Save','Users','UserPlus','UserMinus','LogOut','ScrollText','Warehouse','LayoutDashboard','Settings','Target','Radio','Wifi','PlusCircle','MinusCircle','Edit','Play','Lock','Unlock','Menu','Power','ChevronDown','AlertOctagon','Check','Send','Bell','Flag','MessageSquare','ClipboardList','Calendar','CheckSquare','Map','Briefcase','SteeringWheel'].forEach(name => {
             Icons[name] = (props) => <Icon name={name} {...props} />;
         });
 
-        // ==========================================
-        // 4. SOUS-COMPOSANTS (DÉFINIS AVANT USAGE)
-        // ==========================================
+        // ... (Sous-Composants: ClockDisplay, NotificationToast, StatCard, ActionButton, etc. identiques)
         const ClockDisplay = () => {
             const [time, setTime] = useState(new Date());
             useEffect(() => {
@@ -296,31 +288,44 @@
         const EmptyState = ({ canEdit, Target }) => (<div className="flex flex-col items-center justify-center h-64 md:h-96 border border-dashed border-green-900 bg-green-900/5 rounded-lg m-2">{Target && <Target size={48} className="mb-4 text-green-900 opacity-50" />}<p className="text-sm font-bold uppercase text-green-800 tracking-widest">AUCUNE UNITÉ DÉPLOYÉE</p>{canEdit && <p className="text-xs text-green-900 mt-2">ACCÉDER AU GARAGE POUR DÉPLOIEMENT</p>}</div>);
         const GarageSlot = ({ model, index, activeCount, onDeploy, ArrowUpRight }) => { const isAvailable = index >= activeCount; return (<button disabled={!isAvailable} onClick={isAvailable ? onDeploy : undefined} className={`relative p-1 md:p-3 border flex flex-col items-center justify-center text-center h-20 md:h-32 transition-all rounded ${isAvailable ? 'bg-green-900/10 border-green-800 hover:bg-green-900/30 hover:border-green-500 active:scale-95 group' : 'bg-black border-green-900/30 opacity-30 cursor-default'}`}>{isAvailable ? (<><div className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-500 shadow-[0_0_5px_#22c55e] rounded-full"></div><span className="mt-1 text-[9px] md:text-xs font-black text-green-400 leading-tight uppercase px-1 truncate w-full">{model.name}</span><span className="text-[9px] text-green-800 font-mono mt-1 hidden sm:block">{model.cost} PTS</span></>) : (<div className="flex flex-col items-center">{ArrowUpRight && <ArrowUpRight size={20} className="text-green-900 mb-1"/>}<span className="text-[9px] font-black text-green-900 uppercase tracking-widest">MISS.</span></div>)}<div className="absolute bottom-0.5 left-1 text-[7px] font-mono text-green-900">#{index+1}</div></button>); };
         const Modal = ({ title, color, onClose, children, Icon }) => (<div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"><div className={`bg-black border border-${color}-800 w-full max-w-lg p-4 md:p-6 relative shadow-[0_0_30px_rgba(0,0,0,0.5)] max-h-[90vh] overflow-y-auto rounded`}><div className="flex justify-between items-center mb-6"><h3 className={`text-lg font-black uppercase text-${color}-500 tracking-widest`}>{title}</h3><button onClick={onClose} className={`text-${color}-700 hover:text-${color}-400`}>{Icon && <Icon size={20} />}</button></div>{children}</div></div>);
-        
         function StatusBtn({ label, active, color, onClick }) { const styles = { green: active ? 'bg-green-600 text-black' : 'bg-black text-green-700 border-green-900 hover:text-green-500', blue: active ? 'bg-blue-600 text-black' : 'bg-black text-blue-700 border-blue-900 hover:text-blue-500', orange: active ? 'bg-orange-600 text-black' : 'bg-black text-orange-700 border-orange-900 hover:text-orange-500', red: 'bg-black text-red-800 border-red-900 hover:text-red-500' }; return <button onClick={onClick} className={`text-[9px] font-black py-1 border ${styles[color]} transition-all uppercase rounded`}>{label}</button>; }
         function MissionTimer({ startTime }) { const [d, sD] = useState('00:00:00'); useEffect(() => { const t = setInterval(() => { const df = Date.now() - startTime; const h = Math.floor(df / 3600000).toString().padStart(2, '0'); const m = Math.floor((df % 3600000) / 60000).toString().padStart(2, '0'); const s = Math.floor((df % 60000) / 1000).toString().padStart(2, '0'); sD(`${h}:${m}:${s}`); }, 1000); return () => clearInterval(t); }, [startTime]); return <span className="font-mono text-blue-400 font-bold bg-blue-900/30 px-2 py-0.5 text-[10px] border border-blue-900 rounded">T+{d}</span>; }
-        
-        function UnitCard({ unit, onStatusChange, onEndMission, onRTB, onShowLogs, Icons, readOnly, userIdentity, onStartMission, onRequestRTB, onValidateRTB, onAddCrew, onSitrep, onConfirmArrival }) { 
+
+        // UPDATED UNIT CARD to support self-assignment
+        function UnitCard({ unit, onStatusChange, onEndMission, onRTB, onShowLogs, Icons, readOnly, userIdentity, onStartMission, onRequestRTB, onValidateRTB, onAddCrew, onSitrep, onConfirmArrival, canAssignSelf, onTakeDriver, onTakePax }) { 
             let borderColor='border-green-600'; let statusText='text-green-500';
             if(unit.status.includes('mission')){ borderColor='border-blue-600'; statusText='text-blue-500'; }
             else if(unit.status==='damaged'){ borderColor='border-orange-600'; statusText='text-orange-500'; }
             else if(unit.status==='destroyed'){ borderColor='border-red-600'; statusText='text-red-600'; }
             
-            const isMyUnit = unit.responsible === userIdentity; // Chief
-            const isInCrew = unit.crew && unit.crew.includes(userIdentity); // Crew member
+            const isMyUnit = unit.responsible === userIdentity; 
+            const isInCrew = unit.crew && unit.crew.includes(userIdentity);
             const isSL = !readOnly;
+            const isPendingMission = unit.status === 'mission_reserved'; // New status for unassigned vehicles
 
-            const IconComp=Icons[CATEGORIES[unit.cat]?.icon||'Truck']; const List=Icons['List']; const Clock=Icons['Clock']; const RotateCcw=Icons['RotateCcw']; const XCircle=Icons['XCircle']; const Send=Icons['Send']; const Check=Icons['Check']; const UserPlus=Icons['UserPlus']; const MessageSquare=Icons['MessageSquare']; const CheckSquare=Icons['CheckSquare'];
+            const IconComp=Icons[CATEGORIES[unit.cat]?.icon||'Truck']; const List=Icons['List']; const Clock=Icons['Clock']; const RotateCcw=Icons['RotateCcw']; const XCircle=Icons['XCircle']; const Send=Icons['Send']; const Check=Icons['Check']; const UserPlus=Icons['UserPlus']; const MessageSquare=Icons['MessageSquare']; const CheckSquare=Icons['CheckSquare']; const SteeringWheel=Icons['SteeringWheel'];
             
             return (<div className={`relative border-l-4 ${borderColor} bg-green-900/5 p-2 md:p-3 flex flex-col h-auto border-t border-r border-b border-green-900/30 hover:bg-green-900/10 transition-all rounded-r min-h-[8rem]`}>
                 <div className="flex justify-between items-start mb-2"><div className="flex gap-2 overflow-hidden"><div className={`p-1.5 bg-black border border-green-900 flex items-center justify-center h-8 w-8 shrink-0 rounded ${statusText}`}>{IconComp && <IconComp size={16}/>}</div><div className="min-w-0"><h3 className={`font-black text-xs md:text-sm text-gray-300 truncate uppercase leading-tight ${unit.status === 'destroyed' && 'line-through opacity-50'}`}>{unit.name}</h3><div className="flex flex-col gap-0.5 mt-0.5"><span className="text-[9px] text-green-800 font-mono hidden sm:block">{unit.cost} PTS</span>
-                {unit.responsible!=='BASE' && (
+                {/* RESPONSIBLE DISPLAY OR ASSIGN BUTTON */}
+                {(unit.responsible!=='BASE' && unit.responsible!=='PENDING') ? (
                     <div className="flex flex-wrap gap-1 mt-1">
                         <span className={`text-[8px] px-1 border truncate max-w-[80px] rounded ${isMyUnit?'bg-yellow-900/20 text-yellow-400 border-yellow-900':'bg-blue-900/20 text-blue-400 border-blue-900/50'}`}>{unit.responsible}</span>
                         {unit.crew && unit.crew.map((c, idx) => (
                             <span key={idx} className="text-[8px] px-1 border border-green-900/50 text-green-600 bg-green-900/10 rounded" title="Équipier">{c}</span>
                         ))}
                     </div>
+                ) : (
+                    canAssignSelf && unit.status !== 'operational' && (
+                        <div className="flex gap-1 mt-1">
+                            <button onClick={onTakeDriver} className="text-[8px] px-2 py-1 bg-green-900/30 border border-green-600 text-green-400 font-bold rounded hover:bg-green-900/60 flex items-center gap-1">
+                                {SteeringWheel && <SteeringWheel size={10}/>} CONDUIRE
+                            </button>
+                            <button onClick={onTakePax} className="text-[8px] px-2 py-1 bg-blue-900/30 border border-blue-600 text-blue-400 font-bold rounded hover:bg-blue-900/60 flex items-center gap-1">
+                                {UserPlus && <UserPlus size={10}/>} MONTER
+                            </button>
+                        </div>
+                    )
                 )}
                 </div></div></div><button onClick={onShowLogs} className="text-green-900 hover:text-green-500 p-1 shrink-0">{List && <List size={14} />}</button></div>
                 
@@ -336,53 +341,41 @@
                         <div className="bg-red-900/10 border border-red-900/50 p-1 text-center mb-2 rounded"><p className="text-[8px] text-red-700 font-bold uppercase">CAUSE: {unit.reasonHS}</p></div>
                     ) : (
                         <>
-                            {/* 1. PENDING (ORDRE REÇU) */}
-                            {unit.status === 'mission_pending' && (
-                                <div>
-                                    {isMyUnit ? (
-                                        <div className="flex gap-1">
-                                            <button onClick={onAddCrew} className="flex-1 py-1.5 bg-blue-900/20 border border-blue-700 text-blue-400 font-bold text-[10px] hover:bg-blue-900/40 flex items-center justify-center gap-1 rounded">{UserPlus && <UserPlus size={12}/>} +</button>
-                                            <button onClick={onStartMission} className="flex-1 py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 flex items-center justify-center gap-1 rounded">{Send && <Send size={12}/>} GO</button>
-                                        </div>
-                                    ) : isInCrew ? (
-                                        <span className="block text-center text-[10px] text-blue-400 font-bold border border-blue-900/50 px-2 py-1 bg-blue-900/10 rounded">AFFECTÉ</span>
-                                    ) : (
-                                        <span className="block text-center text-[10px] text-orange-500 font-bold border border-orange-900/50 px-2 py-1 bg-orange-900/10 animate-pulse rounded">ATTENTE...</span>
-                                    )}
-                                </div>
-                            )}
-                            
-                            {/* 2. MISSION EN COURS (SITREP / RTB) */}
-                            {unit.status === 'mission' && (
+                            {/* STATUS LOGIC */}
+                            {(unit.status === 'mission' || unit.status === 'mission_pending' || unit.status === 'mission_reserved') && (
                                 <div className="space-y-2">
-                                    <div className="flex items-center gap-1 justify-center">{Clock && <Clock size={10} className="text-blue-600"/>}<MissionTimer startTime={unit.missionStartTime} /></div>
-                                    {isMyUnit && (
+                                    {/* TIMER IF STARTED */}
+                                    {unit.missionStartTime && <div className="flex items-center gap-1 justify-center">{Clock && <Clock size={10} className="text-blue-600"/>}<MissionTimer startTime={unit.missionStartTime} /></div>}
+                                    
+                                    {/* ACTIONS FOR DRIVER */}
+                                    {isMyUnit && unit.status === 'mission_pending' && (
+                                         <button onClick={onStartMission} className="w-full py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 flex items-center justify-center gap-1 rounded">{Send && <Send size={12}/>} DÉPART MISSION</button>
+                                    )}
+
+                                    {isMyUnit && unit.status === 'mission' && (
                                         <div className="grid grid-cols-2 gap-1">
                                             <button onClick={onSitrep} className="py-1 bg-yellow-900/20 border border-yellow-700 text-yellow-500 font-black text-[10px] hover:bg-yellow-900/40 flex items-center justify-center gap-1 rounded">{MessageSquare && <MessageSquare size={12}/>} SITREP</button>
                                             <button onClick={onRequestRTB} className="py-1 bg-blue-900/30 border border-blue-600 text-blue-400 font-black text-[10px] hover:bg-blue-900/50 rounded">RTB</button>
                                         </div>
                                     )}
-                                    {isInCrew && <span className="block text-center text-[9px] text-gray-500 font-mono">MISSION EN COURS</span>}
-                                </div>
-                            )}
-                            
-                            {/* 3. RTB REQUEST (SL VALIDE) */}
-                            {unit.status === 'mission_rtb_request' && (
-                                <div className="text-center">
-                                    {isSL ? (
-                                        <button onClick={onValidateRTB} className="w-full py-1 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 flex items-center justify-center gap-1 animate-pulse rounded">{Check && <Check size={12}/>} AUTORISER RETOUR</button>
-                                    ) : (
-                                        <span className="text-[10px] text-blue-400 font-bold border border-blue-900/50 px-2 py-1 bg-blue-900/10 animate-pulse rounded">ATTENTE SL</span>
+                                    
+                                    {/* RTB STATES */}
+                                    {unit.status === 'mission_rtb_request' && (
+                                        <div className="text-center">
+                                            {isSL ? (
+                                                <button onClick={onValidateRTB} className="w-full py-1 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 flex items-center justify-center gap-1 animate-pulse rounded">{Check && <Check size={12}/>} AUTORISER RETOUR</button>
+                                            ) : (
+                                                <span className="text-[10px] text-blue-400 font-bold border border-blue-900/50 px-2 py-1 bg-blue-900/10 animate-pulse rounded">ATTENTE SL</span>
+                                            )}
+                                        </div>
                                     )}
-                                </div>
-                            )}
-                            
-                            {/* 4. RTB TRANSIT (LOGI RENTRE) */}
-                            {unit.status === 'mission_rtb_transit' && (
-                                <div className="text-center space-y-2">
-                                    <div className="text-[9px] text-blue-300 font-mono animate-pulse">RETOUR BASE EN COURS</div>
-                                    {isMyUnit && (
-                                        <button onClick={onConfirmArrival} className="w-full py-1.5 bg-green-900/30 border border-green-600 text-green-400 font-black text-[10px] hover:bg-green-900/50 rounded flex items-center justify-center gap-1">{CheckSquare && <CheckSquare size={12}/>} ARRIVÉE BASE</button>
+                                    {unit.status === 'mission_rtb_transit' && (
+                                        <div className="text-center space-y-2">
+                                            <div className="text-[9px] text-blue-300 font-mono animate-pulse">RETOUR BASE EN COURS</div>
+                                            {isMyUnit && (
+                                                <button onClick={onConfirmArrival} className="w-full py-1.5 bg-green-900/30 border border-green-600 text-green-400 font-black text-[10px] hover:bg-green-900/50 rounded flex items-center justify-center gap-1">{CheckSquare && <CheckSquare size={12}/>} ARRIVÉE BASE</button>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             )}
@@ -414,7 +407,7 @@
             </div>); 
         }
 
-        // --- LOGIN SCREEN ---
+        // --- LOGIN SCREEN (Identique) ---
         function LoginScreen({ onLogin, squad }) {
             const [username, setUsername] = useState('');
             const [password, setPassword] = useState('');
@@ -478,7 +471,6 @@
         // 5. APPLICATION PRINCIPALE
         // ==========================================
         function LogiOpsV9() {
-            // ... (States and Logic)
             const [userRole, setUserRole] = useState(null); 
             const [userIdentity, setUserIdentity] = useState(null); 
             const [activeTab, setActiveTab] = useState('dashboard'); 
@@ -503,17 +495,16 @@
             
             // --- MISSION GLOBALE STATE ---
             const [showGlobalMissionModal, setShowGlobalMissionModal] = useState(false);
-            const [missions, setMissions] = useState([]); // Stockage des objets mission
-            const [selectedMissionId, setSelectedMissionId] = useState(null); // Pour l'affichage détaillé
+            const [missions, setMissions] = useState([]); 
+            const [selectedMissionId, setSelectedMissionId] = useState(null);
             const [globalMissionData, setGlobalMissionData] = useState({
                 title: '',
                 type: 'TRANS',
                 objective: '',
                 squadTarget: '',
-                vehicleAssignments: {} 
+                vehicles: [] // Liste des Uuids sélectionnés par le SL
             });
-            // ----------------------------
-
+            
             const [currentConfigId, setCurrentConfigId] = useState(null);
             const [inputReason, setInputReason] = useState('');
             const [selectedMemberId, setSelectedMemberId] = useState('');
@@ -524,14 +515,127 @@
             const [showReminderModal, setShowReminderModal] = useState(false);
             const [showShiftCheckModal, setShowShiftCheckModal] = useState(false);
             const [notification, setNotification] = useState(null);
-            
             const [incomingSitrep, setIncomingSitrep] = useState(null); 
             const [sitrepData, setSitrepData] = useState({ location: '', status: 'green', message: '' });
             
-            // Ancienne ref missions
-            const [newMissionData, setNewMissionData] = useState({ title: '', type: 'COMBAT', vehicles: [], personnel: [] });
-
             const canEdit = userRole === 'SL';
+
+            // --- LOGIQUE TACTIQUE (New in V12) ---
+            
+            // 1. SL Crée la mission (véhicules réservés mais pas de conducteurs)
+            const toggleGlobalMissionVehicle = (uuid) => {
+                setGlobalMissionData(prev => {
+                    const list = prev.vehicles.includes(uuid) 
+                        ? prev.vehicles.filter(id => id !== uuid) 
+                        : [...prev.vehicles, uuid];
+                    return { ...prev, vehicles: list };
+                });
+            };
+
+            const submitGlobalMission = () => {
+                if (!globalMissionData.title || globalMissionData.vehicles.length === 0) {
+                    alert("Veuillez remplir le titre et sélectionner au moins un véhicule.");
+                    return;
+                }
+
+                const timestamp = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+                const missionId = `OP_${Date.now()}`; 
+                const missionLog = `ORDRE OPÉRATIONNEL: ${globalMissionData.title} (OBJ: ${globalMissionData.objective})`;
+
+                // Créer l'objet mission
+                const newMissionObj = {
+                    id: missionId,
+                    title: globalMissionData.title,
+                    type: globalMissionData.type,
+                    objective: globalMissionData.objective,
+                    squadTarget: globalMissionData.squadTarget,
+                    startTime: timestamp,
+                    status: 'pending', // En attente d'un leader
+                    leader: null,      // Personne pour l'instant
+                    participants: []   // Liste des logisticiens
+                };
+
+                setMissions([...missions, newMissionObj]);
+                save('missions', [...missions, newMissionObj]);
+
+                // Mise à jour des véhicules: "RÉSERVÉS"
+                const nu = activeUnits.map(u => {
+                    if (globalMissionData.vehicles.includes(u.uuid)) {
+                        return {
+                            ...u,
+                            status: 'mission_reserved', // Nouveau statut
+                            responsible: 'PENDING',     // Pas encore de chauffeur
+                            missionObjective: globalMissionData.objective + (globalMissionData.squadTarget ? ` [${globalMissionData.squadTarget}]` : ''),
+                            missionId: missionId,
+                            logs: [...(u.logs || []), { time: timestamp, msg: `RÉSERVÉ OP: ${globalMissionData.title}` }]
+                        };
+                    }
+                    return u;
+                });
+
+                setActiveUnits(nu);
+                save('activeUnits', nu);
+                logEvent('OPS', missionLog);
+                
+                setGlobalMissionData({ title: '', type: 'TRANS', objective: '', squadTarget: '', vehicles: [] });
+                setShowGlobalMissionModal(false);
+            };
+
+            // 2. Logisticien prend le Lead
+            const takeMissionCommand = (mId) => {
+                if(!confirm("Prendre le commandement de cette mission ?")) return;
+                const nm = missions.map(m => m.id === mId ? {...m, status: 'active', leader: userIdentity, participants: [userIdentity]} : m);
+                setMissions(nm);
+                save('missions', nm);
+                logEvent('OPS', `${userIdentity} PREND LE COMMANDEMENT DE L'OPÉRATION.`);
+            };
+
+            // 3. Logisticien rejoint
+            const joinMission = (mId) => {
+                const mission = missions.find(m => m.id === mId);
+                if(mission.participants.includes(userIdentity)) return;
+                
+                const nm = missions.map(m => m.id === mId ? {...m, participants: [...m.participants, userIdentity]} : m);
+                setMissions(nm);
+                save('missions', nm);
+                logEvent('OPS', `${userIdentity} REJOINT L'OPÉRATION.`);
+            };
+
+            // 4. Assigner un véhicule (Soi-même)
+            const selfAssignDriver = (unitUuid) => {
+                const nu = activeUnits.map(u => {
+                    if(u.uuid === unitUuid) {
+                        return { 
+                            ...u, 
+                            responsible: userIdentity,
+                            status: 'mission_pending', // Prêt au départ
+                            logs: [...(u.logs||[]), {time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `${userIdentity} PREND LE VOLANT`}] 
+                        };
+                    }
+                    return u;
+                });
+                setActiveUnits(nu);
+                save('activeUnits', nu);
+            };
+
+            const selfAssignPax = (unitUuid) => {
+                const nu = activeUnits.map(u => {
+                    if(u.uuid === unitUuid) {
+                        const currentCrew = u.crew || [];
+                        if(currentCrew.includes(userIdentity)) return u;
+                        return { 
+                            ...u, 
+                            crew: [...currentCrew, userIdentity],
+                            logs: [...(u.logs||[]), {time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `${userIdentity} MONTE À BORD`}] 
+                        };
+                    }
+                    return u;
+                });
+                setActiveUnits(nu);
+                save('activeUnits', nu);
+            };
+
+            // -----------------------------------------
 
             // SITREP LOGIC
             const openSitrepModal = (unit) => { 
@@ -549,123 +653,40 @@
                 setShowSitrepModal(false);
             };
 
-            // POST MISSION LOGIC
             const confirmArrival = (unit) => {
                 if (!canEdit && unit.responsible !== userIdentity) return; 
                 setActionModal({ type: 'post_mission', unit });
                 setShowPostMissionModal(true);
             };
 
-            const endMission = (unit) => {
-                confirmArrival(unit);
-            };
+            const endMission = (unit) => { confirmArrival(unit); };
 
             const finalizeMission = (finalStatus) => {
                 if (!actionModal || !actionModal.unit) return;
                 const unit = actionModal.unit;
-                const logMsg = finalStatus === 'operational' 
-                    ? 'MISSION TERMINÉE: RETOUR DISPO (RAS)' 
-                    : 'MISSION TERMINÉE: ENVOI ATELIER (DOMMAGES)';
-
+                const logMsg = finalStatus === 'operational' ? 'MISSION TERMINÉE: RETOUR DISPO (RAS)' : 'MISSION TERMINÉE: ENVOI ATELIER (DOMMAGES)';
                 updateUnitData(unit.uuid, {
-                    status: finalStatus,
-                    responsible: 'BASE',
-                    crew: [],
-                    missionStartTime: null,
-                    missionId: null, // On détache de la mission globale
-                    logs: [...(unit.logs || []), { 
-                        time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 
-                        msg: logMsg 
-                    }]
+                    status: finalStatus, responsible: 'BASE', crew: [], missionStartTime: null, missionId: null,
+                    logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: logMsg }]
                 });
-
                 logEvent('OPS', `${unit.name}: ${logMsg}`);
                 setShowPostMissionModal(false);
                 setActionModal(null);
             };
 
-            // --- LOGIQUE MISSION GLOBALE ---
-            const handleGlobalMissionAssign = (unitUuid, memberName) => {
-                setGlobalMissionData(prev => {
-                    const newAssignments = { ...prev.vehicleAssignments };
-                    if (memberName === "") {
-                        delete newAssignments[unitUuid];
-                    } else {
-                        newAssignments[unitUuid] = memberName;
-                    }
-                    return { ...prev, vehicleAssignments: newAssignments };
-                });
-            };
-
-            const submitGlobalMission = () => {
-                if (!globalMissionData.title || Object.keys(globalMissionData.vehicleAssignments).length === 0) {
-                    alert("Veuillez remplir le titre et assigner au moins un véhicule.");
-                    return;
-                }
-
-                const timestamp = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-                const missionId = `GM_${Date.now()}`; // ID Unique
-                const missionLog = `MISSION GLOBALE: ${globalMissionData.title} (OBJ: ${globalMissionData.objective})`;
-
-                // Créer l'objet mission
-                const newMissionObj = {
-                    id: missionId,
-                    title: globalMissionData.title,
-                    type: globalMissionData.type,
-                    objective: globalMissionData.objective,
-                    squadTarget: globalMissionData.squadTarget,
-                    startTime: timestamp,
-                    status: 'active',
-                    vehicleCount: Object.keys(globalMissionData.vehicleAssignments).length
-                };
-
-                setMissions([...missions, newMissionObj]);
-                save('missions', [...missions, newMissionObj]);
-
-                // Mise à jour des unités concernées
-                const nu = activeUnits.map(u => {
-                    const assignedMember = globalMissionData.vehicleAssignments[u.uuid];
-                    if (assignedMember) {
-                        return {
-                            ...u,
-                            status: 'mission_pending',
-                            responsible: assignedMember,
-                            missionObjective: globalMissionData.objective + (globalMissionData.squadTarget ? ` [${globalMissionData.squadTarget}]` : ''),
-                            missionId: missionId, // LIEN CRITIQUE
-                            logs: [...(u.logs || []), { time: timestamp, msg: `ORDRE MISSION (GROUPE): ${globalMissionData.title} -> ${assignedMember}` }]
-                        };
-                    }
-                    return u;
-                });
-
-                setActiveUnits(nu);
-                save('activeUnits', nu);
-                logEvent('OPS', missionLog);
-                
-                setGlobalMissionData({ title: '', type: 'TRANS', objective: '', squadTarget: '', vehicleAssignments: {} });
-                setShowGlobalMissionModal(false);
-            };
-
             const endWholeMission = (mId) => {
                 if(!confirm("TERMINER LA MISSION ET LIBÉRER TOUS LES VÉHICULES ?")) return;
-                
-                // Update Units
                 const nu = activeUnits.map(u => {
                     if(u.missionId === mId) {
                         return { ...u, status: 'operational', responsible: 'BASE', crew: [], missionId: null, missionStartTime: null, missionObjective: null, logs: [...(u.logs||[]), {time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: "FIN DE MISSION GLOBALE"}]};
                     }
                     return u;
                 });
-                setActiveUnits(nu);
-                save('activeUnits', nu);
-
-                // Update Mission Status
+                setActiveUnits(nu); save('activeUnits', nu);
                 const nm = missions.map(m => m.id === mId ? {...m, status: 'ended'} : m);
-                setMissions(nm);
-                save('missions', nm);
+                setMissions(nm); save('missions', nm);
                 setSelectedMissionId(null);
             };
-            // -----------------------------------------
 
             useEffect(() => {
                 let isMounted = true;
@@ -690,7 +711,13 @@
                     if (!isMounted) return;
                     clearTimeout(timeout);
                     if (data) {
-                        // ... (Existing Firebase Logic omitted for brevity, same as before) ...
+                        if (data.activeUnits) {
+                            // Notification logic (simplified for brevity)
+                            const pendingMission = data.missions?.find(m => m.status === 'pending');
+                            if (pendingMission && !missions.find(m => m.id === pendingMission.id)) {
+                                setNotification({ message: "NOUVELLE MISSION DISPONIBLE !", type: 'alert' });
+                            }
+                        }
                         if(data.activeUnits) setActiveUnits(data.activeUnits);
                         if(data.catalog) setCatalog(data.catalog);
                         if(data.squad) setSquad(data.squad);
@@ -704,51 +731,28 @@
                     setDataLoaded(true);
                 });
                 return () => { isMounted = false; if(unsubscribe) unsubscribe(); clearTimeout(timeout); };
-            }, [activeUnits, userIdentity, userRole]);
+            }, [activeUnits, userIdentity, userRole, missions]);
             
-            useEffect(() => {
-                if (!isSlActive) return; 
-                const interval = setInterval(() => { setShowReminderModal(true); }, 30 * 60 * 1000); 
-                return () => clearInterval(interval);
-            }, [isSlActive]);
+            useEffect(() => { if (!isSlActive) return; const interval = setInterval(() => { setShowReminderModal(true); }, 30 * 60 * 1000); return () => clearInterval(interval); }, [isSlActive]);
 
             const isMyUnit = (u, id) => u.responsible === id;
-
             const save = (key, val) => StorageService.save({ [key]: val });
-            const logEvent = (type, message) => {
-                const newLog = { id: Date.now(), time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), type, msg: message };
-                const newLogs = [newLog, ...globalLogs].slice(0, 50); 
-                setGlobalLogs(newLogs); save('globalLogs', newLogs);
-            };
-            
+            const logEvent = (type, message) => { const newLog = { id: Date.now(), time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), type, msg: message }; const newLogs = [newLog, ...globalLogs].slice(0, 50); setGlobalLogs(newLogs); save('globalLogs', newLogs); };
             const clearJMO = () => { if(confirm("VIDER JMO ?")) { setGlobalLogs([]); save('globalLogs', []); } };
             const updateStock = (id, d) => { if(!canEdit)return; const c = catalog.map(m=>m.id===id?{...m,stock:Math.max(0,m.stock+d)}:m); setCatalog(c); save('catalog', c); };
             const deleteModel = (id) => { if(!canEdit||!confirm("Supprimer ?"))return; const c = catalog.filter(m=>m.id!==id); setCatalog(c); save('catalog', c); };
-            
-            const deployUnit = (id) => {
-                if(!canEdit) return;
-                const model = catalog.find(x=>x.id===id); if(!model) return;
-                if(activeUnits.filter(u=>u.modelId===id).length >= model.stock) return;
-                const source = supplySources[0];
-                if (!source || source.amount < model.cost) { alert(`SUPPLY INSUFFISANT !`); return; }
-                const newSupply = supplySources.map((s, i) => i === 0 ? { ...s, amount: s.amount - model.cost } : s);
-                setSupplySources(newSupply); save('supplySources', newSupply);
-                const u = { uuid: Date.now()+Math.random(), modelId: model.id, name: model.name, cat: model.cat, cost: model.cost, status: 'operational', responsible: 'BASE', crew: [], reasonHS: '', missionStartTime: null, deployTime: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), logs: [] };
-                const nu = [u, ...activeUnits]; setActiveUnits(nu); save('activeUnits', nu); logEvent('GARAGE', `DÉPLOIEMENT: ${model.name}`);
-            };
+            const deployUnit = (id) => { if(!canEdit) return; const model = catalog.find(x=>x.id===id); if(!model) return; if(activeUnits.filter(u=>u.modelId===id).length >= model.stock) return; const source = supplySources[0]; if (!source || source.amount < model.cost) { alert(`SUPPLY INSUFFISANT !`); return; } const newSupply = supplySources.map((s, i) => i === 0 ? { ...s, amount: s.amount - model.cost } : s); setSupplySources(newSupply); save('supplySources', newSupply); const u = { uuid: Date.now()+Math.random(), modelId: model.id, name: model.name, cat: model.cat, cost: model.cost, status: 'operational', responsible: 'BASE', crew: [], reasonHS: '', missionStartTime: null, deployTime: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), logs: [] }; const nu = [u, ...activeUnits]; setActiveUnits(nu); save('activeUnits', nu); logEvent('GARAGE', `DÉPLOIEMENT: ${model.name}`); };
             const createModel = () => { if(!canEdit||!newModelData.name)return; const m={id:`custom_${Date.now()}`, cat:newModelData.cat, name:newModelData.name.toUpperCase(), type:newModelData.type.toUpperCase()||'STD', cost:parseInt(newModelData.cost)||0, stock:parseInt(newModelData.stock)||1}; const c=[...catalog, m]; setCatalog(c); save('catalog', c); setShowCreateVehicleModal(false); setNewModelData({name:'',cat:'LOGI',type:'',cost:0,stock:1}); logEvent('GARAGE', `NOUVEAU MODÈLE: ${m.name}`); };
             const toggleSlShift = () => { if(!canEdit||!slName)return; if (!isSlActive) setShowShiftCheckModal(true); else { const s=!isSlActive; setIsSlActive(s); save('isSlActive', s); save('slName', slName); logEvent('RH', `FIN SERVICE SL: ${slName}`); } };
             const confirmShiftStart = () => { setIsSlActive(true); setShowShiftCheckModal(false); save('isSlActive', true); save('slName', slName); logEvent('RH', `PRISE POSTE SL: ${slName}`); };
             const addSquadMember = (n) => { if(!canEdit||!n)return; const s=[...squad, {id:Date.now(), name:n.toUpperCase(), startTime:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}]; setSquad(s); save('squad', s); logEvent('RH', `RENFORT: ${n.toUpperCase()}`); };
             const removeSquadMember = (id) => { if(!canEdit)return; const m=squad.find(x=>x.id===id); if(m && confirm(`DÉPART ${m.name} ?`)){ const s=squad.filter(x=>x.id!==id); setSquad(s); save('squad', s); logEvent('RH', `DÉPART: ${m.name}`); } };
             const renameSquadMember = (id) => { if (!canEdit) return; const m = squad.find(x => x.id === id); if (!m) return; const nn = prompt("Nouveau nom :", m.name); if (nn && nn !== m.name) { const ns = squad.map(x => x.id === id ? { ...x, name: nn.toUpperCase() } : x); setSquad(ns); save('squad', ns); logEvent('RH', `NOM MODIFIÉ: ${m.name} -> ${nn.toUpperCase()}`); } };
-            
             const updateUnitData = (uuid, newData) => { const nu = activeUnits.map(u => u.uuid === uuid ? { ...u, ...newData } : u); setActiveUnits(nu); save('activeUnits', nu); };
             const confirmMission = () => { if (!actionModal) return; let respName = "INDÉFINI"; if (selectedMemberId === 'SL') respName = slName || "CHEF LOGI"; else { const member = squad.find(m => m.id === parseInt(selectedMemberId)); if (member) respName = member.name; } updateUnitData(actionModal.unit.uuid, { status: 'mission_pending', responsible: respName, logs: [...(actionModal.unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `ORDRE MISSION -> ${respName}` }] }); logEvent('FLOTTE', `${actionModal.unit.name}: ORDRE MISSION POUR ${respName}`); setActionModal(null); };
             const acceptMission = (unit) => { updateUnitData(unit.uuid, { status: 'mission', missionStartTime: Date.now(), logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DÉPART MISSION` }] }); logEvent('FLOTTE', `${unit.name}: DÉPART MISSION CONFIRMÉ`); };
             const requestRTB = (unit) => { updateUnitData(unit.uuid, { status: 'mission_rtb_request', logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DEMANDE RTB` }] }); logEvent('FLOTTE', `${unit.name}: DEMANDE RTB`); };
             const validateRTB = (unit) => { const durationMs = Date.now() - unit.missionStartTime; const minutes = Math.floor(durationMs / 60000); updateUnitData(unit.uuid, { status: 'mission_rtb_transit', logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `RETOUR AUTORISÉ` }] }); logEvent('FLOTTE', `${unit.name}: RETOUR AUTORISÉ PAR SL`); };
-
             const confirmDestruction = () => { if (!actionModal || !inputReason) return; updateUnitData(actionModal.unit.uuid, { status: 'destroyed', reasonHS: inputReason, missionStartTime: null, logs: [...(actionModal.unit.logs || []), {time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DÉTRUIT: ${inputReason}`}] }); setActionModal(null); };
             const returnToBase = (uuid) => { if(!canEdit)return; if(confirm("FORCER RTB ?")) { const u=activeUnits.find(x=>x.uuid===uuid); const nu=activeUnits.filter(x=>x.uuid!==uuid); setActiveUnits(nu); save('activeUnits', nu); if(u) logEvent('GARAGE', `RTB FORCÉ: ${u.name}`); } };
             const updateSupplySource = (id, f, v) => { if(!canEdit)return; const s=supplySources.map(x=>x.id===id?{...x,[f]:v}:x); setSupplySources(s); save('supplySources', s); };
@@ -759,39 +763,9 @@
             const setConfigCount = (cid, mid, val) => { if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return; const cnt=Math.max(0, parseInt(val)||0); const nc={...c.content, [mid]:cnt}; if(cnt===0) delete nc[mid]; const ncs=configurations.map(x=>x.id===cid?{...x, content:nc}:x); setConfigurations(ncs); save('configurations', ncs); };
             const renameConfig = (cid, val) => { if(!canEdit)return; const ncs=configurations.map(x=>x.id===cid?{...x, name:val.toUpperCase()}:x); setConfigurations(ncs); save('configurations', ncs); };
             const deleteConfig = (cid) => { if(!canEdit||!confirm("Supprimer ?"))return; const ncs=configurations.filter(x=>x.id!==cid); setConfigurations(ncs); if(currentConfigId===cid) setCurrentConfigId(null); save('configurations', ncs); };
-            const deployConfig = (cid) => {
-                if(!canEdit)return; const config=configurations.find(x=>x.id===cid); if(!config)return;
-                let count=0; let nu=[...activeUnits]; let totalCost = 0; let pendingDeployment = [];
-                Object.entries(config.content).forEach(([mid, target]) => {
-                    const m=catalog.find(x=>x.id===mid); if(!m)return;
-                    const curr=nu.filter(u=>u.modelId===mid).length;
-                    const needed=target-curr;
-                    if(needed>0) {
-                        const avail=m.stock-curr;
-                        const toAdd=Math.min(needed, avail);
-                        if (toAdd > 0) { totalCost += toAdd * m.cost; pendingDeployment.push({ model: m, count: toAdd }); }
-                    }
-                });
-                const source = supplySources[0];
-                if (!source || source.amount < totalCost) { alert(`SUPPLY INSUFFISANT !\nCoût: ${totalCost}`); return; }
-                if(pendingDeployment.length > 0) {
-                    const newSupply = supplySources.map((s, i) => i === 0 ? { ...s, amount: s.amount - totalCost } : s);
-                    setSupplySources(newSupply); save('supplySources', newSupply);
-                    pendingDeployment.forEach(item => { for(let i=0;i<item.count;i++) { nu.push({uuid:Date.now()+Math.random()+i, modelId:item.model.id, name:item.model.name, cat:item.model.cat, cost:item.model.cost, status:'operational', responsible:'BASE', crew:[], reasonHS:'', missionStartTime:null, deployTime:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), logs:[]}); count++; } });
-                    setActiveUnits(nu); save('activeUnits', nu); logEvent('GARAGE', `DÉPLOIEMENT PHASE: ${config.name} (+${count} UNITÉS, -${totalCost} Supply)`); 
-                } else alert("Rien à déployer.");
-            };
-
-            const addToCrew = (member) => {
-                if(!actionModal || !actionModal.unit) return;
-                const u = actionModal.unit;
-                const currentCrew = u.crew || [];
-                if(currentCrew.includes(member)) return;
-                const newCrew = [...currentCrew, member];
-                updateUnitData(u.uuid, { crew: newCrew });
-                setShowCrewModal(false);
-            };
-
+            const deployConfig = (cid) => { if(!canEdit)return; const config=configurations.find(x=>x.id===cid); if(!config)return; let count=0; let nu=[...activeUnits]; let totalCost = 0; let pendingDeployment = []; Object.entries(config.content).forEach(([mid, target]) => { const m=catalog.find(x=>x.id===mid); if(!m)return; const curr=nu.filter(u=>u.modelId===mid).length; const needed=target-curr; if(needed>0) { const avail=m.stock-curr; const toAdd=Math.min(needed, avail); if (toAdd > 0) { totalCost += toAdd * m.cost; pendingDeployment.push({ model: m, count: toAdd }); } } }); const source = supplySources[0]; if (!source || source.amount < totalCost) { alert(`SUPPLY INSUFFISANT !\nCoût: ${totalCost}`); return; } if(pendingDeployment.length > 0) { const newSupply = supplySources.map((s, i) => i === 0 ? { ...s, amount: s.amount - totalCost } : s); setSupplySources(newSupply); save('supplySources', newSupply); pendingDeployment.forEach(item => { for(let i=0;i<item.count;i++) { nu.push({uuid:Date.now()+Math.random()+i, modelId:item.model.id, name:item.model.name, cat:item.model.cat, cost:item.model.cost, status:'operational', responsible:'BASE', crew:[], reasonHS:'', missionStartTime:null, deployTime:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), logs:[]}); count++; } }); setActiveUnits(nu); save('activeUnits', nu); logEvent('GARAGE', `DÉPLOIEMENT PHASE: ${config.name} (+${count} UNITÉS, -${totalCost} Supply)`); } else alert("Rien à déployer."); };
+            const addToCrew = (member) => { if(!actionModal || !actionModal.unit) return; const u = actionModal.unit; const currentCrew = u.crew || []; if(currentCrew.includes(member)) return; const newCrew = [...currentCrew, member]; updateUnitData(u.uuid, { crew: newCrew }); setShowCrewModal(false); };
+            const acknowledgeSitrep = () => { if (incomingSitrep && incomingSitrep.unitUuid) { updateUnitData(incomingSitrep.unitUuid, { logs: [...(activeUnits.find(u=>u.uuid===incomingSitrep.unitUuid)?.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `SITREP REÇU PAR SL` }] }); } setIncomingSitrep(null); };
             const handleStatusClick = (unit, targetStatus) => { if (!canEdit) return; if (unit.status === targetStatus && targetStatus !== 'mission') return; if (targetStatus === 'mission') { setSelectedMemberId(''); setSelectedMissionType(''); setActionModal({ type: 'mission', unit }); } else if (targetStatus === 'destroyed') { setInputReason(''); setActionModal({ type: 'destroy', unit }); } else { updateUnitData(unit.uuid, { status: targetStatus }); } };
             const toggleCat = (key) => setExpandedCats(prev => ({...prev, [key]: !prev[key]}));
             const stats = useMemo(() => ({ deployedCost: activeUnits.reduce((s, u) => s + (u.status!=='stored'?u.cost:0), 0), destroyedCount: activeUnits.filter(u => u.status === 'destroyed').length, missionCount: activeUnits.filter(u => u.status === 'mission').length, repairCount: activeUnits.filter(u => u.status === 'damaged').length, operationalCount: activeUnits.filter(u => u.status === 'operational').length, totalVehicles: activeUnits.length, activeCount: activeUnits.length, totalSupply: supplySources.reduce((a, s) => a + (parseInt(s.amount)||0), 0) }), [activeUnits, supplySources]);
@@ -825,7 +799,7 @@
                         <div className="flex items-center gap-4">
                             <div className="p-1.5 rounded">{Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}</div>
                             <div>
-                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V11.9</span></h1>
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V12.0</span></h1>
                                 <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
                                     <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}><div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>SL: {slName || "N/A"}</span>
                                     <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
@@ -875,10 +849,18 @@
                                         </button>
                                     )}
 
-                                    {/* STANDARD SL VIEW */}
+                                    {/* STANDARD SL VIEW / LOGI VIEW (FILTERED) */}
                                     <div className="flex-1 overflow-y-auto space-y-2 pr-2">
                                         {Object.keys(CATEGORIES).map(catKey => {
-                                            const unitsInCat = activeUnits.filter(u => u.cat === catKey && (filterStatus === 'ALL' || u.status === filterStatus || (filterStatus === 'mission' && (u.status === 'mission_pending' || u.status === 'mission_rtb_request' || u.status === 'mission_rtb_transit'))));
+                                            // Filter logic: Show all for SL, Show assigned for Logi UNLESS operational
+                                            const unitsInCat = activeUnits.filter(u => {
+                                                const isAssignedToMe = u.responsible === userIdentity || (u.crew && u.crew.includes(userIdentity));
+                                                const isOp = u.status === 'operational';
+                                                const matchesFilter = filterStatus === 'ALL' || u.status === filterStatus;
+                                                if(canEdit) return u.cat === catKey && matchesFilter;
+                                                return u.cat === catKey && (isAssignedToMe || isOp) && matchesFilter;
+                                            });
+
                                             if (unitsInCat.length === 0) return null;
                                             const conf = CATEGORIES[catKey];
                                             const isOpen = expandedCats[catKey];
@@ -912,6 +894,9 @@
                                                                     onValidateRTB={() => validateRTB(unit)}
                                                                     onSitrep={() => openSitrepModal(unit)} 
                                                                     onShowLogs={() => setActionModal({ type: 'logs', unit })}
+                                                                    onTakeDriver={() => selfAssignDriver(unit.uuid)}
+                                                                    onTakePax={() => selfAssignPax(unit.uuid)}
+                                                                    canAssignSelf={false} // Not on main dashboard
                                                                 />
                                                             ))}
                                                         </div>
@@ -923,7 +908,7 @@
                                 </div>
                             )}
 
-                            {/* MISSIONS TAB (NEW) */}
+                            {/* MISSIONS TAB (NEW LOGIC) */}
                             {activeTab === 'missions' && (
                                 <div className="animate-in fade-in h-full flex flex-col">
                                     {!selectedMissionId ? (
@@ -940,28 +925,46 @@
                                                 )}
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                {missions.filter(m => m.status !== 'ended').map(mission => (
-                                                    <button key={mission.id} onClick={() => setSelectedMissionId(mission.id)} className="bg-black border border-purple-900 p-4 text-left hover:bg-purple-900/10 hover:border-purple-500 transition-all group relative overflow-hidden">
-                                                        <div className="absolute top-0 left-0 w-1 h-full bg-purple-600"></div>
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <h3 className="font-black text-white uppercase text-sm">{mission.title}</h3>
-                                                            <span className="text-[10px] bg-purple-900/30 text-purple-300 px-2 py-1 border border-purple-800">{mission.startTime}</span>
+                                                {missions.filter(m => m.status !== 'ended').map(mission => {
+                                                    const isLeader = mission.leader === userIdentity;
+                                                    const hasJoined = mission.participants?.includes(userIdentity);
+                                                    return (
+                                                        <div key={mission.id} className="bg-black border border-purple-900 p-4 relative overflow-hidden group">
+                                                            <div className="absolute top-0 left-0 w-1 h-full bg-purple-600"></div>
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <h3 className="font-black text-white uppercase text-sm">{mission.title}</h3>
+                                                                <span className={`text-[10px] px-2 py-1 border font-bold rounded ${mission.leader ? 'bg-green-900/30 text-green-400 border-green-800' : 'bg-red-900/30 text-red-400 border-red-800 animate-pulse'}`}>
+                                                                    {mission.leader ? `LEAD: ${mission.leader}` : 'LEADER REQUIS'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="space-y-1 mb-4">
+                                                                <p className="text-xs text-gray-400 font-bold flex items-center gap-2"><Icon name="Target" size={12}/> {mission.objective}</p>
+                                                                <p className="text-[10px] text-gray-500 flex items-center gap-2"><Icon name="Clock" size={12}/> {mission.startTime}</p>
+                                                            </div>
+                                                            
+                                                            {/* ACTIONS DE JOIN/LEAD */}
+                                                            {!canEdit && (
+                                                                <div className="grid grid-cols-2 gap-2 mb-2">
+                                                                    {!mission.leader && (
+                                                                        <button onClick={() => takeMissionCommand(mission.id)} className="col-span-2 py-2 border border-green-500 text-green-400 font-black text-[10px] hover:bg-green-900/30 uppercase">
+                                                                            PRENDRE LE COMMANDEMENT
+                                                                        </button>
+                                                                    )}
+                                                                    {mission.leader && !hasJoined && (
+                                                                        <button onClick={() => joinMission(mission.id)} className="col-span-2 py-2 border border-blue-500 text-blue-400 font-black text-[10px] hover:bg-blue-900/30 uppercase">
+                                                                            REJOINDRE L'UNITÉ
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+                                                            <button onClick={() => setSelectedMissionId(mission.id)} className="w-full py-2 bg-purple-900/20 text-purple-400 font-bold text-xs hover:bg-purple-900/40 flex items-center justify-between px-4 border-t border-purple-900/30">
+                                                                <span>{activeUnits.filter(u => u.missionId === mission.id).length} VÉHICULES</span>
+                                                                <Icon name="ArrowRight" size={16}/>
+                                                            </button>
                                                         </div>
-                                                        <div className="space-y-1">
-                                                            <p className="text-xs text-gray-400 font-bold flex items-center gap-2"><Icon name="Target" size={12}/> {mission.objective}</p>
-                                                            {mission.squadTarget && <p className="text-xs text-gray-500 flex items-center gap-2"><Icon name="Users" size={12}/> {mission.squadTarget}</p>}
-                                                        </div>
-                                                        <div className="mt-4 pt-3 border-t border-purple-900/30 flex justify-between items-center">
-                                                            <span className="text-xs font-mono text-purple-500 font-bold">{activeUnits.filter(u => u.missionId === mission.id).length} VÉHICULES</span>
-                                                            <span className="text-purple-400 group-hover:translate-x-1 transition-transform"><Icon name="ArrowRight" size={16}/></span>
-                                                        </div>
-                                                    </button>
-                                                ))}
-                                                {missions.filter(m => m.status !== 'ended').length === 0 && (
-                                                    <div className="col-span-full text-center py-12 border border-dashed border-purple-900 bg-purple-900/5">
-                                                        <p className="text-purple-500 font-bold opacity-50">AUCUNE OPÉRATION GROUPÉE ACTIVE</p>
-                                                    </div>
-                                                )}
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     ) : (
@@ -977,21 +980,16 @@
                                                             <span className="text-[10px] font-bold bg-purple-600 text-black px-2 py-0.5 rounded">EN COURS</span>
                                                         </div>
                                                         <div className="flex gap-4 text-xs text-purple-300 mt-1 font-mono">
-                                                            <span>OBJ: {missions.find(m=>m.id===selectedMissionId)?.objective}</span>
+                                                            <span>LEAD: {missions.find(m=>m.id===selectedMissionId)?.leader || "N/A"}</span>
                                                             <span>|</span>
-                                                            <span>DÉBUT: {missions.find(m=>m.id===selectedMissionId)?.startTime}</span>
+                                                            <span>PAX: {missions.find(m=>m.id===selectedMissionId)?.participants?.length || 0}</span>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 {canEdit && (
-                                                    <div className="flex gap-2">
-                                                        <button onClick={() => setShowGlobalMissionModal(true)} className="px-4 py-2 border border-purple-500 text-purple-400 font-bold text-xs hover:bg-purple-900/30 flex items-center gap-2">
-                                                            {Plus && <Plus size={14}/>} AJOUTER VÉHICULE
-                                                        </button>
-                                                        <button onClick={() => endWholeMission(selectedMissionId)} className="px-4 py-2 bg-red-600 text-black font-black text-xs hover:bg-red-500 flex items-center gap-2 shadow-[0_0_10px_rgba(220,38,38,0.4)]">
-                                                            {XCircle && <XCircle size={16}/>} TERMINER MISSION
-                                                        </button>
-                                                    </div>
+                                                    <button onClick={() => endWholeMission(selectedMissionId)} className="px-4 py-2 bg-red-600 text-black font-black text-xs hover:bg-red-500 flex items-center gap-2 shadow-[0_0_10px_rgba(220,38,38,0.4)]">
+                                                        {XCircle && <XCircle size={16}/>} TERMINER MISSION
+                                                    </button>
                                                 )}
                                             </div>
 
@@ -1002,6 +1000,9 @@
                                                     const unitsInMission = activeUnits.filter(u => u.missionId === selectedMissionId && u.cat === catKey);
                                                     if (unitsInMission.length === 0) return null;
                                                     
+                                                    const currentMission = missions.find(m => m.id === selectedMissionId);
+                                                    const hasJoined = currentMission?.participants?.includes(userIdentity);
+
                                                     const conf = CATEGORIES[catKey];
                                                     return (
                                                         <div key={catKey} className="border border-purple-900/30 bg-purple-900/5">
@@ -1021,6 +1022,10 @@
                                                                         onValidateRTB={() => validateRTB(unit)}
                                                                         onSitrep={() => openSitrepModal(unit)} 
                                                                         onShowLogs={() => setActionModal({ type: 'logs', unit })}
+                                                                        // Self Assign Logic
+                                                                        canAssignSelf={hasJoined}
+                                                                        onTakeDriver={() => selfAssignDriver(unit.uuid)}
+                                                                        onTakePax={() => selfAssignPax(unit.uuid)}
                                                                     />
                                                                 ))}
                                                             </div>
@@ -1039,6 +1044,7 @@
                             {/* (GARAGE / SQUAD / JMO : Identique au précédent) */}
                             {activeTab === 'garage' && canEdit && (
                                 <div className="space-y-6 animate-in fade-in">
+                                    {/* ... (Contenu Garage identique) ... */}
                                     <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-green-900 pb-4">
                                         <h2 className="text-lg font-black text-green-500 flex items-center gap-2 uppercase tracking-widest">
                                             {Warehouse && <Warehouse size={20}/>} CATALOGUE DÉPLOIEMENT
@@ -1049,7 +1055,6 @@
                                             <ActionButton onClick={()=>setShowStockModal(true)} icon={Settings} label="STOCKS" color="green" />
                                         </div>
                                     </div>
-
                                     {configurations.length > 0 && (
                                         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-green-900/50">
                                             {configurations.map(config => (
@@ -1060,7 +1065,6 @@
                                             ))}
                                         </div>
                                     )}
-
                                     <div className="space-y-8">
                                         {Object.keys(CATEGORIES).map(catKey => {
                                             const models = catalog.filter(m => m.cat === catKey);
@@ -1068,8 +1072,6 @@
                                             const IconComp = Icons[CATEGORIES[catKey].icon];
                                             return (
                                                 <div key={catKey} className="bg-black border border-green-900/50 p-4 relative">
-                                                    <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-green-800"></div>
-                                                    <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-green-800"></div>
                                                     <div className="flex items-center gap-2 mb-4 pb-2 border-b border-green-900/30">
                                                         <span className={CATEGORIES[catKey].color.split(' ')[1]}>{IconComp && <IconComp size={20}/>}</span>
                                                         <span className="font-black text-sm text-gray-400 tracking-wider">{CATEGORIES[catKey].label}</span>
@@ -1146,22 +1148,6 @@
                         <NavButton icon={ScrollText} label="JMO" active={activeTab==='journal'} onClick={()=>canEdit&&setActiveTab('journal')} disabled={!canEdit} />
                     </nav>
 
-                    {/* MODAL: REMINDER (30 MIN) */}
-                    {showReminderModal && (
-                        <Modal title="RAPPEL SITUATION" color="orange" onClose={()=>setShowReminderModal(false)} Icon={AlertOctagon}>
-                            <div className="text-center space-y-4 animate-alert p-4 border border-orange-500/50 bg-orange-900/10 mb-4 rounded">
-                                <h3 className="text-lg font-black text-orange-500">POINT SITUATION (30 MIN)</h3>
-                                <p className="text-xs text-orange-200">IL EST TEMPS DE VÉRIFIER :</p>
-                                <ul className="text-xs font-bold text-left list-disc pl-8 space-y-2 text-orange-400">
-                                    <li>ÉTAT DU PARC VÉHICULES</li>
-                                    <li>NIVEAU DU SUPPLY</li>
-                                    <li>POSITION DES EFFECTIFS</li>
-                                </ul>
-                            </div>
-                            <button onClick={()=>setShowReminderModal(false)} className="w-full py-3 bg-orange-600 text-black font-black text-xs hover:bg-orange-500">REÇU</button>
-                        </Modal>
-                    )}
-
                     {/* MODAL: SHIFT START CHECK */}
                     {showShiftCheckModal && (
                         <Modal title="PRISE DE SERVICE" color="green" onClose={()=>setShowShiftCheckModal(false)} Icon={XCircle}>
@@ -1180,7 +1166,7 @@
                         </Modal>
                     )}
 
-                    {/* NEW: GLOBAL MISSION MODAL */}
+                    {/* NEW: GLOBAL MISSION MODAL (SL ONLY - SIMPLIFIED) */}
                     {showGlobalMissionModal && canEdit && (
                         <Modal title="ORDRE DE MISSION GLOBAL" color="green" onClose={()=>setShowGlobalMissionModal(false)} Icon={XCircle}>
                             <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
@@ -1188,11 +1174,11 @@
                                 <div className="space-y-3 pb-4 border-b border-green-900/30">
                                     <h4 className="text-xs font-black text-green-500 uppercase tracking-widest mb-2">1. DÉTAILS OPÉRATION</h4>
                                     <div>
-                                        <label className="text-[10px] font-bold text-green-800 block mb-1">NOM DE L'OPÉRATION (CONVOI...)</label>
+                                        <label className="text-[10px] font-bold text-green-800 block mb-1">NOM DE L'OPÉRATION</label>
                                         <input type="text" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold uppercase text-sm" 
                                             value={globalMissionData.title} 
                                             onChange={e => setGlobalMissionData({...globalMissionData, title: e.target.value})} 
-                                            placeholder="EX: CONVOI ALPHA, DEPLOIEMENT BRAVO..." 
+                                            placeholder="EX: CONVOI ALPHA..." 
                                         />
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
@@ -1209,49 +1195,41 @@
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="text-[10px] font-bold text-green-800 block mb-1">SQUAD SOUTENUE</label>
+                                            <label className="text-[10px] font-bold text-green-800 block mb-1">SQUAD CIBLE</label>
                                             <input type="text" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold text-xs uppercase" 
                                                 value={globalMissionData.squadTarget} 
                                                 onChange={e => setGlobalMissionData({...globalMissionData, squadTarget: e.target.value})} 
-                                                placeholder="EX: SQUAD 1, INF 2..." 
+                                                placeholder="EX: SQUAD 1..." 
                                             />
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-green-800 block mb-1">OBJECTIF / POSITION</label>
+                                        <label className="text-[10px] font-bold text-green-800 block mb-1">OBJECTIF</label>
                                         <input type="text" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold text-xs" 
                                             value={globalMissionData.objective} 
                                             onChange={e => setGlobalMissionData({...globalMissionData, objective: e.target.value})} 
-                                            placeholder="EX: FOB RUSTY, GRID G5-2..." 
+                                            placeholder="EX: FOB RUSTY..." 
                                         />
                                     </div>
                                 </div>
 
-                                {/* STEP 2: VEHICLE SELECTION */}
+                                {/* STEP 2: VEHICLE SELECTION (NO DRIVER ASSIGNMENT) */}
                                 <div>
-                                    <h4 className="text-xs font-black text-green-500 uppercase tracking-widest mb-2">2. VÉHICULES & CHEFS DE BORD</h4>
+                                    <h4 className="text-xs font-black text-green-500 uppercase tracking-widest mb-2">2. SÉLECTION VÉHICULES</h4>
                                     <div className="space-y-2">
                                         {activeUnits.filter(u => u.status === 'operational').length === 0 && (
-                                            <p className="text-xs text-gray-500 italic">Aucun véhicule opérationnel disponible au garage.</p>
+                                            <p className="text-xs text-gray-500 italic">Aucun véhicule opérationnel.</p>
                                         )}
                                         {activeUnits.filter(u => u.status === 'operational').map(unit => {
-                                            const isSelected = !!globalMissionData.vehicleAssignments[unit.uuid];
+                                            const isSelected = globalMissionData.vehicles.includes(unit.uuid);
                                             return (
-                                                <div key={unit.uuid} className={`flex items-center justify-between p-2 border transition-all ${isSelected ? 'border-green-500 bg-green-900/20' : 'border-green-900/30 bg-black'}`}>
+                                                <div key={unit.uuid} onClick={() => toggleGlobalMissionVehicle(unit.uuid)} className={`flex items-center justify-between p-3 border cursor-pointer transition-all ${isSelected ? 'border-green-500 bg-green-900/20' : 'border-green-900/30 bg-black hover:bg-green-900/10'}`}>
                                                     <div className="flex flex-col">
                                                         <span className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-gray-500'}`}>{unit.name}</span>
                                                         <span className="text-[9px] text-green-800">{CATEGORIES[unit.cat]?.label}</span>
                                                     </div>
-                                                    <div className="w-1/2">
-                                                        <select 
-                                                            className={`w-full text-[10px] font-bold p-1 border outline-none ${isSelected ? 'bg-green-900/40 border-green-500 text-green-300' : 'bg-black border-green-900 text-gray-600'}`}
-                                                            value={globalMissionData.vehicleAssignments[unit.uuid] || ""}
-                                                            onChange={(e) => handleGlobalMissionAssign(unit.uuid, e.target.value)}
-                                                        >
-                                                            <option value="">-- NON ASSIGNÉ --</option>
-                                                            <option value="SL">SL - {slName || "MOI"}</option>
-                                                            {squad.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
-                                                        </select>
+                                                    <div className={`w-6 h-6 rounded border flex items-center justify-center ${isSelected ? 'bg-green-600 border-green-500' : 'border-green-900'}`}>
+                                                        {isSelected && <Check size={14} className="text-black"/>}
                                                     </div>
                                                 </div>
                                             );
@@ -1261,7 +1239,7 @@
                             </div>
                             <div className="mt-6 pt-4 border-t border-green-900">
                                 <button onClick={submitGlobalMission} className="w-full py-3 bg-green-600 text-black font-black text-sm hover:bg-green-500 uppercase tracking-widest shadow-[0_0_15px_rgba(22,163,74,0.4)]">
-                                    LANCER L'OPÉRATION
+                                    CRÉER L'OPÉRATION
                                 </button>
                             </div>
                         </Modal>
