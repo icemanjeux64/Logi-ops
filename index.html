@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V9.4 (STABLE)</title>
+    <title>LOGI-OPS V9.5 (FILTRES & RH)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -134,13 +134,15 @@
             'Trash2': <><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></>,
             'Plus': <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
             'Play': <polygon points="5 3 19 12 5 21 5 3" />,
-            'Settings': <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.18-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.18-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.18.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.18.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />,
+            'Settings': <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.18-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.18.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />,
             'ChevronDown': <polyline points="6 9 12 15 18 9" />,
             'Truck': <><rect x="1" y="3" width="15" height="13" rx="2" ry="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></>,
             'Package': <><path d="M16.5 9.4 7.55 4.24" /><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></>,
             'Crosshair': <><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></>,
             'Plane': <path d="M20.38 3.4a1.6 1.6 0 0 1 2.36 2.26L20 8.4l-6.6 1.3-5.7-5.7-1.4 1.4 5 5.7-7.7 2.7-2.8-2.9L0 12.4l6.4 3.2 3.2 6.4 1.4-1.4-2.9-2.8 2.7-7.7 5.7 5 1.4-1.4-5.7-5.7 2.7-2.7z" />,
-            'Edit': <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+            'Edit': <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />,
+            'Wrench': <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />,
+            'List': <><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></>
         };
 
         const Icon = ({ name, size = 24, className, ...props }) => {
@@ -276,6 +278,9 @@
             const [selectedMemberId, setSelectedMemberId] = useState('');
             const [newModelData, setNewModelData] = useState({ name: '', cat: 'LOGI', type: '', cost: 0, stock: 1 });
             
+            // NOUVEAU: Filter state pour les stats
+            const [filterStatus, setFilterStatus] = useState('ALL'); // 'ALL', 'operational', 'mission', 'damaged', 'destroyed'
+            
             const [expandedCats, setExpandedCats] = useState(Object.keys(CATEGORIES).reduce((acc, key) => ({...acc, [key]: true}), {}));
 
             const canEdit = userRole === 'SL';
@@ -348,14 +353,17 @@
             };
             const toggleSlShift = () => { if(!canEdit||!slName)return; const s=!isSlActive; setIsSlActive(s); save('isSlActive', s); save('slName', slName); logEvent('RH', s?`PRISE POSTE: ${slName}`:`FIN SERVICE: ${slName}`); };
             const addSquadMember = (n) => { if(!canEdit||!n)return; const s=[...squad, {id:Date.now(), name:n.toUpperCase(), startTime:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}]; setSquad(s); save('squad', s); logEvent('RH', `RENFORT: ${n.toUpperCase()}`); };
+            
+            // MODIFIÉ : DÉPART AVEC LOG
             const removeSquadMember = (id) => { 
                 if(!canEdit)return; 
                 const m=squad.find(x=>x.id===id); 
-                if(m && confirm(`Confirmer le départ de ${m.name} ?`)){ 
+                if(m && confirm(`Confirmer le départ (Fin de Service) de ${m.name} ?`)){ 
                     const s=squad.filter(x=>x.id!==id); setSquad(s); save('squad', s); logEvent('RH', `DÉPART: ${m.name}`); 
                 } 
             };
             
+            // MODIFIÉ : RENOMMER MEMBRE
             const renameSquadMember = (id) => {
                 if (!canEdit) return;
                 const member = squad.find(m => m.id === id);
@@ -391,10 +399,7 @@
             const createConfig = () => { if(!canEdit)return; const c=[...configurations, {id:Date.now(), name:`PHASE ${configurations.length+1}`, content:{}}]; setConfigurations(c); setCurrentConfigId(c[c.length-1].id); save('configurations', c); };
             const updateConfig = (cid, mid, d) => { if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return; const cnt=Math.max(0, (c.content[mid]||0)+d); const nc={...c.content, [mid]:cnt}; if(cnt===0) delete nc[mid]; const ncs=configurations.map(x=>x.id===cid?{...x, content:nc}:x); setConfigurations(ncs); save('configurations', ncs); };
             const setConfigCount = (cid, mid, val) => { if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return; const cnt=Math.max(0, parseInt(val)||0); const nc={...c.content, [mid]:cnt}; if(cnt===0) delete nc[mid]; const ncs=configurations.map(x=>x.id===cid?{...x, content:nc}:x); setConfigurations(ncs); save('configurations', ncs); };
-            
-            // FIX: RenameConfig logic fix (was renameConfiguration in call)
-            const renameConfiguration = (cid, val) => { if(!canEdit)return; const ncs=configurations.map(x=>x.id===cid?{...x, name:val.toUpperCase()}:x); setConfigurations(ncs); save('configurations', ncs); };
-            
+            const renameConfig = (cid, val) => { if(!canEdit)return; const ncs=configurations.map(x=>x.id===cid?{...x, name:val.toUpperCase()}:x); setConfigurations(ncs); save('configurations', ncs); };
             const deleteConfig = (cid) => { if(!canEdit||!confirm("Supprimer ?"))return; const ncs=configurations.filter(x=>x.id!==cid); setConfigurations(ncs); if(currentConfigId===cid) setCurrentConfigId(null); save('configurations', ncs); };
             const deployConfig = (cid) => {
                 if(!canEdit)return; const c=configurations.find(x=>x.id===cid); if(!c)return;
@@ -432,11 +437,14 @@
                 deployedCost: activeUnits.reduce((s, u) => s + (u.status!=='stored'?u.cost:0), 0),
                 destroyedCount: activeUnits.filter(u => u.status === 'destroyed').length,
                 missionCount: activeUnits.filter(u => u.status === 'mission').length,
+                repairCount: activeUnits.filter(u => u.status === 'damaged').length,
+                operationalCount: activeUnits.filter(u => u.status === 'operational').length,
+                totalVehicles: activeUnits.length,
                 activeCount: activeUnits.length,
                 totalSupply: supplySources.reduce((a, s) => a + (parseInt(s.amount)||0), 0)
             }), [activeUnits, supplySources]);
 
-            const Activity = Icons['Activity']; const Database = Icons['Database']; const LayoutDashboard = Icons['LayoutDashboard']; const Warehouse = Icons['Warehouse']; const Users = Icons['Users']; const ScrollText = Icons['ScrollText']; const Target = Icons['Target']; const Shield = Icons['Shield']; const Plus = Icons['Plus']; const Wifi = Icons['Wifi']; const LogOut = Icons['LogOut']; const ArrowUpRight = Icons['ArrowUpRight']; const Settings = Icons['Settings']; const XCircle = Icons['XCircle']; const Trash2 = Icons['Trash2']; const RotateCcw = Icons['RotateCcw']; const Clock = Icons['Clock']; const List = Icons['List']; const Play = Icons['Play']; const PlusCircle = Icons['PlusCircle']; const MinusCircle = Icons['MinusCircle']; const Power = Icons['Power']; const ChevronDown = Icons['ChevronDown']; const Edit = Icons['Edit'];
+            const Activity = Icons['Activity']; const Database = Icons['Database']; const LayoutDashboard = Icons['LayoutDashboard']; const Warehouse = Icons['Warehouse']; const Users = Icons['Users']; const ScrollText = Icons['ScrollText']; const Target = Icons['Target']; const Shield = Icons['Shield']; const Plus = Icons['Plus']; const Wifi = Icons['Wifi']; const LogOut = Icons['LogOut']; const ArrowUpRight = Icons['ArrowUpRight']; const Settings = Icons['Settings']; const XCircle = Icons['XCircle']; const Trash2 = Icons['Trash2']; const RotateCcw = Icons['RotateCcw']; const Clock = Icons['Clock']; const List = Icons['List']; const Play = Icons['Play']; const PlusCircle = Icons['PlusCircle']; const MinusCircle = Icons['MinusCircle']; const Power = Icons['Power']; const ChevronDown = Icons['ChevronDown']; const Edit = Icons['Edit']; const Wrench = Icons['Wrench'];
 
             if (!userRole) return <LoginScreen onLogin={(role) => setUserRole(role)} />;
             if (!dataLoaded) return <div className="min-h-screen bg-black flex items-center justify-center text-green-500 font-mono animate-pulse">CHARGEMENT...</div>;
@@ -449,7 +457,7 @@
                         <div className="flex items-center gap-4">
                             <div className="p-1.5 rounded">{Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}</div>
                             <div>
-                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V9.4</span></h1>
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V9.5</span></h1>
                                 <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
                                     <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}><div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>SL: {slName || "N/A"}</span>
                                     <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
@@ -481,10 +489,13 @@
                             
                             {activeTab === 'dashboard' && (
                                 <div className="space-y-6 animate-in fade-in flex flex-col h-full">
-                                    <div className="grid grid-cols-3 gap-4 shrink-0 mb-4">
-                                        <StatCard color="green" value={activeUnits.filter(u=>u.status==='operational').length} label="DISPO" />
-                                        <StatCard color="blue" value={stats.missionCount} label="MISSION" />
-                                        <StatCard color="red" value={stats.destroyedCount} label="PERTES" />
+                                    {/* NOUVEAU : BARRE DE STATS FILTRABLE */}
+                                    <div className="grid grid-cols-5 gap-2 md:gap-4 shrink-0 mb-4">
+                                        <StatCard color="gray" value={stats.totalVehicles} label="TOTAL" active={filterStatus === 'ALL'} onClick={() => setFilterStatus('ALL')} />
+                                        <StatCard color="green" value={stats.operationalCount} label="DISPO" active={filterStatus === 'operational'} onClick={() => setFilterStatus('operational')} />
+                                        <StatCard color="blue" value={stats.missionCount} label="MISSION" active={filterStatus === 'mission'} onClick={() => setFilterStatus('mission')} />
+                                        <StatCard color="orange" value={stats.repairCount} label="RÉP." active={filterStatus === 'damaged'} onClick={() => setFilterStatus('damaged')} />
+                                        <StatCard color="red" value={stats.destroyedCount} label="PERTES" active={filterStatus === 'destroyed'} onClick={() => setFilterStatus('destroyed')} />
                                     </div>
 
                                     {activeUnits.length === 0 ? (
@@ -492,8 +503,12 @@
                                     ) : (
                                         <div className="flex-1 overflow-y-auto space-y-2 pr-2">
                                             {Object.keys(CATEGORIES).map(catKey => {
-                                                const unitsInCat = activeUnits.filter(u => u.cat === catKey);
+                                                // FILTRE APPLIQUÉ ICI
+                                                const unitsInCat = activeUnits.filter(u => u.cat === catKey && (filterStatus === 'ALL' || u.status === filterStatus));
+                                                
+                                                // Si aucune unité ne correspond au filtre dans cette catégorie, on ne l'affiche pas
                                                 if (unitsInCat.length === 0) return null;
+                                                
                                                 const conf = CATEGORIES[catKey];
                                                 const isOpen = expandedCats[catKey];
                                                 const stats = {
@@ -511,11 +526,6 @@
                                                                 <span className="text-xs font-mono text-green-600 bg-green-900/20 px-2 py-0.5 rounded ml-2">{unitsInCat.length}</span>
                                                             </div>
                                                             <div className="flex items-center gap-4">
-                                                                <div className="flex gap-2 text-[10px] font-bold uppercase mr-4">
-                                                                    {stats.mis > 0 && <span className="text-blue-500 bg-blue-900/20 px-1.5 py-0.5 rounded border border-blue-900/30">MIS: {stats.mis}</span>}
-                                                                    {stats.rep > 0 && <span className="text-orange-500 bg-orange-900/20 px-1.5 py-0.5 rounded border border-orange-900/30">RÉP: {stats.rep}</span>}
-                                                                    {stats.hs > 0 && <span className="text-red-500 bg-red-900/20 px-1.5 py-0.5 rounded border border-red-900/30">HS: {stats.hs}</span>}
-                                                                </div>
                                                                 {ChevronDown && <ChevronDown size={16} className={`text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />}
                                                             </div>
                                                         </div>
@@ -608,24 +618,28 @@
                                             </div>
                                             <div className="bg-black border border-green-900/50 p-6">
                                                 <h3 className="text-sm font-black text-gray-400 mb-4 flex items-center gap-2">{Users && <Users size={16}/>} EFFECTIFS ({squad.length})</h3>
+                                                
+                                                {/* AJOUT RAPIDE EN HAUT */}
+                                                {canEdit && <div className="flex gap-2 mb-4 border-b border-green-900/30 pb-4"><input id="newMemberName" type="text" placeholder="NOUVEAU MEMBRE..." className="flex-1 bg-black border border-green-900 px-3 py-2 text-sm text-green-400 uppercase focus:border-green-500 outline-none" onKeyDown={(e)=>{if(e.key==='Enter'){addSquadMember(e.target.value);e.target.value='';}}} /><button onClick={()=>{const e=document.getElementById('newMemberName');addSquadMember(e.value);e.value='';}} className="bg-green-900/20 px-4 border border-green-800 text-green-500 hover:bg-green-900/40"><Plus size={18}/></button></div>}
+
                                                 <div className="space-y-2 mb-4">
                                                     {squad.map(m => (
                                                         <div key={m.id} className="flex justify-between items-center bg-green-900/5 p-3 border border-green-900/30">
                                                             <div><div className="font-bold text-sm text-green-400">{m.name}</div><div className="text-[10px] text-green-800">IN: {m.startTime}</div></div>
                                                             {canEdit && (
-                                                                <div className="flex items-center">
-                                                                    <button onClick={() => renameSquadMember(m.id)} className="text-blue-600 hover:text-blue-400 mr-3" title="Renommer">
+                                                                <div className="flex items-center gap-2">
+                                                                    <button onClick={() => renameSquadMember(m.id)} className="text-blue-600 hover:text-blue-400 p-1 border border-blue-900/30 bg-blue-900/10" title="Renommer">
                                                                         {Edit && <Edit size={14}/>}
                                                                     </button>
-                                                                    <button onClick={()=>removeSquadMember(m.id)} className="text-red-800 hover:text-red-500" title="Départ">
-                                                                        {LogOut && <LogOut size={16}/>}
+                                                                    {/* BOUTON FIN DE SERVICE (SORTIE) */}
+                                                                    <button onClick={()=>removeSquadMember(m.id)} className="text-red-500 hover:text-red-400 p-1 border border-red-900/30 bg-red-900/10 flex items-center gap-1" title="Fin de Service">
+                                                                        <span className="text-[9px] font-bold hidden md:inline">SORTIE</span> {LogOut && <LogOut size={14}/>}
                                                                     </button>
                                                                 </div>
                                                             )}
                                                         </div>
                                                     ))}
                                                 </div>
-                                                {canEdit && <div className="flex gap-2"><input id="newMemberName" type="text" placeholder="NOUVEAU..." className="flex-1 bg-black border border-green-900 px-3 py-2 text-sm text-green-400 uppercase" onKeyDown={(e)=>{if(e.key==='Enter'){addSquadMember(e.target.value);e.target.value='';}}} /><button onClick={()=>{const e=document.getElementById('newMemberName');addSquadMember(e.value);e.value='';}} className="bg-green-900/20 px-4 border border-green-800 text-green-500"><Plus size={18}/></button></div>}
                                             </div>
                                         </div>
                                     )}
@@ -658,7 +672,7 @@
                         <NavButton icon={ScrollText} label="JMO" active={activeTab==='journal'} onClick={()=>canEdit&&setActiveTab('journal')} disabled={!canEdit} />
                     </nav>
 
-                    {/* MODALES */}
+                    {/* MODALES (IDENTIQUES AUX VERSIONS PRÉCÉDENTES) */}
                     {actionModal?.type === 'mission' && (
                         <Modal title="ORDRE DE MISSION" color="blue" onClose={()=>setActionModal(null)} Icon={XCircle}>
                             <div className="mb-6">
@@ -702,9 +716,9 @@
                                                     />
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-3">
-                                                    {catalog.map(m => {
-                                                        const cnt = configurations.find(x=>x.id===currentConfigId)?.content[m.id]||0;
-                                                        return (<div key={m.id} className={`flex justify-between items-center p-2 border mb-2 ${cnt>0?'border-blue-600 bg-blue-900/10':'border-blue-900/20 opacity-50'}`}><span className="text-xs font-bold text-gray-400 w-1/2 truncate">{m.name}</span><div className="flex items-center gap-2"><button onClick={()=>updateConfig(currentConfigId,m.id,-1)} className="text-blue-500"><MinusCircle size={16}/></button><input type="number" value={cnt} onChange={(e)=>setConfigCount(currentConfigId,m.id,e.target.value)} className="w-10 bg-transparent text-center text-blue-400 font-bold border-b border-blue-900" /><button onClick={()=>updateConfig(currentConfigId,m.id,1)} className="text-blue-500"><PlusCircle size={16}/></button></div></div>)
+                                                    {catalog.map(model => {
+                                                        const cnt = configurations.find(c => c.id === currentConfigId)?.content[model.id]||0;
+                                                        return (<div key={model.id} className={`flex justify-between items-center p-2 border mb-2 ${cnt>0?'border-blue-600 bg-blue-900/10':'border-blue-900/20 opacity-50'}`}><span className="text-xs font-bold text-gray-400 w-1/2 truncate">{model.name}</span><div className="flex items-center gap-2"><button onClick={()=>updateConfig(currentConfigId,model.id,-1)} className="text-blue-500"><MinusCircle size={16}/></button><input type="number" value={cnt} onChange={(e)=>setConfigCount(currentConfigId,model.id,e.target.value)} className="w-10 bg-transparent text-center text-blue-400 font-bold border-b border-blue-900" /><button onClick={()=>updateConfig(currentConfigId,model.id,1)} className="text-blue-500"><PlusCircle size={16}/></button></div></div>)
                                                     })}
                                                 </div>
                                             </div>
@@ -749,18 +763,22 @@
         }
 
         // --- SOUS-COMPOSANTS ---
-        const StatCard = ({ color, value, label }) => {
+        const StatCard = ({ color, value, label, active, onClick }) => {
             const colors = {
+                gray: "border-gray-800 bg-gray-900/10 text-gray-400",
                 green: "border-green-800 bg-green-900/10 text-green-500",
                 blue: "border-blue-800 bg-blue-900/10 text-blue-500",
+                orange: "border-orange-800 bg-orange-900/10 text-orange-500",
                 red: "border-red-800 bg-red-900/10 text-red-500"
             };
+            const activeClass = active ? `ring-1 ring-offset-1 ring-${color}-500 bg-opacity-20` : 'opacity-70 hover:opacity-100';
+            
             return (
-                <div className={`border p-3 md:p-4 text-center relative overflow-hidden ${colors[color]}`}>
+                <button onClick={onClick} className={`border p-2 md:p-4 text-center relative overflow-hidden transition-all ${colors[color]} ${activeClass}`}>
                     <div className={`absolute top-0 left-0 w-2 h-2 border-t border-l border-${color}-500`}></div>
-                    <span className="text-3xl md:text-4xl font-black block leading-none">{value}</span>
-                    <span className="text-[10px] md:text-xs font-bold opacity-70 uppercase tracking-widest">{label}</span>
-                </div>
+                    <span className="text-2xl md:text-4xl font-black block leading-none">{value}</span>
+                    <span className="text-[8px] md:text-xs font-bold uppercase tracking-widest">{label}</span>
+                </button>
             );
         };
 
@@ -830,7 +848,7 @@
             else if (unit.status === 'damaged') { borderColor = 'border-orange-600'; statusText = 'text-orange-500'; }
             else if (unit.status === 'destroyed') { borderColor = 'border-red-600'; statusText = 'text-red-600'; }
             
-            const IconComp = Icons[CATEGORIES[unit.cat]?.icon || 'Truck'];
+            const IconComp = Icons[CATEGORIES[unit.cat]?.icon || 'Truck']; 
             const List = Icons['List']; const Clock = Icons['Clock']; const RotateCcw = Icons['RotateCcw']; const XCircle = Icons['XCircle'];
 
             return (
