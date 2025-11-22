@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LOGI-OPS V11.8 (HOTFIX)</title>
+    <title>LOGI-OPS V12.0 (MISSION CONTROL)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -176,6 +176,7 @@
             'AIR': ['TRANSPORT AÉRIEN', 'CAS (APPUI FEU)', 'RECONNAISSANCE AÉRIENNE', 'EVASAN AÉRIENNE']
         };
 
+        // --- SYSTÈME D'ICÔNES ---
         const SVG_PATHS = {
             'Power': <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />,
             'Activity': <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
@@ -212,6 +213,19 @@
         };
 
         const Icon = ({ name, size = 24, className, ...props }) => {
+            if (typeof lucide !== 'undefined' && lucide.icons) {
+                const keys = Object.keys(lucide.icons);
+                const key = keys.find(k => k.toLowerCase() === name.toLowerCase());
+                if (key) {
+                    const iconData = lucide.icons[key];
+                    if (Array.isArray(iconData)) {
+                        const [tag, attrs, children] = iconData;
+                        return React.createElement(tag, { ...attrs, width: size, height: size, className, ...props, stroke: props.color || "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }, 
+                            children.map(([childTag, childAttrs], i) => React.createElement(childTag, { ...childAttrs, key: i }))
+                        );
+                    }
+                }
+            }
             const fallbackContent = SVG_PATHS[name];
             if (fallbackContent) {
                 return (
@@ -309,6 +323,15 @@
                             OBJ: {unit.missionObjective}
                         </div>
                     )}
+                    
+                    {/* MISSION DETAILS DISPLAY (FROM GLOBAL MISSION) */}
+                    {unit.missionDetails && unit.status.includes('mission') && (
+                        <div className="text-[9px] font-mono text-blue-300 border border-blue-900/30 p-1 bg-blue-900/5">
+                             <div className="font-bold">{unit.missionDetails.type}</div>
+                             {unit.missionDetails.location && <div>LOC: {unit.missionDetails.location}</div>}
+                             {unit.missionDetails.payload && <div>PAX: {unit.missionDetails.payload}</div>}
+                        </div>
+                    )}
 
                     {unit.status === 'destroyed' ? (
                         <div className="bg-red-900/10 border border-red-900/50 p-1 text-center mb-2 rounded"><p className="text-[8px] text-red-700 font-bold uppercase">CAUSE: {unit.reasonHS}</p></div>
@@ -348,7 +371,7 @@
                             {unit.status === 'mission_rtb_request' && (
                                 <div className="text-center">
                                     {isSL ? (
-                                        <button onClick={onValidateRTB} className="w-full py-1 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 flex items-center justify-center gap-1 animate-pulse rounded">{Check && <Check size={12}/>} VALIDER</button>
+                                        <button onClick={onValidateRTB} className="w-full py-1 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 flex items-center justify-center gap-1 animate-pulse rounded">{Check && <Check size={12}/>} AUTORISER RETOUR</button>
                                     ) : (
                                         <span className="text-[10px] text-blue-400 font-bold border border-blue-900/50 px-2 py-1 bg-blue-900/10 animate-pulse rounded">ATTENTE SL</span>
                                     )}
@@ -481,7 +504,7 @@
             const [currentConfigId, setCurrentConfigId] = useState(null);
             const [inputReason, setInputReason] = useState('');
             const [selectedMemberId, setSelectedMemberId] = useState('');
-            const [selectedMissionType, setSelectedMissionType] = useState(''); 
+            const [selectedMissionType, setSelectedMissionType] = useState(''); // RESTORED
             const [newModelData, setNewModelData] = useState({ name: '', cat: 'LOGI', type: '', cost: 0, stock: 1 });
             const [filterStatus, setFilterStatus] = useState('ALL');
             const [expandedCats, setExpandedCats] = useState(Object.keys(CATEGORIES).reduce((acc, key) => ({...acc, [key]: true}), {}));
@@ -492,11 +515,13 @@
             const [incomingSitrep, setIncomingSitrep] = useState(null); 
             const [sitrepData, setSitrepData] = useState({ location: '', status: 'green', message: '' });
             
+            // MISSION MANAGER STATE
             const [missions, setMissions] = useState([]); 
-            const [newMissionData, setNewMissionData] = useState({ title: '', type: 'COMBAT', vehicles: [], personnel: [] });
+            const [newMissionData, setNewMissionData] = useState({ title: '', type: 'COMBAT', vehicles: [], personnel: [], payload: '', location: '' }); // Added Payload/Location fields
 
             const canEdit = userRole === 'SL';
 
+            // ... (Load/Save Effects same as before)
             useEffect(() => {
                 let isMounted = true;
                 const timeout = setTimeout(() => {
@@ -601,10 +626,52 @@
             const renameSquadMember = (id) => { if (!canEdit) return; const m = squad.find(x => x.id === id); if (!m) return; const nn = prompt("Nouveau nom :", m.name); if (nn && nn !== m.name) { const ns = squad.map(x => x.id === id ? { ...x, name: nn.toUpperCase() } : x); setSquad(ns); save('squad', ns); logEvent('RH', `NOM MODIFIÉ: ${m.name} -> ${nn.toUpperCase()}`); } };
             
             const updateUnitData = (uuid, newData) => { const nu = activeUnits.map(u => u.uuid === uuid ? { ...u, ...newData } : u); setActiveUnits(nu); save('activeUnits', nu); };
-            const confirmMission = () => { if (!actionModal) return; let respName = "INDÉFINI"; if (selectedMemberId === 'SL') respName = slName || "CHEF LOGI"; else { const member = squad.find(m => m.id === parseInt(selectedMemberId)); if (member) respName = member.name; } updateUnitData(actionModal.unit.uuid, { status: 'mission_pending', responsible: respName, logs: [...(actionModal.unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `ORDRE MISSION -> ${respName}` }] }); logEvent('FLOTTE', `${actionModal.unit.name}: ORDRE MISSION POUR ${respName}`); setActionModal(null); };
+            
+            // WORKFLOW MISSION SL
+            const confirmMission = () => {
+                if (!actionModal) return;
+                let respName = "INDÉFINI";
+                let obj = selectedMissionType || "MISSION STANDARD";
+                if (selectedMemberId === 'SL') respName = slName || "CHEF LOGI";
+                else { const member = squad.find(m => m.id === parseInt(selectedMemberId)); if (member) respName = member.name; }
+                updateUnitData(actionModal.unit.uuid, { 
+                    status: 'mission_pending', 
+                    responsible: respName,
+                    missionObjective: obj,
+                    logs: [...(actionModal.unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `ORDRE MISSION [${obj}] -> ${respName}` }]
+                });
+                logEvent('FLOTTE', `${actionModal.unit.name}: ORDRE MISSION (${obj}) POUR ${respName}`);
+                setActionModal(null);
+            };
             const acceptMission = (unit) => { updateUnitData(unit.uuid, { status: 'mission', missionStartTime: Date.now(), logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DÉPART MISSION` }] }); logEvent('FLOTTE', `${unit.name}: DÉPART MISSION CONFIRMÉ`); };
             const requestRTB = (unit) => { updateUnitData(unit.uuid, { status: 'mission_rtb_request', logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DEMANDE RTB` }] }); logEvent('FLOTTE', `${unit.name}: DEMANDE RTB`); };
-            const validateRTB = (unit) => { const durationMs = Date.now() - unit.missionStartTime; const minutes = Math.floor(durationMs / 60000); updateUnitData(unit.uuid, { status: 'mission_rtb_transit', logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `RETOUR AUTORISÉ` }] }); logEvent('FLOTTE', `${unit.name}: RETOUR AUTORISÉ PAR SL`); };
+            const validateRTB = (unit) => { updateUnitData(unit.uuid, { status: 'mission_rtb_transit', logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `RETOUR AUTORISÉ` }] }); logEvent('FLOTTE', `${unit.name}: RETOUR AUTORISÉ PAR SL`); };
+            
+            const confirmArrival = (unit) => {
+                setActionModal({ type: 'post_mission', unit: unit });
+                setShowPostMissionModal(true);
+            };
+
+            const finalizeMission = (status) => {
+                if (!actionModal || !actionModal.unit) return;
+                const unit = actionModal.unit;
+                const durationMs = Date.now() - unit.missionStartTime;
+                const minutes = Math.floor(durationMs / 60000);
+                
+                updateUnitData(unit.uuid, { 
+                    status: status, // 'operational' or 'damaged'
+                    missionStartTime: null, 
+                    responsible: 'BASE', 
+                    crew: [], 
+                    missionObjective: null, 
+                    missionDetails: null, // Clear details
+                    logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `MISSION TERMINÉE (${minutes} min) - ÉTAT: ${status.toUpperCase()}` }] 
+                }); 
+                logEvent('FLOTTE', `${unit.name}: RETOUR BASE CONFIRMÉ (${status.toUpperCase()})`);
+                setShowPostMissionModal(false);
+                setActionModal(null);
+            };
+
             const confirmDestruction = () => { if (!actionModal || !inputReason) return; updateUnitData(actionModal.unit.uuid, { status: 'destroyed', reasonHS: inputReason, missionStartTime: null, logs: [...(actionModal.unit.logs || []), {time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DÉTRUIT: ${inputReason}`}] }); setActionModal(null); };
             const returnToBase = (uuid) => { if(!canEdit)return; if(confirm("FORCER RTB ?")) { const u=activeUnits.find(x=>x.uuid===uuid); const nu=activeUnits.filter(x=>x.uuid!==uuid); setActiveUnits(nu); save('activeUnits', nu); if(u) logEvent('GARAGE', `RTB FORCÉ: ${u.name}`); } };
             const updateSupplySource = (id, f, v) => { if(!canEdit)return; const s=supplySources.map(x=>x.id===id?{...x,[f]:v}:x); setSupplySources(s); save('supplySources', s); };
@@ -670,6 +737,54 @@
                 setIncomingSitrep(null);
             };
 
+            // MISSION MANAGER LOGIC (GLOBAL)
+            const createNewMission = () => {
+                if (!newMissionData.title) return;
+                const missionId = `MISS_${Date.now()}`;
+                const newMission = {
+                    id: missionId,
+                    title: newMissionData.title,
+                    type: newMissionData.type,
+                    startTime: Date.now(),
+                    vehicles: newMissionData.vehicles,
+                    personnel: newMissionData.personnel
+                };
+                
+                const updatedMissions = [...missions, newMission];
+                setMissions(updatedMissions);
+                save('missions', updatedMissions);
+
+                // Update Vehicles with Mission Details
+                const nu = activeUnits.map(u => {
+                    if (newMissionData.vehicles.includes(u.uuid)) {
+                        return { 
+                            ...u, 
+                            status: 'mission_pending', 
+                            missionDetails: { // Store specific details
+                                type: newMissionData.type,
+                                payload: newMissionData.payload,
+                                location: newMissionData.location
+                            },
+                            logs: [...(u.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `AFFECTÉ MISSION: ${newMissionData.title}` }]
+                        };
+                    }
+                    return u;
+                });
+                setActiveUnits(nu);
+                save('activeUnits', nu);
+                
+                logEvent('OPS', `NOUVELLE MISSION CRÉÉE: ${newMissionData.title}`);
+                setShowMissionManagerModal(false);
+                setNewMissionData({ title: '', type: 'COMBAT', vehicles: [], personnel: [], payload: '', location: '' });
+            };
+
+            const toggleMissionVehicle = (uuid) => {
+                setNewMissionData(prev => ({
+                    ...prev,
+                    vehicles: prev.vehicles.includes(uuid) ? prev.vehicles.filter(id => id !== uuid) : [...prev.vehicles, uuid]
+                }));
+            };
+
             const handleStatusClick = (unit, targetStatus) => { if (!canEdit) return; if (unit.status === targetStatus && targetStatus !== 'mission') return; if (targetStatus === 'mission') { setSelectedMemberId(''); setSelectedMissionType(''); setActionModal({ type: 'mission', unit }); } else if (targetStatus === 'destroyed') { setInputReason(''); setActionModal({ type: 'destroy', unit }); } else { updateUnitData(unit.uuid, { status: targetStatus }); } };
             const toggleCat = (key) => setExpandedCats(prev => ({...prev, [key]: !prev[key]}));
             const stats = useMemo(() => ({ deployedCost: activeUnits.reduce((s, u) => s + (u.status!=='stored'?u.cost:0), 0), destroyedCount: activeUnits.filter(u => u.status === 'destroyed').length, missionCount: activeUnits.filter(u => u.status === 'mission').length, repairCount: activeUnits.filter(u => u.status === 'damaged').length, operationalCount: activeUnits.filter(u => u.status === 'operational').length, totalVehicles: activeUnits.length, activeCount: activeUnits.length, totalSupply: supplySources.reduce((a, s) => a + (parseInt(s.amount)||0), 0) }), [activeUnits, supplySources]);
@@ -700,11 +815,57 @@
                         </Modal>
                     )}
 
+                    {/* MODAL: MISSION MANAGER (NEW) */}
+                    {showMissionManagerModal && (
+                        <Modal title="CRÉER MISSION GLOBALE" color="blue" onClose={() => setShowMissionManagerModal(false)} Icon={ClipboardList}>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">NOM DE MISSION</label>
+                                    <input type="text" className="w-full bg-blue-900/10 border border-blue-800 p-2 text-blue-400 font-bold text-xs uppercase" value={newMissionData.title} onChange={(e) => setNewMissionData({...newMissionData, title: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">TYPE DE MISSION</label>
+                                    <select className="w-full bg-blue-900/10 border border-blue-800 p-2 text-blue-400 font-bold text-xs" value={newMissionData.type} onChange={(e) => setNewMissionData({...newMissionData, type: e.target.value})}>
+                                        {Object.keys(MISSION_TYPES).map(cat => MISSION_TYPES[cat].map(m => <option key={m} value={m}>{m}</option>))}
+                                    </select>
+                                </div>
+                                
+                                {/* DYNAMIC FIELDS FOR TRANSPORT */}
+                                {(newMissionData.type.includes('TRANSPORT') || newMissionData.type.includes('DÉPLOIEMENT') || newMissionData.type.includes('EXTRACTION') || newMissionData.type.includes('NAVETTE')) && (
+                                    <>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-blue-800 block mb-1">ESCOUADE / PAX À TRANSPORTER</label>
+                                            <input type="text" className="w-full bg-blue-900/10 border border-blue-800 p-2 text-blue-400 font-bold text-xs uppercase" value={newMissionData.payload} onChange={(e) => setNewMissionData({...newMissionData, payload: e.target.value})} placeholder="EX: SQUAD ALPHA (9 PAX)" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-blue-800 block mb-1">DESTINATION / COORDONNÉES</label>
+                                            <input type="text" className="w-full bg-blue-900/10 border border-blue-800 p-2 text-blue-400 font-bold text-xs uppercase" value={newMissionData.location} onChange={(e) => setNewMissionData({...newMissionData, location: e.target.value})} placeholder="EX: GRID 145-089" />
+                                        </div>
+                                    </>
+                                )}
+
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">VÉHICULES À ASSIGNER</label>
+                                    <div className="bg-blue-900/10 border border-blue-800 p-2 max-h-40 overflow-y-auto grid grid-cols-2 gap-2">
+                                        {activeUnits.filter(u => u.status === 'operational').map(u => (
+                                            <div key={u.uuid} onClick={() => toggleMissionVehicle(u.uuid)} className={`p-2 border cursor-pointer text-[10px] font-bold ${newMissionData.vehicles.includes(u.uuid) ? 'bg-blue-600 text-black border-blue-500' : 'border-blue-900/30 text-gray-400 hover:bg-blue-900/20'}`}>
+                                                {u.name}
+                                            </div>
+                                        ))}
+                                        {activeUnits.filter(u => u.status === 'operational').length === 0 && <p className="text-xs text-gray-500 col-span-2 text-center">Aucun véhicule disponible.</p>}
+                                    </div>
+                                </div>
+
+                                <button onClick={createNewMission} disabled={!newMissionData.title || newMissionData.vehicles.length === 0} className="w-full py-3 bg-blue-600 text-black font-black text-xs hover:bg-blue-500 disabled:opacity-50 mt-4">LANCER MISSION GLOBALE</button>
+                            </div>
+                        </Modal>
+                    )}
+
                     <header className="bg-black border-b border-green-900 h-16 shrink-0 flex justify-between items-center px-4 z-50 shadow-lg shadow-green-900/10">
                         <div className="flex items-center gap-4">
                             <div className="p-1.5 rounded">{Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}</div>
                             <div>
-                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V11.7</span></h1>
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V12.0</span></h1>
                                 <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
                                     <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}><div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>SL: {slName || "N/A"}</span>
                                     <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
@@ -737,13 +898,37 @@
                             
                             {activeTab === 'dashboard' && (
                                 <div className="space-y-6 animate-in fade-in flex flex-col h-full">
-                                    <div className="grid grid-cols-5 gap-2 md:gap-4 shrink-0 mb-4">
-                                        <StatCard color="gray" value={stats.totalVehicles} label="TOTAL" active={filterStatus === 'ALL'} onClick={() => setFilterStatus('ALL')} />
-                                        <StatCard color="green" value={stats.operationalCount} label="DISPO" active={filterStatus === 'operational'} onClick={() => setFilterStatus('operational')} />
-                                        <StatCard color="blue" value={stats.missionCount} label="MISSION" active={filterStatus === 'mission'} onClick={() => setFilterStatus('mission')} />
-                                        <StatCard color="orange" value={stats.repairCount} label="RÉP." active={filterStatus === 'damaged'} onClick={() => setFilterStatus('damaged')} />
-                                        <StatCard color="red" value={stats.destroyedCount} label="PERTES" active={filterStatus === 'destroyed'} onClick={() => setFilterStatus('destroyed')} />
+                                    <div className="flex justify-between items-center mb-4">
+                                        <div className="grid grid-cols-5 gap-2 md:gap-4 shrink-0 flex-1">
+                                            <StatCard color="gray" value={stats.totalVehicles} label="TOTAL" active={filterStatus === 'ALL'} onClick={() => setFilterStatus('ALL')} />
+                                            <StatCard color="green" value={stats.operationalCount} label="DISPO" active={filterStatus === 'operational'} onClick={() => setFilterStatus('operational')} />
+                                            <StatCard color="blue" value={stats.missionCount} label="MISSION" active={filterStatus === 'mission'} onClick={() => setFilterStatus('mission')} />
+                                            <StatCard color="orange" value={stats.repairCount} label="RÉP." active={filterStatus === 'damaged'} onClick={() => setFilterStatus('damaged')} />
+                                            <StatCard color="red" value={stats.destroyedCount} label="PERTES" active={filterStatus === 'destroyed'} onClick={() => setFilterStatus('destroyed')} />
+                                        </div>
+                                        {canEdit && (
+                                            <button onClick={() => setShowMissionManagerModal(true)} className="ml-4 h-full px-4 border border-blue-600 bg-blue-900/20 text-blue-400 font-bold hover:bg-blue-900/40 flex flex-col items-center justify-center gap-1 rounded">
+                                                {ClipboardList && <ClipboardList size={20}/>} <span className="text-[10px]">MISSIONS</span>
+                                            </button>
+                                        )}
                                     </div>
+
+                                    {/* ACTIVE MISSIONS DISPLAY (TOP) */}
+                                    {missions.length > 0 && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                                            {missions.map(mission => (
+                                                <div key={mission.id} className="border border-blue-700/50 bg-blue-900/10 p-3 relative overflow-hidden rounded">
+                                                    <div className="absolute top-0 right-0 bg-blue-700 text-black text-[9px] font-bold px-2 py-0.5">{mission.type}</div>
+                                                    <h4 className="text-blue-400 font-black uppercase text-sm mb-2">{mission.title}</h4>
+                                                    <div className="text-[10px] text-gray-400 space-y-1">
+                                                        <div className="flex items-center gap-1">{Truck && <Truck size={10}/>} {mission.vehicles.length} VÉHICULES</div>
+                                                        <div className="flex items-center gap-1">{User && <User size={10}/>} {mission.personnel.length} PERSONNELS</div>
+                                                        <div className="font-mono text-blue-600">DÉBUT: {new Date(mission.startTime).toLocaleTimeString()}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
 
                                     {/* LOGISTICIAN FILTERED VIEW */}
                                     {!canEdit && userIdentity ? (
