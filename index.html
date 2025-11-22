@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LOGI-OPS V11.8 (STABLE)</title>
     
     <!-- React & ReactDOM -->
@@ -14,15 +14,6 @@
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    screens: { 'xs': '380px' }
-                }
-            }
-        }
-    </script>
     
     <!-- Lucide Icons (Version FIXÉE) -->
     <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
@@ -35,9 +26,10 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
         body { font-family: 'JetBrains Mono', monospace; background-color: #050505; overflow: hidden; }
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: #000; }
-        ::-webkit-scrollbar-thumb { background: #14532d; border-radius: 2px; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #14532d; }
+        ::-webkit-scrollbar-thumb { background: #14532d; border: 1px solid #000; }
+        ::-webkit-scrollbar-thumb:hover { background: #22c55e; }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
         
         .login-scan {
@@ -47,8 +39,8 @@
         }
         @keyframes scan { 0% { background-position: 0 0; } 100% { background-position: 0 100%; } }
         @keyframes flash-red {
-            0%, 100% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.8); }
-            50% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.5); border-color: rgba(239, 68, 68, 1); }
+            0%, 100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.8); }
+            50% { box-shadow: 0 0 40px rgba(239, 68, 68, 0.5); border-color: rgba(239, 68, 68, 1); }
         }
         .animate-alert { animation: flash-red 2s infinite; }
     </style>
@@ -80,7 +72,7 @@
                 if (!firebase.apps.length) firebase.initializeApp(envConfig);
                 db = firebase.firestore();
                 USE_FIREBASE = true;
-            } catch (e) { console.warn("Init Canvas", e); }
+            } catch (e) { console.warn("Erreur init Canvas config", e); }
         } else if (isConfigured) {
             try {
                 if (!firebase.apps.length) {
@@ -89,10 +81,13 @@
                 }
                 db = firebase.firestore();
                 USE_FIREBASE = true;
+                console.log("Mode: PROD (Online)");
             } catch (e) {
-                console.error("Firebase Error:", e);
+                console.error("Erreur connexion Firebase:", e);
                 USE_FIREBASE = false;
             }
+        } else {
+            USE_FIREBASE = false;
         }
 
         const SESSION_ID = typeof __app_id !== 'undefined' ? __app_id : "operation_actuelle";
@@ -134,7 +129,7 @@
         const { useState, useMemo, useEffect } = React;
 
         // ==========================================
-        // 2. DONNÉES STATIQUES & ICÔNES
+        // 2. DONNÉES STATIQUES
         // ==========================================
         const INITIAL_CATALOG = [
             { id: 'l1', cat: 'LOGI', name: 'JEEP EM', type: 'TRANSPORT EM', cost: 110, stock: 2 },
@@ -177,7 +172,9 @@
             'AIR': ['TRANSPORT AÉRIEN', 'CAS (APPUI FEU)', 'RECONNAISSANCE AÉRIENNE', 'EVASAN AÉRIENNE']
         };
 
-        // --- SYSTÈME D'ICÔNES ---
+        // ==========================================
+        // 3. SYSTÈME D'ICÔNES
+        // ==========================================
         const SVG_PATHS = {
             'Power': <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />,
             'Activity': <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
@@ -244,7 +241,7 @@
         });
 
         // ==========================================
-        // 4. SOUS-COMPOSANTS
+        // 4. SOUS-COMPOSANTS (DÉFINIS AVANT USAGE)
         // ==========================================
         const ClockDisplay = () => {
             const [time, setTime] = useState(new Date());
@@ -434,7 +431,7 @@
             }
             if (mode === 'SL') {
                 return (
-                     <div className="min-h-screen bg-black flex items-center justify-center p-4 login-scan w-full h-full fixed inset-0 overflow-hidden">
+                      <div className="min-h-screen bg-black flex items-center justify-center p-4 login-scan w-full h-full fixed inset-0 overflow-hidden">
                         <div className="w-full max-w-md border border-green-800 bg-black relative p-8 shadow-[0_0_50px_rgba(0,255,0,0.1)] z-10 rounded">
                             <h2 className="text-xs font-bold text-green-600 uppercase mb-4 text-center">CONNEXION SL</h2>
                             <form onSubmit={handleSL} className="space-y-4">
@@ -450,7 +447,7 @@
             }
             if (mode === 'LOGI') {
                  return (
-                     <div className="min-h-screen bg-black flex items-center justify-center p-4 login-scan w-full h-full fixed inset-0 overflow-hidden">
+                      <div className="min-h-screen bg-black flex items-center justify-center p-4 login-scan w-full h-full fixed inset-0 overflow-hidden">
                         <div className="w-full max-w-md border border-blue-800 bg-black relative p-8 shadow-[0_0_50px_rgba(0,0,255,0.1)] z-10 rounded">
                             <h2 className="text-xs font-bold text-blue-600 uppercase mb-4 text-center">IDENTIFICATION LOGISTICIEN</h2>
                             <div className="space-y-4">
@@ -620,6 +617,44 @@
             const acceptMission = (unit) => { updateUnitData(unit.uuid, { status: 'mission', missionStartTime: Date.now(), logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DÉPART MISSION` }] }); logEvent('FLOTTE', `${unit.name}: DÉPART MISSION CONFIRMÉ`); };
             const requestRTB = (unit) => { updateUnitData(unit.uuid, { status: 'mission_rtb_request', logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DEMANDE RTB` }] }); logEvent('FLOTTE', `${unit.name}: DEMANDE RTB`); };
             const validateRTB = (unit) => { const durationMs = Date.now() - unit.missionStartTime; const minutes = Math.floor(durationMs / 60000); updateUnitData(unit.uuid, { status: 'mission_rtb_transit', logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `RETOUR AUTORISÉ` }] }); logEvent('FLOTTE', `${unit.name}: RETOUR AUTORISÉ PAR SL`); };
+
+            // --- CORRECTIONS AJOUTÉES ---
+            const confirmArrival = (unit) => {
+                if (!canEdit && unit.responsible !== userIdentity) return; // Basic check
+                // On prépare l'unité dans le modal d'action pour la suite
+                setActionModal({ type: 'post_mission', unit });
+                setShowPostMissionModal(true);
+            };
+
+            const endMission = (unit) => {
+                confirmArrival(unit);
+            };
+
+            const finalizeMission = (finalStatus) => {
+                if (!actionModal || !actionModal.unit) return;
+                
+                const unit = actionModal.unit;
+                const logMsg = finalStatus === 'operational' 
+                    ? 'MISSION TERMINÉE: RETOUR DISPO (RAS)' 
+                    : 'MISSION TERMINÉE: ENVOI ATELIER (DOMMAGES)';
+
+                updateUnitData(unit.uuid, {
+                    status: finalStatus, // 'operational' ou 'damaged'
+                    responsible: 'BASE', // Le véhicule revient à la base
+                    crew: [], // On vide l'équipage
+                    missionStartTime: null,
+                    logs: [...(unit.logs || []), { 
+                        time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 
+                        msg: logMsg 
+                    }]
+                });
+
+                logEvent('OPS', `${unit.name}: ${logMsg}`);
+                setShowPostMissionModal(false);
+                setActionModal(null);
+            };
+            // ----------------------------
+
             const confirmDestruction = () => { if (!actionModal || !inputReason) return; updateUnitData(actionModal.unit.uuid, { status: 'destroyed', reasonHS: inputReason, missionStartTime: null, logs: [...(actionModal.unit.logs || []), {time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DÉTRUIT: ${inputReason}`}] }); setActionModal(null); };
             const returnToBase = (uuid) => { if(!canEdit)return; if(confirm("FORCER RTB ?")) { const u=activeUnits.find(x=>x.uuid===uuid); const nu=activeUnits.filter(x=>x.uuid!==uuid); setActiveUnits(nu); save('activeUnits', nu); if(u) logEvent('GARAGE', `RTB FORCÉ: ${u.name}`); } };
             const updateSupplySource = (id, f, v) => { if(!canEdit)return; const s=supplySources.map(x=>x.id===id?{...x,[f]:v}:x); setSupplySources(s); save('supplySources', s); };
@@ -664,6 +699,76 @@
                 setShowCrewModal(false);
             };
 
+            // SITREP LOGIC
+            const openSitrepModal = (unit) => { setSitrepData({ unit: unit, location: '', status: 'green', message: '' }); setShowSitrepModal(true); };
+            const submitSitrep = () => {
+                if (!sitrepData.unit) return;
+                const msg = `SITREP [${sitrepData.status.toUpperCase()}] LOC: ${sitrepData.location} // ${sitrepData.message}`;
+                updateUnitData(sitrepData.unit.uuid, {
+                    logs: [...(sitrepData.unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: msg }]
+                });
+                logEvent('FLOTTE', `SITREP ${sitrepData.unit.name}: ${sitrepData.status.toUpperCase()}`);
+                setShowSitrepModal(false);
+            };
+            // ACK SITREP (SL)
+            const acknowledgeSitrep = () => {
+                if (incomingSitrep && incomingSitrep.unitUuid) {
+                      updateUnitData(incomingSitrep.unitUuid, {
+                          logs: [...(activeUnits.find(u=>u.uuid===incomingSitrep.unitUuid)?.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `SITREP REÇU PAR SL` }]
+                      });
+                }
+                setIncomingSitrep(null);
+            };
+
+            // MISSION MANAGER LOGIC
+            const createNewMission = () => {
+                if (!newMissionData.title) return;
+                const missionId = `MISS_${Date.now()}`;
+                const newMission = {
+                    id: missionId,
+                    title: newMissionData.title,
+                    type: newMissionData.type,
+                    startTime: Date.now(),
+                    vehicles: newMissionData.vehicles, // IDs
+                    personnel: newMissionData.personnel // Names
+                };
+                
+                const updatedMissions = [...missions, newMission];
+                setMissions(updatedMissions);
+                save('missions', updatedMissions);
+
+                // Update Vehicles
+                const nu = activeUnits.map(u => {
+                    if (newMissionData.vehicles.includes(u.uuid)) {
+                        return { 
+                            ...u, 
+                            status: 'mission_pending', 
+                            logs: [...(u.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `AFFECTÉ MISSION: ${newMissionData.title}` }]
+                        };
+                    }
+                    return u;
+                });
+                setActiveUnits(nu);
+                save('activeUnits', nu);
+                
+                logEvent('OPS', `NOUVELLE MISSION CRÉÉE: ${newMissionData.title}`);
+                setShowMissionManagerModal(false);
+                setNewMissionData({ title: '', type: 'COMBAT', vehicles: [], personnel: [] });
+            };
+
+            const toggleMissionVehicle = (uuid) => {
+                setNewMissionData(prev => ({
+                    ...prev,
+                    vehicles: prev.vehicles.includes(uuid) ? prev.vehicles.filter(id => id !== uuid) : [...prev.vehicles, uuid]
+                }));
+            };
+            const toggleMissionPersonnel = (name) => {
+                setNewMissionData(prev => ({
+                    ...prev,
+                    personnel: prev.personnel.includes(name) ? prev.personnel.filter(n => n !== name) : [...prev.personnel, name]
+                }));
+            };
+
             const handleStatusClick = (unit, targetStatus) => { if (!canEdit) return; if (unit.status === targetStatus && targetStatus !== 'mission') return; if (targetStatus === 'mission') { setSelectedMemberId(''); setSelectedMissionType(''); setActionModal({ type: 'mission', unit }); } else if (targetStatus === 'destroyed') { setInputReason(''); setActionModal({ type: 'destroy', unit }); } else { updateUnitData(unit.uuid, { status: targetStatus }); } };
             const toggleCat = (key) => setExpandedCats(prev => ({...prev, [key]: !prev[key]}));
             const stats = useMemo(() => ({ deployedCost: activeUnits.reduce((s, u) => s + (u.status!=='stored'?u.cost:0), 0), destroyedCount: activeUnits.filter(u => u.status === 'destroyed').length, missionCount: activeUnits.filter(u => u.status === 'mission').length, repairCount: activeUnits.filter(u => u.status === 'damaged').length, operationalCount: activeUnits.filter(u => u.status === 'operational').length, totalVehicles: activeUnits.length, activeCount: activeUnits.length, totalSupply: supplySources.reduce((a, s) => a + (parseInt(s.amount)||0), 0) }), [activeUnits, supplySources]);
@@ -698,7 +803,7 @@
                         <div className="flex items-center gap-4">
                             <div className="p-1.5 rounded">{Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}</div>
                             <div>
-                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V11.7</span></h1>
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V11.8</span></h1>
                                 <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
                                     <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}><div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>SL: {slName || "N/A"}</span>
                                     <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
@@ -752,9 +857,9 @@
                                                             onStartMission={() => acceptMission(unit)}
                                                             onRequestRTB={() => requestRTB(unit)}
                                                             onValidateRTB={() => validateRTB(unit)}
-                                                            onConfirmArrival={() => confirmArrival(unit)} // ADDED
+                                                            onConfirmArrival={() => confirmArrival(unit)}
                                                             onAddCrew={() => { setActionModal({type:'crew', unit}); setShowCrewModal(true); }}
-                                                            onSitrep={() => openSitrepModal(unit)} // SITREP BUTTON
+                                                            onSitrep={() => openSitrepModal(unit)}
                                                             onShowLogs={() => setActionModal({ type: 'logs', unit })}
                                                         />
                                                     ))}
