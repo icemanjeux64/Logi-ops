@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LOGI-OPS V11.5 (ADVANCED RTB)</title>
+    <title>LOGI-OPS V11.6 (RP MISSIONS)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -167,14 +167,49 @@
             'AIR': { label: 'AÉRIEN', icon: 'Plane', color: 'border-cyan-600 text-cyan-300 bg-cyan-900/10' },
         };
 
+        // --- DÉFINITION DES MISSIONS PAR CATÉGORIE (RP UPDATE) ---
         const MISSION_TYPES = {
-            'LOGI': ['RAVITAILLEMENT (AMMO)', 'RAVITAILLEMENT (BUILD)', 'CONSTRUCTION FOB', 'RÉPARATION SITE', 'RÉCUPÉRATION ÉPAVE'],
-            'TRANS': ['DÉPLOIEMENT INFANTERIE', 'EXTRACTION', 'NAVETTE BASE/FRONT'],
-            'BLINDE': ['APPUI FEU', 'ESCORTE CONVOI', 'PATROUILLE', 'RECONNAISSANCE BLINDÉE'],
-            'VCI': ['ASSAUT MÉCANISÉ', 'TRANSPORT ASSAUT', 'APPUI INFANTERIE'],
-            'SANTE': ['EVASAN (URGENCE)', 'SOUTIEN MÉDICAL', 'VADROUILLE SANITAIRE'],
-            'CHAR': ['ASSAUT BLINDÉ', 'DESTRUCTION OBJECTIF', 'DÉFENSE DE ZONE'],
-            'AIR': ['TRANSPORT AÉRIEN', 'CAS (APPUI FEU)', 'RECONNAISSANCE AÉRIENNE', 'EVASAN AÉRIENNE']
+            'LOGI': [
+                'RAVITAILLEMENT (SUPPLY RUN)', 
+                'LOGISTIQUE INTERNE (DISPATCH)', 
+                'CONSTRUCTION / FORTIFICATION', 
+                'MAINTENANCE / RÉPARATIONS', 
+                'DÉMÉNAGEMENT BASE (RE-DEPLOY)',
+                'ORGANISATION GROUPES DE COMBAT' // Pour ADC/EM absent
+            ],
+            'TRANS': [
+                'RAVITAILLEMENT TROUPES (FRONT)', 
+                'DÉPLOIEMENT INFANTERIE', 
+                'EXTRACTION / ÉVACUATION', 
+                'NAVETTE TACTIQUE'
+            ],
+            'BLINDE': [
+                'SÉCURISATION (EOD/DÉMINAGE)', 
+                'ESCORTE CONVOI LOGI', 
+                'PATROUILLE SECTEUR', 
+                'RECONNAISSANCE'
+            ],
+            'VCI': [
+                'APPUI FEU DIRECT', 
+                'SÉCURISATION (EOD/DÉMINAGE)',
+                'TRANSPORT ASSAUT'
+            ],
+            'SANTE': [
+                'EVASAN (URGENCE)', 
+                'SOUTIEN MÉDICAL SUR ZONE', 
+                'TRIAGE / STABILISATION'
+            ],
+            'CHAR': [
+                'ASSAUT BLINDÉ', 
+                'DESTRUCTION OBJECTIF', 
+                'DÉFENSE DE ZONE'
+            ],
+            'AIR': [
+                'TRANSPORT AÉRIEN (SUPPLY)', 
+                'CAS (APPUI FEU)', 
+                'RECONNAISSANCE AÉRIENNE', 
+                'EVASAN AÉRIENNE'
+            ]
         };
 
         // --- SYSTÈME D'ICÔNES ---
@@ -244,7 +279,7 @@
         });
 
         // ==========================================
-        // 4. SOUS-COMPOSANTS
+        // 4. SOUS-COMPOSANTS (DÉFINIS AVANT USAGE)
         // ==========================================
         const ClockDisplay = () => {
             const [time, setTime] = useState(new Date());
@@ -617,8 +652,6 @@
             const updateUnitData = (uuid, newData) => { const nu = activeUnits.map(u => u.uuid === uuid ? { ...u, ...newData } : u); setActiveUnits(nu); save('activeUnits', nu); };
             const confirmMission = () => { if (!actionModal) return; let respName = "INDÉFINI"; if (selectedMemberId === 'SL') respName = slName || "CHEF LOGI"; else { const member = squad.find(m => m.id === parseInt(selectedMemberId)); if (member) respName = member.name; } updateUnitData(actionModal.unit.uuid, { status: 'mission_pending', responsible: respName, logs: [...(actionModal.unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `ORDRE MISSION -> ${respName}` }] }); logEvent('FLOTTE', `${actionModal.unit.name}: ORDRE MISSION POUR ${respName}`); setActionModal(null); };
             const acceptMission = (unit) => { updateUnitData(unit.uuid, { status: 'mission', missionStartTime: Date.now(), logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DÉPART MISSION` }] }); logEvent('FLOTTE', `${unit.name}: DÉPART MISSION CONFIRMÉ`); };
-            
-            // RTB LOGIC
             const requestRTB = (unit) => { updateUnitData(unit.uuid, { status: 'mission_rtb_request', logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `DEMANDE RTB` }] }); logEvent('FLOTTE', `${unit.name}: DEMANDE RTB`); };
             const validateRTB = (unit) => { updateUnitData(unit.uuid, { status: 'mission_rtb_transit', logs: [...(unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `RETOUR AUTORISÉ` }] }); logEvent('FLOTTE', `${unit.name}: RETOUR AUTORISÉ PAR SL`); };
             
@@ -690,28 +723,7 @@
                 setShowCrewModal(false);
             };
 
-            // SITREP LOGIC
-            const openSitrepModal = (unit) => { setSitrepData({ unit: unit, location: '', status: 'green', message: '' }); setShowSitrepModal(true); };
-            const submitSitrep = () => {
-                if (!sitrepData.unit) return;
-                const msg = `SITREP [${sitrepData.status.toUpperCase()}] LOC: ${sitrepData.location} // ${sitrepData.message}`;
-                updateUnitData(sitrepData.unit.uuid, {
-                    logs: [...(sitrepData.unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: msg }]
-                });
-                logEvent('FLOTTE', `SITREP ${sitrepData.unit.name}: ${sitrepData.status.toUpperCase()}`);
-                setShowSitrepModal(false);
-            };
-            // ACK SITREP (SL)
-            const acknowledgeSitrep = () => {
-                if (incomingSitrep && incomingSitrep.unitUuid) {
-                     updateUnitData(incomingSitrep.unitUuid, {
-                         logs: [...(activeUnits.find(u=>u.uuid===incomingSitrep.unitUuid)?.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: `SITREP REÇU PAR SL` }]
-                     });
-                }
-                setIncomingSitrep(null);
-            };
-
-            const handleStatusClick = (unit, targetStatus) => { if (!canEdit) return; if (unit.status === targetStatus && targetStatus !== 'mission') return; if (targetStatus === 'mission') { setSelectedMemberId(''); setSelectedMissionType(''); setActionModal({ type: 'mission', unit }); } else if (targetStatus === 'destroyed') { setInputReason(''); setActionModal({ type: 'destroy', unit }); } else { updateUnitData(unit.uuid, { status: targetStatus }); } };
+            const handleStatusClick = (unit, targetStatus) => { if (!canEdit) return; if (unit.status === targetStatus && targetStatus !== 'mission') return; if (targetStatus === 'mission') { setSelectedMemberId(''); setActionModal({ type: 'mission', unit }); } else if (targetStatus === 'destroyed') { setInputReason(''); setActionModal({ type: 'destroy', unit }); } else { updateUnitData(unit.uuid, { status: targetStatus }); } };
             const toggleCat = (key) => setExpandedCats(prev => ({...prev, [key]: !prev[key]}));
             const stats = useMemo(() => ({ deployedCost: activeUnits.reduce((s, u) => s + (u.status!=='stored'?u.cost:0), 0), destroyedCount: activeUnits.filter(u => u.status === 'destroyed').length, missionCount: activeUnits.filter(u => u.status === 'mission').length, repairCount: activeUnits.filter(u => u.status === 'damaged').length, operationalCount: activeUnits.filter(u => u.status === 'operational').length, totalVehicles: activeUnits.length, activeCount: activeUnits.length, totalSupply: supplySources.reduce((a, s) => a + (parseInt(s.amount)||0), 0) }), [activeUnits, supplySources]);
             const Activity = Icons['Activity']; const Database = Icons['Database']; const LayoutDashboard = Icons['LayoutDashboard']; const Warehouse = Icons['Warehouse']; const Users = Icons['Users']; const ScrollText = Icons['ScrollText']; const Target = Icons['Target']; const Shield = Icons['Shield']; const Plus = Icons['Plus']; const Wifi = Icons['Wifi']; const LogOut = Icons['LogOut']; const ArrowUpRight = Icons['ArrowUpRight']; const Settings = Icons['Settings']; const XCircle = Icons['XCircle']; const Trash2 = Icons['Trash2']; const RotateCcw = Icons['RotateCcw']; const Clock = Icons['Clock']; const List = Icons['List']; const Play = Icons['Play']; const PlusCircle = Icons['PlusCircle']; const MinusCircle = Icons['MinusCircle']; const Power = Icons['Power']; const ChevronDown = Icons['ChevronDown']; const Edit = Icons['Edit']; const Wrench = Icons['Wrench']; const AlertOctagon = Icons['AlertOctagon']; const Check = Icons['Check']; const Send = Icons['Send']; const MessageSquare = Icons['MessageSquare']; const ClipboardList = Icons['ClipboardList']; const Calendar = Icons['Calendar']; const CheckSquare = Icons['CheckSquare'];
