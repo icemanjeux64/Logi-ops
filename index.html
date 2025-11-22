@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V10.7 (CLEAN)</title>
+    <title>LOGI-OPS V11.1 (SITREP)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -15,7 +15,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Lucide Icons (Version FIXÉE à 0.263.1) -->
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
 
     <!-- FIREBASE -->
@@ -162,6 +162,9 @@
             'AIR': { label: 'AÉRIEN', icon: 'Plane', color: 'border-cyan-600 text-cyan-300 bg-cyan-900/10' },
         };
 
+        // ==========================================
+        // 3. SYSTÈME D'ICÔNES
+        // ==========================================
         const SVG_PATHS = {
             'Power': <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />,
             'Activity': <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
@@ -190,7 +193,8 @@
             'MinusCircle': <><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></>,
             'Bell': <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />,
             'UserPlus': <><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" /></>,
-            'Flag': <><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" /></>
+            'Flag': <><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" /></>,
+            'MessageSquare': <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         };
 
         const Icon = ({ name, size = 24, className, ...props }) => {
@@ -219,14 +223,13 @@
         };
 
         const Icons = {};
-        ['Truck','Activity','AlertTriangle','Crosshair','Shield','Plane','Package','Plus','ArrowRight','RotateCcw','XCircle','LayoutGrid','List','PlayCircle','CheckCircle','Wrench','Skull','MapPin','User','FileText','Clock','ArrowUpRight','PieChart','BarChart3','Timer','Database','Trash2','Save','Users','UserPlus','UserMinus','LogOut','ScrollText','Warehouse','LayoutDashboard','Settings','Target','Radio','Wifi','PlusCircle','MinusCircle','Edit','Play','Lock','Unlock','Menu','Power','ChevronDown','AlertOctagon','Check','Send','Bell','Flag'].forEach(name => {
+        ['Truck','Activity','AlertTriangle','Crosshair','Shield','Plane','Package','Plus','ArrowRight','RotateCcw','XCircle','LayoutGrid','List','PlayCircle','CheckCircle','Wrench','Skull','MapPin','User','FileText','Clock','ArrowUpRight','PieChart','BarChart3','Timer','Database','Trash2','Save','Users','UserPlus','UserMinus','LogOut','ScrollText','Warehouse','LayoutDashboard','Settings','Target','Radio','Wifi','PlusCircle','MinusCircle','Edit','Play','Lock','Unlock','Menu','Power','ChevronDown','AlertOctagon','Check','Send','Bell','Flag','MessageSquare'].forEach(name => {
             Icons[name] = (props) => <Icon name={name} {...props} />;
         });
 
         // ==========================================
-        // 3. SOUS-COMPOSANTS
+        // 4. SOUS-COMPOSANTS (DÉFINIS AVANT USAGE)
         // ==========================================
-        
         const NotificationToast = ({ message, type, onClose }) => {
             useEffect(() => {
                 const timer = setTimeout(onClose, 5000); 
@@ -261,7 +264,8 @@
         function StatusBtn({ label, active, color, onClick }) { const styles = { green: active ? 'bg-green-600 text-black' : 'bg-black text-green-700 border-green-900 hover:text-green-500', blue: active ? 'bg-blue-600 text-black' : 'bg-black text-blue-700 border-blue-900 hover:text-blue-500', orange: active ? 'bg-orange-600 text-black' : 'bg-black text-orange-700 border-orange-900 hover:text-orange-500', red: 'bg-black text-red-800 border-red-900 hover:text-red-500' }; return <button onClick={onClick} className={`text-[9px] font-black py-1 border ${styles[color]} transition-all uppercase`}>{label}</button>; }
         function MissionTimer({ startTime }) { const [d, sD] = useState('00:00:00'); useEffect(() => { const t = setInterval(() => { const df = Date.now() - startTime; const h = Math.floor(df / 3600000).toString().padStart(2, '0'); const m = Math.floor((df % 3600000) / 60000).toString().padStart(2, '0'); const s = Math.floor((df % 60000) / 1000).toString().padStart(2, '0'); sD(`${h}:${m}:${s}`); }, 1000); return () => clearInterval(t); }, [startTime]); return <span className="font-mono text-blue-400 font-bold bg-blue-900/30 px-2 py-0.5 text-[10px] border border-blue-900">T+{d}</span>; }
         
-        function UnitCard({ unit, onStatusChange, onEndMission, onRTB, onShowLogs, Icons, readOnly, userIdentity, onStartMission, onRequestRTB, onValidateRTB, onAddCrew }) { 
+        // MODIFIED UNIT CARD TO INCLUDE SITREP BUTTON
+        function UnitCard({ unit, onStatusChange, onEndMission, onRTB, onShowLogs, Icons, readOnly, userIdentity, onStartMission, onRequestRTB, onValidateRTB, onAddCrew, onSitrep }) { 
             let borderColor='border-green-600'; let statusText='text-green-500';
             if(unit.status.includes('mission')){ borderColor='border-blue-600'; statusText='text-blue-500'; }
             else if(unit.status==='damaged'){ borderColor='border-orange-600'; statusText='text-orange-500'; }
@@ -271,7 +275,7 @@
             const isInCrew = unit.crew && unit.crew.includes(userIdentity); // Crew member
             const isSL = !readOnly;
 
-            const IconComp=Icons[CATEGORIES[unit.cat]?.icon||'Truck']; const List=Icons['List']; const Clock=Icons['Clock']; const RotateCcw=Icons['RotateCcw']; const XCircle=Icons['XCircle']; const Send=Icons['Send']; const Check=Icons['Check']; const UserPlus=Icons['UserPlus'];
+            const IconComp=Icons[CATEGORIES[unit.cat]?.icon||'Truck']; const List=Icons['List']; const Clock=Icons['Clock']; const RotateCcw=Icons['RotateCcw']; const XCircle=Icons['XCircle']; const Send=Icons['Send']; const Check=Icons['Check']; const UserPlus=Icons['UserPlus']; const MessageSquare=Icons['MessageSquare'];
             
             return (<div className={`relative border-l-2 ${borderColor} bg-green-900/5 p-3 flex flex-col h-auto border-t border-r border-b border-green-900/30 hover:bg-green-900/10 transition-all min-h-[9rem]`}>
                 <div className="flex justify-between items-start mb-2"><div className="flex gap-2 overflow-hidden"><div className={`p-1.5 bg-black border border-green-900 flex items-center justify-center h-8 w-8 shrink-0 ${statusText}`}>{IconComp && <IconComp size={16}/>}</div><div className="min-w-0"><h3 className={`font-black text-xs md:text-sm text-gray-300 truncate uppercase leading-tight ${unit.status === 'destroyed' && 'line-through opacity-50'}`}>{unit.name}</h3><div className="flex flex-col gap-0.5 mt-0.5"><span className="text-[9px] text-green-800 font-mono">{unit.cost} PTS</span>
@@ -308,27 +312,35 @@
                                 </div>
                             )}
                             {/* MISSION */}
-                            {unit.status === 'mission' && (
+                            {(unit.status === 'mission' || unit.status === 'mission_rtb') && (
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-1 justify-center">{Clock && <Clock size={10} className="text-blue-600"/>}<MissionTimer startTime={unit.missionStartTime} /></div>
-                                    {isMyUnit && (
-                                        <button onClick={onRequestRTB} className="w-full py-1 bg-blue-900/30 border border-blue-600 text-blue-400 font-black text-[10px] hover:bg-blue-900/50">DEMANDE RTB</button>
+                                    
+                                    {/* SITREP BUTTON FOR CHIEF */}
+                                    {isMyUnit && unit.status === 'mission' && (
+                                        <div className="grid grid-cols-2 gap-1">
+                                            <button onClick={onSitrep} className="py-1 bg-yellow-900/20 border border-yellow-700 text-yellow-500 font-black text-[10px] hover:bg-yellow-900/40 flex items-center justify-center gap-1">{MessageSquare && <MessageSquare size={12}/>} SITREP</button>
+                                            <button onClick={onRequestRTB} className="py-1 bg-blue-900/30 border border-blue-600 text-blue-400 font-black text-[10px] hover:bg-blue-900/50">RTB</button>
+                                        </div>
                                     )}
+                                    
+                                    {isMyUnit && unit.status === 'mission_rtb' && (
+                                        <span className="block text-center text-[10px] text-blue-400 font-bold border border-blue-900/50 px-2 py-1 bg-blue-900/10 animate-pulse">DEMANDE RTB ENVOYÉE</span>
+                                    )}
+
                                     {isInCrew && (
                                          <span className="block text-center text-[9px] text-gray-500 font-mono">MISSION EN COURS...</span>
                                     )}
                                 </div>
                             )}
-                            {/* RTB REQUEST */}
-                            {unit.status === 'mission_rtb' && (
+                            
+                            {/* RTB REQUEST (SL VIEW) */}
+                            {unit.status === 'mission_rtb' && isSL && (
                                 <div className="text-center">
-                                    {isSL ? (
-                                        <button onClick={onValidateRTB} className="w-full py-1 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 flex items-center justify-center gap-1 animate-pulse">{Check && <Check size={12}/>} VALIDER RETOUR</button>
-                                    ) : (
-                                        <span className="text-[10px] text-blue-400 font-bold border border-blue-900/50 px-2 py-1 bg-blue-900/10 animate-pulse">ATTENTE SL...</span>
-                                    )}
+                                    <button onClick={onValidateRTB} className="w-full py-1 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 flex items-center justify-center gap-1 animate-pulse">{Check && <Check size={12}/>} VALIDER RETOUR</button>
                                 </div>
                             )}
+
                             {/* STANDARD STATUS */}
                             {(unit.status === 'operational' || unit.status === 'damaged') && (
                                 isSL ? (
@@ -426,13 +438,11 @@
                 );
             }
         }
-
+        
         // ==========================================
         // 5. APPLICATION PRINCIPALE
         // ==========================================
         function LogiOpsV9() {
-            // ... (Reste de l'application identique mais désormais, toutes les briques sont connues avant d'être appelées)
-            // Je recopie ici le contenu de LogiOpsV9 pour que le fichier soit complet
             const [userRole, setUserRole] = useState(null); 
             const [userIdentity, setUserIdentity] = useState(null); 
             const [activeTab, setActiveTab] = useState('dashboard'); 
@@ -450,7 +460,8 @@
             const [showStockModal, setShowStockModal] = useState(false);
             const [showConfigModal, setShowConfigModal] = useState(false);
             const [showCreateVehicleModal, setShowCreateVehicleModal] = useState(false);
-            const [showCrewModal, setShowCrewModal] = useState(false); // NEW
+            const [showCrewModal, setShowCrewModal] = useState(false);
+            const [showSitrepModal, setShowSitrepModal] = useState(false); // NEW SITREP
             const [currentConfigId, setCurrentConfigId] = useState(null);
             const [inputReason, setInputReason] = useState('');
             const [selectedMemberId, setSelectedMemberId] = useState('');
@@ -459,7 +470,10 @@
             const [expandedCats, setExpandedCats] = useState(Object.keys(CATEGORIES).reduce((acc, key) => ({...acc, [key]: true}), {}));
             const [showReminderModal, setShowReminderModal] = useState(false);
             const [showShiftCheckModal, setShowShiftCheckModal] = useState(false);
-            const [notification, setNotification] = useState(null); // NEW
+            const [notification, setNotification] = useState(null);
+            
+            // NEW SITREP DATA
+            const [sitrepData, setSitrepData] = useState({ location: '', status: 'green', message: '' });
 
             const canEdit = userRole === 'SL';
 
@@ -485,27 +499,33 @@
                     if (!isMounted) return;
                     clearTimeout(timeout);
                     if (data) {
-                        // DETECTION CHANGEMENTS POUR NOTIFICATIONS
-                        if(userIdentity && data.activeUnits) {
-                             data.activeUnits.forEach(u => {
-                                 const oldU = activeUnits.find(old => old.uuid === u.uuid);
-                                 // 1. Assignation en tant que chef
-                                 if ((!oldU || oldU.responsible !== userIdentity) && u.responsible === userIdentity && u.status === 'mission_pending') {
+                        // NOTIFICATIONS
+                        if (data.activeUnits) {
+                            data.activeUnits.forEach(u => {
+                                const oldU = activeUnits.find(old => old.uuid === u.uuid);
+                                
+                                // Notif SL : Nouveau SITREP
+                                if (userRole === 'SL' && u.logs && oldU && oldU.logs && u.logs.length > oldU.logs.length) {
+                                    const lastLog = u.logs[u.logs.length - 1];
+                                    if (lastLog.msg.startsWith("SITREP")) {
+                                        setNotification({ message: `NOUVEAU SITREP : ${u.name}`, type: 'info' });
+                                    }
+                                }
+                                
+                                // Notif Logi : Mission
+                                if (userIdentity && (!oldU || oldU.responsible !== userIdentity) && u.responsible === userIdentity && u.status === 'mission_pending') {
                                      setNotification({ message: "NOUVELLE MISSION ASSIGNÉE !", type: 'alert' });
-                                 }
-                                 // 2. Ajout en tant qu'équipier
-                                 if (u.crew && u.crew.includes(userIdentity) && (!oldU || !oldU.crew || !oldU.crew.includes(userIdentity))) {
-                                     setNotification({ message: "AJOUTÉ À UN ÉQUIPAGE !", type: 'info' });
-                                 }
-                             });
-                        }
-                        // Notif pour SL : Demande RTB
-                        if (userRole === 'SL' && data.activeUnits) {
-                             const rtbReq = data.activeUnits.find(u => u.status === 'mission_rtb');
-                             const oldRtb = activeUnits.find(u => u.status === 'mission_rtb');
-                             if (rtbReq && !oldRtb) {
-                                 setNotification({ message: `DEMANDE RTB : ${rtbReq.name}`, type: 'info' });
-                             }
+                                }
+                            });
+                            
+                            // RTB Notif
+                            if (userRole === 'SL') {
+                                const rtbReq = data.activeUnits.find(u => u.status === 'mission_rtb');
+                                const oldRtb = activeUnits.find(u => u.status === 'mission_rtb');
+                                if (rtbReq && !oldRtb) {
+                                     setNotification({ message: `DEMANDE RTB : ${rtbReq.name}`, type: 'info' });
+                                }
+                            }
                         }
 
                         if(data.activeUnits) setActiveUnits(data.activeUnits);
@@ -520,7 +540,7 @@
                     setDataLoaded(true);
                 });
                 return () => { isMounted = false; if(unsubscribe) unsubscribe(); clearTimeout(timeout); };
-            }, [activeUnits, userIdentity, userRole]); // Dep added for notification logic logic
+            }, [activeUnits, userIdentity, userRole]);
             
             useEffect(() => {
                 if (!isSlActive) return; 
@@ -606,10 +626,26 @@
                 setShowCrewModal(false);
             };
 
+            // SITREP MANAGEMENT (NEW)
+            const openSitrepModal = (unit) => {
+                setSitrepData({ unit: unit, location: '', status: 'green', message: '' });
+                setShowSitrepModal(true);
+            };
+
+            const submitSitrep = () => {
+                if (!sitrepData.unit) return;
+                const msg = `SITREP [${sitrepData.status.toUpperCase()}] LOC: ${sitrepData.location} // ${sitrepData.message}`;
+                updateUnitData(sitrepData.unit.uuid, {
+                    logs: [...(sitrepData.unit.logs || []), { time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), msg: msg }]
+                });
+                logEvent('FLOTTE', `SITREP ${sitrepData.unit.name}: ${sitrepData.status.toUpperCase()}`);
+                setShowSitrepModal(false);
+            };
+
             const handleStatusClick = (unit, targetStatus) => { if (!canEdit) return; if (unit.status === targetStatus && targetStatus !== 'mission') return; if (targetStatus === 'mission') { setSelectedMemberId(''); setActionModal({ type: 'mission', unit }); } else if (targetStatus === 'destroyed') { setInputReason(''); setActionModal({ type: 'destroy', unit }); } else { updateUnitData(unit.uuid, { status: targetStatus }); } };
             const toggleCat = (key) => setExpandedCats(prev => ({...prev, [key]: !prev[key]}));
             const stats = useMemo(() => ({ deployedCost: activeUnits.reduce((s, u) => s + (u.status!=='stored'?u.cost:0), 0), destroyedCount: activeUnits.filter(u => u.status === 'destroyed').length, missionCount: activeUnits.filter(u => u.status === 'mission').length, repairCount: activeUnits.filter(u => u.status === 'damaged').length, operationalCount: activeUnits.filter(u => u.status === 'operational').length, totalVehicles: activeUnits.length, activeCount: activeUnits.length, totalSupply: supplySources.reduce((a, s) => a + (parseInt(s.amount)||0), 0) }), [activeUnits, supplySources]);
-            const Activity = Icons['Activity']; const Database = Icons['Database']; const LayoutDashboard = Icons['LayoutDashboard']; const Warehouse = Icons['Warehouse']; const Users = Icons['Users']; const ScrollText = Icons['ScrollText']; const Target = Icons['Target']; const Shield = Icons['Shield']; const Plus = Icons['Plus']; const Wifi = Icons['Wifi']; const LogOut = Icons['LogOut']; const ArrowUpRight = Icons['ArrowUpRight']; const Settings = Icons['Settings']; const XCircle = Icons['XCircle']; const Trash2 = Icons['Trash2']; const RotateCcw = Icons['RotateCcw']; const Clock = Icons['Clock']; const List = Icons['List']; const Play = Icons['Play']; const PlusCircle = Icons['PlusCircle']; const MinusCircle = Icons['MinusCircle']; const Power = Icons['Power']; const ChevronDown = Icons['ChevronDown']; const Edit = Icons['Edit']; const Wrench = Icons['Wrench']; const AlertOctagon = Icons['AlertOctagon']; const Check = Icons['Check']; const Send = Icons['Send'];
+            const Activity = Icons['Activity']; const Database = Icons['Database']; const LayoutDashboard = Icons['LayoutDashboard']; const Warehouse = Icons['Warehouse']; const Users = Icons['Users']; const ScrollText = Icons['ScrollText']; const Target = Icons['Target']; const Shield = Icons['Shield']; const Plus = Icons['Plus']; const Wifi = Icons['Wifi']; const LogOut = Icons['LogOut']; const ArrowUpRight = Icons['ArrowUpRight']; const Settings = Icons['Settings']; const XCircle = Icons['XCircle']; const Trash2 = Icons['Trash2']; const RotateCcw = Icons['RotateCcw']; const Clock = Icons['Clock']; const List = Icons['List']; const Play = Icons['Play']; const PlusCircle = Icons['PlusCircle']; const MinusCircle = Icons['MinusCircle']; const Power = Icons['Power']; const ChevronDown = Icons['ChevronDown']; const Edit = Icons['Edit']; const Wrench = Icons['Wrench']; const AlertOctagon = Icons['AlertOctagon']; const Check = Icons['Check']; const Send = Icons['Send']; const MessageSquare = Icons['MessageSquare'];
 
             if (!userRole) return <LoginScreen onLogin={(role, identity) => { setUserRole(role); if(identity) setUserIdentity(identity); }} squad={squad} />;
             if (!dataLoaded) return <div className="min-h-screen bg-black flex items-center justify-center text-green-500 font-mono animate-pulse">CHARGEMENT...</div>;
@@ -624,7 +660,7 @@
                         <div className="flex items-center gap-4">
                             <div className="p-1.5 rounded">{Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}</div>
                             <div>
-                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V10.6</span></h1>
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V11.1</span></h1>
                                 <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
                                     <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}><div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>SL: {slName || "N/A"}</span>
                                     <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
@@ -679,6 +715,7 @@
                                                             onRequestRTB={() => requestRTB(unit)}
                                                             onValidateRTB={() => validateRTB(unit)}
                                                             onAddCrew={() => { setActionModal({type:'crew', unit}); setShowCrewModal(true); }}
+                                                            onSitrep={() => openSitrepModal(unit)} // SITREP BUTTON
                                                             onShowLogs={() => setActionModal({ type: 'logs', unit })}
                                                         />
                                                     ))}
@@ -861,7 +898,6 @@
                                     )}
                                 </div>
                             )}
-
                         </main>
                     </div>
 
@@ -871,6 +907,31 @@
                         <NavButton icon={Users} label="SQUAD" active={activeTab==='squad'} onClick={()=>setActiveTab('squad')} />
                         <NavButton icon={ScrollText} label="JMO" active={activeTab==='journal'} onClick={()=>canEdit&&setActiveTab('journal')} disabled={!canEdit} />
                     </nav>
+
+                    {/* MODAL: SITREP (NEW) */}
+                    {showSitrepModal && sitrepData.unit && (
+                        <Modal title="ENVOI SITREP" color="blue" onClose={() => setShowSitrepModal(false)} Icon={XCircle}>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">POSITION</label>
+                                    <input type="text" className="w-full bg-blue-900/10 border border-blue-800 p-2 text-blue-400 font-bold text-xs" value={sitrepData.location} onChange={(e) => setSitrepData({...sitrepData, location: e.target.value})} placeholder="EX: SUR ZONE, EN ROUTE..." />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">ÉTAT</label>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setSitrepData({...sitrepData, status: 'green'})} className={`flex-1 py-2 border text-xs font-bold ${sitrepData.status === 'green' ? 'bg-green-600 text-black border-green-600' : 'border-green-900 text-green-600'}`}>VERT</button>
+                                        <button onClick={() => setSitrepData({...sitrepData, status: 'orange'})} className={`flex-1 py-2 border text-xs font-bold ${sitrepData.status === 'orange' ? 'bg-orange-600 text-black border-orange-600' : 'border-orange-900 text-orange-600'}`}>ORANGE</button>
+                                        <button onClick={() => setSitrepData({...sitrepData, status: 'red'})} className={`flex-1 py-2 border text-xs font-bold ${sitrepData.status === 'red' ? 'bg-red-600 text-black border-red-600' : 'border-red-900 text-red-600'}`}>ROUGE</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">MESSAGE / BESOINS</label>
+                                    <textarea className="w-full bg-blue-900/10 border border-blue-800 p-2 text-blue-400 font-bold text-xs h-20" value={sitrepData.message} onChange={(e) => setSitrepData({...sitrepData, message: e.target.value})} placeholder="RAS ou DÉTAILS..." />
+                                </div>
+                                <button onClick={submitSitrep} className="w-full py-3 bg-blue-600 text-black font-black text-xs hover:bg-blue-500">ENVOYER RAPPORT</button>
+                            </div>
+                        </Modal>
+                    )}
 
                     {/* MODAL: REMINDER (30 MIN) */}
                     {showReminderModal && (
