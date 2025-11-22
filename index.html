@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V9.2 (STABLE)</title>
+    <title>LOGI-OPS V9.3 (STABLE)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -15,7 +15,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Lucide Icons (Version FIXÉE à 0.263.1 pour éviter le crash "Element type is invalid") -->
+    <!-- Lucide Icons (Version FIXÉE à 0.263.1) -->
     <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
 
     <!-- FIREBASE (Base de données) -->
@@ -25,12 +25,11 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
-        body { font-family: 'JetBrains Mono', monospace; background-color: #050505; overflow: hidden; } /* Overflow hidden pour gérer le scroll dans l'app */
+        body { font-family: 'JetBrains Mono', monospace; background-color: #050505; overflow: hidden; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #14532d; }
         ::-webkit-scrollbar-thumb { background: #14532d; border: 1px solid #000; }
         ::-webkit-scrollbar-thumb:hover { background: #22c55e; }
-        @keyframes scanline { 0% { transform: translateY(0); } 100% { transform: translateY(100vh); } }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
         
         .login-scan {
@@ -38,6 +37,7 @@
             background-size: 100% 4px;
             animation: scan 2s linear infinite;
         }
+        @keyframes scan { 0% { background-position: 0 0; } 100% { background-position: 0 100%; } }
     </style>
 </head>
 <body>
@@ -122,7 +122,7 @@
 
         const { useState, useMemo, useEffect } = React;
 
-        // --- SYSTÈME D'ICÔNES HYBRIDE (FALLBACK INTÉGRÉ) ---
+        // --- SYSTÈME D'ICÔNES HYBRIDE ---
         const SVG_PATHS = {
             'Power': <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />,
             'Activity': <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
@@ -136,12 +136,11 @@
             'Play': <polygon points="5 3 19 12 5 21 5 3" />,
             'Settings': <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.18-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.18-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.18.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.18.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />,
             'ChevronDown': <polyline points="6 9 12 15 18 9" />,
-            
-            // CATÉGORIES
             'Truck': <><rect x="1" y="3" width="15" height="13" rx="2" ry="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></>,
             'Package': <><path d="M16.5 9.4 7.55 4.24" /><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></>,
             'Crosshair': <><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></>,
-            'Plane': <path d="M20.38 3.4a1.6 1.6 0 0 1 2.36 2.26L20 8.4l-6.6 1.3-5.7-5.7-1.4 1.4 5 5.7-7.7 2.7-2.8-2.9L0 12.4l6.4 3.2 3.2 6.4 1.4-1.4-2.9-2.8 2.7-7.7 5.7 5 1.4-1.4-5.7-5.7 2.7-2.7z" />
+            'Plane': <path d="M20.38 3.4a1.6 1.6 0 0 1 2.36 2.26L20 8.4l-6.6 1.3-5.7-5.7-1.4 1.4 5 5.7-7.7 2.7-2.8-2.9L0 12.4l6.4 3.2 3.2 6.4 1.4-1.4-2.9-2.8 2.7-7.7 5.7 5 1.4-1.4-5.7-5.7 2.7-2.7z" />,
+            'Edit': <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
         };
 
         const Icon = ({ name, size = 24, className, ...props }) => {
@@ -152,7 +151,7 @@
                     const iconData = lucide.icons[key];
                     if (Array.isArray(iconData)) {
                         const [tag, attrs, children] = iconData;
-                        return React.createElement(tag, { ...attrs, width: size, height: size, className: className, ...props, stroke: props.color || "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }, 
+                        return React.createElement(tag, { ...attrs, width: size, height: size, className, ...props, stroke: props.color || "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }, 
                             children.map(([childTag, childAttrs], i) => React.createElement(childTag, { ...childAttrs, key: i }))
                         );
                     }
@@ -217,7 +216,7 @@
 
             const handleSL = (e) => {
                 e.preventDefault();
-                if (username === 'SLLOGI' && password === 'sllogi') { onLogin('SL'); } else { setError('IDENTIFIANTS INCORRECTS'); }
+                if (username === 'SLLogi' && password === 'sllogie') { onLogin('SL'); } else { setError('IDENTIFIANTS INCORRECTS'); }
             };
 
             return (
@@ -277,8 +276,6 @@
             const [selectedMemberId, setSelectedMemberId] = useState('');
             const [newModelData, setNewModelData] = useState({ name: '', cat: 'LOGI', type: '', cost: 0, stock: 1 });
             
-            // NOUVEAU STATE POUR L'ACCORDÉON
-            // Initialise tout ouvert par défaut
             const [expandedCats, setExpandedCats] = useState(Object.keys(CATEGORIES).reduce((acc, key) => ({...acc, [key]: true}), {}));
 
             const canEdit = userRole === 'SL';
@@ -327,7 +324,6 @@
                 setGlobalLogs(newLogs); save('globalLogs', newLogs);
             };
             
-            // ... Toutes les fonctions actions (identiques V9) ...
             const updateStock = (id, d) => { if(!canEdit)return; const c = catalog.map(m=>m.id===id?{...m,stock:Math.max(0,m.stock+d)}:m); setCatalog(c); save('catalog', c); };
             const deleteModel = (id) => { if(!canEdit||!confirm("Supprimer ?"))return; const c = catalog.filter(m=>m.id!==id); setCatalog(c); save('catalog', c); };
             const deployUnit = (id) => {
@@ -344,7 +340,28 @@
             };
             const toggleSlShift = () => { if(!canEdit||!slName)return; const s=!isSlActive; setIsSlActive(s); save('isSlActive', s); save('slName', slName); logEvent('RH', s?`PRISE POSTE: ${slName}`:`FIN SERVICE: ${slName}`); };
             const addSquadMember = (n) => { if(!canEdit||!n)return; const s=[...squad, {id:Date.now(), name:n.toUpperCase(), startTime:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}]; setSquad(s); save('squad', s); logEvent('RH', `RENFORT: ${n.toUpperCase()}`); };
-            const removeSquadMember = (id) => { if(!canEdit)return; const m=squad.find(x=>x.id===id); if(m){ const s=squad.filter(x=>x.id!==id); setSquad(s); save('squad', s); logEvent('RH', `DÉPART: ${m.name}`); } };
+            const removeSquadMember = (id) => { 
+                if(!canEdit)return; 
+                const m=squad.find(x=>x.id===id); 
+                if(m && confirm(`Confirmer le départ de ${m.name} ?`)){ 
+                    const s=squad.filter(x=>x.id!==id); setSquad(s); save('squad', s); logEvent('RH', `DÉPART: ${m.name}`); 
+                } 
+            };
+            
+            // NOUVEAU: Fonction pour renommer un membre
+            const renameSquadMember = (id) => {
+                if (!canEdit) return;
+                const member = squad.find(m => m.id === id);
+                if (!member) return;
+                const newName = prompt("Nouveau nom :", member.name);
+                if (newName && newName !== member.name) {
+                    const newSquad = squad.map(m => m.id === id ? { ...m, name: newName.toUpperCase() } : m);
+                    setSquad(newSquad);
+                    save('squad', newSquad);
+                    logEvent('RH', `NOM MODIFIÉ: ${member.name} -> ${newName.toUpperCase()}`);
+                }
+            };
+
             const updateUnitStatus = (uuid, st, data={}) => {
                 if(!canEdit) return;
                 const nu = activeUnits.map(u => {
@@ -399,7 +416,6 @@
             const confirmMission = () => { if (!actionModal) return; let respName = "INDÉFINI"; if (selectedMemberId === 'SL') respName = slName || "CHEF LOGI"; else { const member = squad.find(m => m.id === parseInt(selectedMemberId)); if (member) respName = member.name; } updateUnitStatus(actionModal.unit.uuid, 'mission', { responsible: respName, missionStartTime: Date.now() }); setActionModal(null); };
             const confirmDestruction = () => { if (!actionModal || !inputReason) return; updateUnitStatus(actionModal.unit.uuid, 'destroyed', { reasonHS: inputReason, missionStartTime: null }); setActionModal(null); };
 
-            // NOUVEAU: Toggle Accordion
             const toggleCat = (key) => setExpandedCats(prev => ({...prev, [key]: !prev[key]}));
 
             const stats = useMemo(() => ({
@@ -410,7 +426,7 @@
                 totalSupply: supplySources.reduce((a, s) => a + (parseInt(s.amount)||0), 0)
             }), [activeUnits, supplySources]);
 
-            const Activity = Icons['Activity']; const Database = Icons['Database']; const LayoutDashboard = Icons['LayoutDashboard']; const Warehouse = Icons['Warehouse']; const Users = Icons['Users']; const ScrollText = Icons['ScrollText']; const Target = Icons['Target']; const Shield = Icons['Shield']; const Plus = Icons['Plus']; const Wifi = Icons['Wifi']; const LogOut = Icons['LogOut']; const ArrowUpRight = Icons['ArrowUpRight']; const Settings = Icons['Settings']; const XCircle = Icons['XCircle']; const Trash2 = Icons['Trash2']; const RotateCcw = Icons['RotateCcw']; const Clock = Icons['Clock']; const List = Icons['List']; const Play = Icons['Play']; const PlusCircle = Icons['PlusCircle']; const MinusCircle = Icons['MinusCircle']; const Power = Icons['Power']; const ChevronDown = Icons['ChevronDown'];
+            const Activity = Icons['Activity']; const Database = Icons['Database']; const LayoutDashboard = Icons['LayoutDashboard']; const Warehouse = Icons['Warehouse']; const Users = Icons['Users']; const ScrollText = Icons['ScrollText']; const Target = Icons['Target']; const Shield = Icons['Shield']; const Plus = Icons['Plus']; const Wifi = Icons['Wifi']; const LogOut = Icons['LogOut']; const ArrowUpRight = Icons['ArrowUpRight']; const Settings = Icons['Settings']; const XCircle = Icons['XCircle']; const Trash2 = Icons['Trash2']; const RotateCcw = Icons['RotateCcw']; const Clock = Icons['Clock']; const List = Icons['List']; const Play = Icons['Play']; const PlusCircle = Icons['PlusCircle']; const MinusCircle = Icons['MinusCircle']; const Power = Icons['Power']; const ChevronDown = Icons['ChevronDown']; const Edit = Icons['Edit'];
 
             if (!userRole) return <LoginScreen onLogin={(role) => setUserRole(role)} />;
             if (!dataLoaded) return <div className="min-h-screen bg-black flex items-center justify-center text-green-500 font-mono animate-pulse">CHARGEMENT...</div>;
@@ -423,7 +439,7 @@
                         <div className="flex items-center gap-4">
                             <div className="p-1.5 rounded">{Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}</div>
                             <div>
-                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V9.2</span></h1>
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V9.3</span></h1>
                                 <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
                                     <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}><div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>SL: {slName || "N/A"}</span>
                                     <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
@@ -591,7 +607,16 @@
                                                     {squad.map(m => (
                                                         <div key={m.id} className="flex justify-between items-center bg-green-900/5 p-3 border border-green-900/30">
                                                             <div><div className="font-bold text-sm text-green-400">{m.name}</div><div className="text-[10px] text-green-800">IN: {m.startTime}</div></div>
-                                                            {canEdit && <button onClick={()=>removeSquadMember(m.id)} className="text-red-800 hover:text-red-500"><LogOut size={16}/></button>}
+                                                            {canEdit && (
+                                                                <div className="flex items-center">
+                                                                    <button onClick={() => renameSquadMember(m.id)} className="text-blue-600 hover:text-blue-400 mr-3" title="Renommer">
+                                                                        {Edit && <Edit size={14}/>}
+                                                                    </button>
+                                                                    <button onClick={()=>removeSquadMember(m.id)} className="text-red-800 hover:text-red-500" title="Départ">
+                                                                        {LogOut && <LogOut size={16}/>}
+                                                                    </button>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     ))}
                                                 </div>
