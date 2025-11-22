@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V11.1 (SITREP)</title>
+    <title>LOGI-OPS V11.2 (SITREP MODAL)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -43,6 +43,12 @@
             50% { box-shadow: 0 0 40px rgba(239, 68, 68, 0.5); border-color: rgba(239, 68, 68, 1); }
         }
         .animate-alert { animation: flash-red 2s infinite; }
+        /* Animation d'apparition de la modale SITREP */
+        @keyframes pop-in {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .modal-pop { animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
     </style>
 </head>
 <body>
@@ -162,9 +168,6 @@
             'AIR': { label: 'AÉRIEN', icon: 'Plane', color: 'border-cyan-600 text-cyan-300 bg-cyan-900/10' },
         };
 
-        // ==========================================
-        // 3. SYSTÈME D'ICÔNES
-        // ==========================================
         const SVG_PATHS = {
             'Power': <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />,
             'Activity': <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
@@ -228,7 +231,7 @@
         });
 
         // ==========================================
-        // 4. SOUS-COMPOSANTS (DÉFINIS AVANT USAGE)
+        // 4. SOUS-COMPOSANTS
         // ==========================================
         const NotificationToast = ({ message, type, onClose }) => {
             useEffect(() => {
@@ -259,12 +262,11 @@
         const NavButtonDesktop = ({ icon: Icon, label, active, onClick, disabled }) => (<button onClick={onClick} disabled={disabled} className={`w-full flex items-center gap-3 px-4 py-3 transition-all border-l-4 text-left ${active?'text-green-400 border-green-500 bg-green-900/20':disabled?'text-green-900 border-transparent opacity-30':'text-gray-500 border-transparent hover:text-green-500 hover:bg-green-900/10'}`}>{Icon && <Icon size={20}/>} <span className="text-xs font-black tracking-widest uppercase">{label}</span></button>);
         const EmptyState = ({ canEdit, Target }) => (<div className="flex flex-col items-center justify-center h-64 md:h-96 border border-dashed border-green-900 bg-green-900/5 rounded-lg">{Target && <Target size={64} className="mb-4 text-green-900 opacity-50" />}<p className="text-sm font-bold uppercase text-green-800 tracking-widest">AUCUNE UNITÉ DÉPLOYÉE</p>{canEdit && <p className="text-xs text-green-900 mt-2">ACCÉDER AU GARAGE POUR DÉPLOIEMENT</p>}</div>);
         const GarageSlot = ({ model, index, activeCount, onDeploy, ArrowUpRight }) => { const isAvailable = index >= activeCount; return (<button disabled={!isAvailable} onClick={isAvailable ? onDeploy : undefined} className={`relative p-2 md:p-3 border flex flex-col items-center justify-center text-center h-24 md:h-32 transition-all ${isAvailable ? 'bg-green-900/10 border-green-800 hover:bg-green-900/30 hover:border-green-500 active:scale-95 group' : 'bg-black border-green-900/30 opacity-30 cursor-default'}`}>{isAvailable ? (<><div className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-500 shadow-[0_0_5px_#22c55e]"></div><span className="mt-1 text-[10px] md:text-xs font-black text-green-400 leading-tight uppercase px-1">{model.name}</span><span className="text-[9px] text-green-800 font-mono mt-1">{model.cost} PTS</span></>) : (<div className="flex flex-col items-center">{ArrowUpRight && <ArrowUpRight size={20} className="text-green-900 mb-1"/>}<span className="text-[9px] font-black text-green-900 uppercase tracking-widest">MISSION</span></div>)}<div className="absolute bottom-1 left-1 text-[8px] font-mono text-green-900">SLOT {index+1}</div></button>); };
-        const Modal = ({ title, color, onClose, children, Icon }) => (<div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"><div className={`bg-black border border-${color}-800 w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(0,0,0,0.5)]`}><div className="flex justify-between items-center mb-6"><h3 className={`text-lg font-black uppercase text-${color}-500 tracking-widest`}>{title}</h3><button onClick={onClose} className={`text-${color}-700 hover:text-${color}-400`}>{Icon && <Icon size={20} />}</button></div>{children}</div></div>);
+        const Modal = ({ title, color, onClose, children, Icon }) => (<div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"><div className={`bg-black border border-${color}-800 w-full max-w-sm p-6 relative shadow-[0_0_30px_rgba(0,0,0,0.5)] modal-pop`}><div className="flex justify-between items-center mb-6"><h3 className={`text-lg font-black uppercase text-${color}-500 tracking-widest`}>{title}</h3><button onClick={onClose} className={`text-${color}-700 hover:text-${color}-400`}>{Icon && <Icon size={20} />}</button></div>{children}</div></div>);
         
         function StatusBtn({ label, active, color, onClick }) { const styles = { green: active ? 'bg-green-600 text-black' : 'bg-black text-green-700 border-green-900 hover:text-green-500', blue: active ? 'bg-blue-600 text-black' : 'bg-black text-blue-700 border-blue-900 hover:text-blue-500', orange: active ? 'bg-orange-600 text-black' : 'bg-black text-orange-700 border-orange-900 hover:text-orange-500', red: 'bg-black text-red-800 border-red-900 hover:text-red-500' }; return <button onClick={onClick} className={`text-[9px] font-black py-1 border ${styles[color]} transition-all uppercase`}>{label}</button>; }
         function MissionTimer({ startTime }) { const [d, sD] = useState('00:00:00'); useEffect(() => { const t = setInterval(() => { const df = Date.now() - startTime; const h = Math.floor(df / 3600000).toString().padStart(2, '0'); const m = Math.floor((df % 3600000) / 60000).toString().padStart(2, '0'); const s = Math.floor((df % 60000) / 1000).toString().padStart(2, '0'); sD(`${h}:${m}:${s}`); }, 1000); return () => clearInterval(t); }, [startTime]); return <span className="font-mono text-blue-400 font-bold bg-blue-900/30 px-2 py-0.5 text-[10px] border border-blue-900">T+{d}</span>; }
         
-        // MODIFIED UNIT CARD TO INCLUDE SITREP BUTTON
         function UnitCard({ unit, onStatusChange, onEndMission, onRTB, onShowLogs, Icons, readOnly, userIdentity, onStartMission, onRequestRTB, onValidateRTB, onAddCrew, onSitrep }) { 
             let borderColor='border-green-600'; let statusText='text-green-500';
             if(unit.status.includes('mission')){ borderColor='border-blue-600'; statusText='text-blue-500'; }
@@ -443,6 +445,8 @@
         // 5. APPLICATION PRINCIPALE
         // ==========================================
         function LogiOpsV9() {
+            // ... (Reste de l'application identique mais désormais, toutes les briques sont connues avant d'être appelées)
+            // Je recopie ici le contenu de LogiOpsV9 pour que le fichier soit complet
             const [userRole, setUserRole] = useState(null); 
             const [userIdentity, setUserIdentity] = useState(null); 
             const [activeTab, setActiveTab] = useState('dashboard'); 
@@ -460,8 +464,7 @@
             const [showStockModal, setShowStockModal] = useState(false);
             const [showConfigModal, setShowConfigModal] = useState(false);
             const [showCreateVehicleModal, setShowCreateVehicleModal] = useState(false);
-            const [showCrewModal, setShowCrewModal] = useState(false);
-            const [showSitrepModal, setShowSitrepModal] = useState(false); // NEW SITREP
+            const [showCrewModal, setShowCrewModal] = useState(false); // NEW
             const [currentConfigId, setCurrentConfigId] = useState(null);
             const [inputReason, setInputReason] = useState('');
             const [selectedMemberId, setSelectedMemberId] = useState('');
@@ -470,9 +473,11 @@
             const [expandedCats, setExpandedCats] = useState(Object.keys(CATEGORIES).reduce((acc, key) => ({...acc, [key]: true}), {}));
             const [showReminderModal, setShowReminderModal] = useState(false);
             const [showShiftCheckModal, setShowShiftCheckModal] = useState(false);
-            const [notification, setNotification] = useState(null);
-            
-            // NEW SITREP DATA
+            const [notification, setNotification] = useState(null); // NEW
+            // NEW: STATE FOR INCOMING SITREP MODAL
+            const [incomingSitrep, setIncomingSitrep] = useState(null); 
+
+            // NEW SITREP DATA (Sending)
             const [sitrepData, setSitrepData] = useState({ location: '', status: 'green', message: '' });
 
             const canEdit = userRole === 'SL';
@@ -499,16 +504,17 @@
                     if (!isMounted) return;
                     clearTimeout(timeout);
                     if (data) {
-                        // NOTIFICATIONS
+                        // DETECTION CHANGEMENTS POUR NOTIFICATIONS ET MODALE SITREP
                         if (data.activeUnits) {
                             data.activeUnits.forEach(u => {
                                 const oldU = activeUnits.find(old => old.uuid === u.uuid);
                                 
-                                // Notif SL : Nouveau SITREP
+                                // DETECTION NOUVEAU SITREP (SL SEULEMENT)
                                 if (userRole === 'SL' && u.logs && oldU && oldU.logs && u.logs.length > oldU.logs.length) {
                                     const lastLog = u.logs[u.logs.length - 1];
                                     if (lastLog.msg.startsWith("SITREP")) {
-                                        setNotification({ message: `NOUVEAU SITREP : ${u.name}`, type: 'info' });
+                                        // Trigger Modal directly
+                                        setIncomingSitrep({ unitName: u.name, log: lastLog.msg, time: lastLog.time });
                                     }
                                 }
                                 
@@ -516,6 +522,10 @@
                                 if (userIdentity && (!oldU || oldU.responsible !== userIdentity) && u.responsible === userIdentity && u.status === 'mission_pending') {
                                      setNotification({ message: "NOUVELLE MISSION ASSIGNÉE !", type: 'alert' });
                                 }
+                                // 2. Ajout en tant qu'équipier
+                                 if (u.crew && u.crew.includes(userIdentity) && (!oldU || !oldU.crew || !oldU.crew.includes(userIdentity))) {
+                                     setNotification({ message: "AJOUTÉ À UN ÉQUIPAGE !", type: 'info' });
+                                 }
                             });
                             
                             // RTB Notif
@@ -540,7 +550,7 @@
                     setDataLoaded(true);
                 });
                 return () => { isMounted = false; if(unsubscribe) unsubscribe(); clearTimeout(timeout); };
-            }, [activeUnits, userIdentity, userRole]);
+            }, [activeUnits, userIdentity, userRole]); // Dep added for notification logic logic
             
             useEffect(() => {
                 if (!isSlActive) return; 
@@ -656,11 +666,27 @@
                     
                     {notification && <NotificationToast message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
 
+                    {/* MODAL: INCOMING SITREP (SL VIEW) */}
+                    {incomingSitrep && (
+                        <Modal title="SITREP REÇU" color="blue" onClose={() => setIncomingSitrep(null)} Icon={MessageSquare}>
+                            <div className="text-center mb-4">
+                                <h3 className="text-xl font-black text-white uppercase mb-1">{incomingSitrep.unitName}</h3>
+                                <span className="text-xs text-blue-400 font-mono">{incomingSitrep.time}</span>
+                            </div>
+                            <div className="bg-blue-900/20 border border-blue-800 p-4 text-left space-y-3">
+                                <p className="text-sm text-gray-300 font-bold break-words">{incomingSitrep.log}</p>
+                            </div>
+                            <button onClick={() => setIncomingSitrep(null)} className="w-full py-3 bg-blue-600 text-black font-black text-xs hover:bg-blue-500 mt-4">
+                                REÇU (FERMER)
+                            </button>
+                        </Modal>
+                    )}
+
                     <header className="bg-black border-b border-green-900 h-16 shrink-0 flex justify-between items-center px-4 z-50 shadow-lg shadow-green-900/10">
                         <div className="flex items-center gap-4">
                             <div className="p-1.5 rounded">{Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}</div>
                             <div>
-                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V11.1</span></h1>
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V11.2</span></h1>
                                 <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
                                     <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}><div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>SL: {slName || "N/A"}</span>
                                     <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
@@ -898,6 +924,7 @@
                                     )}
                                 </div>
                             )}
+
                         </main>
                     </div>
 
@@ -907,31 +934,6 @@
                         <NavButton icon={Users} label="SQUAD" active={activeTab==='squad'} onClick={()=>setActiveTab('squad')} />
                         <NavButton icon={ScrollText} label="JMO" active={activeTab==='journal'} onClick={()=>canEdit&&setActiveTab('journal')} disabled={!canEdit} />
                     </nav>
-
-                    {/* MODAL: SITREP (NEW) */}
-                    {showSitrepModal && sitrepData.unit && (
-                        <Modal title="ENVOI SITREP" color="blue" onClose={() => setShowSitrepModal(false)} Icon={XCircle}>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">POSITION</label>
-                                    <input type="text" className="w-full bg-blue-900/10 border border-blue-800 p-2 text-blue-400 font-bold text-xs" value={sitrepData.location} onChange={(e) => setSitrepData({...sitrepData, location: e.target.value})} placeholder="EX: SUR ZONE, EN ROUTE..." />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">ÉTAT</label>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setSitrepData({...sitrepData, status: 'green'})} className={`flex-1 py-2 border text-xs font-bold ${sitrepData.status === 'green' ? 'bg-green-600 text-black border-green-600' : 'border-green-900 text-green-600'}`}>VERT</button>
-                                        <button onClick={() => setSitrepData({...sitrepData, status: 'orange'})} className={`flex-1 py-2 border text-xs font-bold ${sitrepData.status === 'orange' ? 'bg-orange-600 text-black border-orange-600' : 'border-orange-900 text-orange-600'}`}>ORANGE</button>
-                                        <button onClick={() => setSitrepData({...sitrepData, status: 'red'})} className={`flex-1 py-2 border text-xs font-bold ${sitrepData.status === 'red' ? 'bg-red-600 text-black border-red-600' : 'border-red-900 text-red-600'}`}>ROUGE</button>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">MESSAGE / BESOINS</label>
-                                    <textarea className="w-full bg-blue-900/10 border border-blue-800 p-2 text-blue-400 font-bold text-xs h-20" value={sitrepData.message} onChange={(e) => setSitrepData({...sitrepData, message: e.target.value})} placeholder="RAS ou DÉTAILS..." />
-                                </div>
-                                <button onClick={submitSitrep} className="w-full py-3 bg-blue-600 text-black font-black text-xs hover:bg-blue-500">ENVOYER RAPPORT</button>
-                            </div>
-                        </Modal>
-                    )}
 
                     {/* MODAL: REMINDER (30 MIN) */}
                     {showReminderModal && (
