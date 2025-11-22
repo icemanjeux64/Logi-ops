@@ -2,8 +2,8 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V11.2 (CLEAN)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LOGI-OPS V11.3 (MOBILE FIX)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -14,8 +14,19 @@
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    screens: {
+                        'xs': '380px',
+                    }
+                }
+            }
+        }
+    </script>
     
-    <!-- Lucide Icons (Version FIXÉE à 0.263.1) -->
+    <!-- Lucide Icons (Version FIXÉE) -->
     <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
 
     <!-- FIREBASE -->
@@ -26,10 +37,10 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
         body { font-family: 'JetBrains Mono', monospace; background-color: #050505; overflow: hidden; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #14532d; }
-        ::-webkit-scrollbar-thumb { background: #14532d; border: 1px solid #000; }
-        ::-webkit-scrollbar-thumb:hover { background: #22c55e; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #14532d; border-radius: 2px; }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
         
         .login-scan {
@@ -39,8 +50,8 @@
         }
         @keyframes scan { 0% { background-position: 0 0; } 100% { background-position: 0 100%; } }
         @keyframes flash-red {
-            0%, 100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.8); }
-            50% { box-shadow: 0 0 40px rgba(239, 68, 68, 0.5); border-color: rgba(239, 68, 68, 1); }
+            0%, 100% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.8); }
+            50% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.5); border-color: rgba(239, 68, 68, 1); }
         }
         .animate-alert { animation: flash-red 2s infinite; }
     </style>
@@ -72,7 +83,7 @@
                 if (!firebase.apps.length) firebase.initializeApp(envConfig);
                 db = firebase.firestore();
                 USE_FIREBASE = true;
-            } catch (e) { console.warn("Erreur init Canvas config", e); }
+            } catch (e) { console.warn("Init Canvas", e); }
         } else if (isConfigured) {
             try {
                 if (!firebase.apps.length) {
@@ -81,13 +92,10 @@
                 }
                 db = firebase.firestore();
                 USE_FIREBASE = true;
-                console.log("Mode: PROD (Online)");
             } catch (e) {
-                console.error("Erreur connexion Firebase:", e);
+                console.error("Firebase Error:", e);
                 USE_FIREBASE = false;
             }
-        } else {
-            USE_FIREBASE = false;
         }
 
         const SESSION_ID = typeof __app_id !== 'undefined' ? __app_id : "operation_actuelle";
@@ -129,7 +137,7 @@
         const { useState, useMemo, useEffect } = React;
 
         // ==========================================
-        // 2. DONNÉES STATIQUES
+        // 2. DONNÉES STATIQUES & ICÔNES
         // ==========================================
         const INITIAL_CATALOG = [
             { id: 'l1', cat: 'LOGI', name: 'JEEP EM', type: 'TRANSPORT EM', cost: 110, stock: 2 },
@@ -162,9 +170,7 @@
             'AIR': { label: 'AÉRIEN', icon: 'Plane', color: 'border-cyan-600 text-cyan-300 bg-cyan-900/10' },
         };
 
-        // ==========================================
-        // 3. SYSTÈME D'ICÔNES
-        // ==========================================
+        // --- SYSTÈME D'ICÔNES ---
         const SVG_PATHS = {
             'Power': <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />,
             'Activity': <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
@@ -231,7 +237,7 @@
         });
 
         // ==========================================
-        // 4. SOUS-COMPOSANTS (DÉFINIS AVANT USAGE)
+        // 4. SOUS-COMPOSANTS
         // ==========================================
         const ClockDisplay = () => {
             const [time, setTime] = useState(new Date());
@@ -240,7 +246,7 @@
                 return () => clearInterval(timer);
             }, []);
             return (
-                <div className="text-[10px] md:text-xs font-mono text-green-600 border border-green-900/30 px-2 py-1 bg-black rounded hidden md:block">
+                <div className="text-[10px] md:text-xs font-mono text-green-600 border border-green-900/30 px-2 py-1 bg-black rounded hidden md:block ml-auto">
                     {time.toLocaleDateString()} - {time.toLocaleTimeString()}
                 </div>
             );
@@ -257,8 +263,8 @@
             if (type === 'success') bgClass = "bg-green-600";
 
             return (
-                <div className={`fixed top-16 right-4 z-[200] ${bgClass} text-white px-6 py-4 rounded shadow-2xl border border-white/20 flex items-center gap-4 toast-enter max-w-sm`}>
-                    <div className="flex-1 font-bold text-sm uppercase tracking-wide">{message}</div>
+                <div className={`fixed top-16 right-4 z-[200] ${bgClass} text-white px-4 py-3 rounded shadow-2xl border border-white/20 flex items-center gap-4 toast-enter max-w-[90vw] sm:max-w-sm`}>
+                    <div className="flex-1 font-bold text-xs sm:text-sm uppercase tracking-wide">{message}</div>
                     <button onClick={onClose} className="text-white/70 hover:text-white"><Icon name="XCircle" size={18}/></button>
                 </div>
             );
@@ -266,19 +272,19 @@
 
         const StatCard = ({ color, value, label, active, onClick }) => {
             const colors = { gray: "border-gray-800 bg-gray-900/10 text-gray-400", green: "border-green-800 bg-green-900/10 text-green-500", blue: "border-blue-800 bg-blue-900/10 text-blue-500", orange: "border-orange-800 bg-orange-900/10 text-orange-500", red: "border-red-800 bg-red-900/10 text-red-500" };
-            const activeClass = active ? `ring-1 ring-offset-1 ring-${color}-500 bg-opacity-20` : 'opacity-70 hover:opacity-100';
-            return <button onClick={onClick} className={`border p-2 md:p-4 text-center relative overflow-hidden transition-all ${colors[color]} ${activeClass}`}><div className={`absolute top-0 left-0 w-2 h-2 border-t border-l border-${color}-500`}></div><span className="text-2xl md:text-4xl font-black block leading-none">{value}</span><span className="text-[8px] md:text-xs font-bold uppercase tracking-widest">{label}</span></button>;
+            const activeClass = active ? `ring-1 ring-offset-1 ring-${color}-500 bg-opacity-30` : 'opacity-70 hover:opacity-100';
+            return <button onClick={onClick} className={`border p-1 md:p-4 text-center relative overflow-hidden transition-all rounded ${colors[color]} ${activeClass} flex-1 min-w-[60px]`}><span className="text-xl md:text-4xl font-black block leading-none">{value}</span><span className="text-[8px] md:text-xs font-bold uppercase tracking-widest">{label}</span></button>;
         };
 
-        const ActionButton = ({ onClick, icon: Icon, label, color }) => (<button onClick={onClick} className={`text-[9px] md:text-xs font-bold bg-${color}-900/20 border border-${color}-800 px-3 py-1.5 text-${color}-400 hover:bg-${color}-900/40 hover:border-${color}-500 flex items-center gap-2 transition-colors`}>{Icon && <Icon size={14} />} {label}</button>);
-        const NavButton = ({ icon: Icon, label, active, onClick, disabled }) => (<button onClick={onClick} disabled={disabled} className={`flex flex-col items-center justify-center gap-1 transition-all border-t-2 ${active?'text-green-400 border-green-500 bg-green-900/20':disabled?'text-green-900 opacity-30':'text-green-900 border-transparent hover:text-green-600'}`}>{Icon && <Icon size={18}/>} <span className="text-[8px] font-black tracking-widest">{label}</span></button>);
+        const ActionButton = ({ onClick, icon: Icon, label, color }) => (<button onClick={onClick} className={`text-[10px] md:text-xs font-bold bg-${color}-900/20 border border-${color}-800 px-3 py-2 md:py-1.5 text-${color}-400 hover:bg-${color}-900/40 hover:border-${color}-500 flex items-center justify-center gap-2 transition-colors rounded`}>{Icon && <Icon size={14} />} {label}</button>);
+        const NavButton = ({ icon: Icon, label, active, onClick, disabled }) => (<button onClick={onClick} disabled={disabled} className={`flex flex-col items-center justify-center gap-1 transition-all border-t-2 ${active?'text-green-400 border-green-500 bg-green-900/20':disabled?'text-green-900 opacity-30':'text-green-900 border-transparent hover:text-green-600'}`}>{Icon && <Icon size={18}/>} <span className="text-[9px] font-black tracking-widest">{label}</span></button>);
         const NavButtonDesktop = ({ icon: Icon, label, active, onClick, disabled }) => (<button onClick={onClick} disabled={disabled} className={`w-full flex items-center gap-3 px-4 py-3 transition-all border-l-4 text-left ${active?'text-green-400 border-green-500 bg-green-900/20':disabled?'text-green-900 border-transparent opacity-30':'text-gray-500 border-transparent hover:text-green-500 hover:bg-green-900/10'}`}>{Icon && <Icon size={20}/>} <span className="text-xs font-black tracking-widest uppercase">{label}</span></button>);
-        const EmptyState = ({ canEdit, Target }) => (<div className="flex flex-col items-center justify-center h-64 md:h-96 border border-dashed border-green-900 bg-green-900/5 rounded-lg">{Target && <Target size={64} className="mb-4 text-green-900 opacity-50" />}<p className="text-sm font-bold uppercase text-green-800 tracking-widest">AUCUNE UNITÉ DÉPLOYÉE</p>{canEdit && <p className="text-xs text-green-900 mt-2">ACCÉDER AU GARAGE POUR DÉPLOIEMENT</p>}</div>);
-        const GarageSlot = ({ model, index, activeCount, onDeploy, ArrowUpRight }) => { const isAvailable = index >= activeCount; return (<button disabled={!isAvailable} onClick={isAvailable ? onDeploy : undefined} className={`relative p-2 md:p-3 border flex flex-col items-center justify-center text-center h-24 md:h-32 transition-all ${isAvailable ? 'bg-green-900/10 border-green-800 hover:bg-green-900/30 hover:border-green-500 active:scale-95 group' : 'bg-black border-green-900/30 opacity-30 cursor-default'}`}>{isAvailable ? (<><div className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-500 shadow-[0_0_5px_#22c55e]"></div><span className="mt-1 text-[10px] md:text-xs font-black text-green-400 leading-tight uppercase px-1">{model.name}</span><span className="text-[9px] text-green-800 font-mono mt-1">{model.cost} PTS</span></>) : (<div className="flex flex-col items-center">{ArrowUpRight && <ArrowUpRight size={20} className="text-green-900 mb-1"/>}<span className="text-[9px] font-black text-green-900 uppercase tracking-widest">MISSION</span></div>)}<div className="absolute bottom-1 left-1 text-[8px] font-mono text-green-900">SLOT {index+1}</div></button>); };
-        const Modal = ({ title, color, onClose, children, Icon }) => (<div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"><div className={`bg-black border border-${color}-800 w-full max-w-lg p-6 relative shadow-[0_0_30px_rgba(0,0,0,0.5)] max-h-[90vh] overflow-y-auto`}><div className="flex justify-between items-center mb-6"><h3 className={`text-lg font-black uppercase text-${color}-500 tracking-widest`}>{title}</h3><button onClick={onClose} className={`text-${color}-700 hover:text-${color}-400`}>{Icon && <Icon size={20} />}</button></div>{children}</div></div>);
+        const EmptyState = ({ canEdit, Target }) => (<div className="flex flex-col items-center justify-center h-64 md:h-96 border border-dashed border-green-900 bg-green-900/5 rounded-lg m-2">{Target && <Target size={48} className="mb-4 text-green-900 opacity-50" />}<p className="text-xs font-bold uppercase text-green-800 tracking-widest">AUCUNE UNITÉ</p>{canEdit && <p className="text-[10px] text-green-900 mt-1">ALLEZ AU GARAGE</p>}</div>);
+        const GarageSlot = ({ model, index, activeCount, onDeploy, ArrowUpRight }) => { const isAvailable = index >= activeCount; return (<button disabled={!isAvailable} onClick={isAvailable ? onDeploy : undefined} className={`relative p-1 md:p-3 border flex flex-col items-center justify-center text-center h-20 md:h-32 transition-all rounded ${isAvailable ? 'bg-green-900/10 border-green-800 hover:bg-green-900/30 hover:border-green-500 active:scale-95 group' : 'bg-black border-green-900/30 opacity-30 cursor-default'}`}>{isAvailable ? (<><div className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-500 shadow-[0_0_5px_#22c55e] rounded-full"></div><span className="mt-1 text-[9px] md:text-xs font-black text-green-400 leading-tight uppercase px-1 truncate w-full">{model.name}</span><span className="text-[8px] text-green-800 font-mono mt-1 hidden sm:block">{model.cost} PTS</span></>) : (<div className="flex flex-col items-center">{ArrowUpRight && <ArrowUpRight size={16} className="text-green-900 mb-1"/>}<span className="text-[8px] font-black text-green-900 uppercase tracking-widest">MISS.</span></div>)}<div className="absolute bottom-0.5 left-1 text-[7px] font-mono text-green-900">#{index+1}</div></button>); };
+        const Modal = ({ title, color, onClose, children, Icon }) => (<div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"><div className={`bg-black border border-${color}-800 w-full max-w-lg p-4 md:p-6 relative shadow-[0_0_30px_rgba(0,0,0,0.5)] max-h-[90vh] overflow-y-auto rounded`}><div className="flex justify-between items-center mb-6"><h3 className={`text-lg font-black uppercase text-${color}-500 tracking-widest`}>{title}</h3><button onClick={onClose} className={`text-${color}-700 hover:text-${color}-400`}>{Icon && <Icon size={20} />}</button></div>{children}</div></div>);
         
-        function StatusBtn({ label, active, color, onClick }) { const styles = { green: active ? 'bg-green-600 text-black' : 'bg-black text-green-700 border-green-900 hover:text-green-500', blue: active ? 'bg-blue-600 text-black' : 'bg-black text-blue-700 border-blue-900 hover:text-blue-500', orange: active ? 'bg-orange-600 text-black' : 'bg-black text-orange-700 border-orange-900 hover:text-orange-500', red: 'bg-black text-red-800 border-red-900 hover:text-red-500' }; return <button onClick={onClick} className={`text-[9px] font-black py-1 border ${styles[color]} transition-all uppercase`}>{label}</button>; }
-        function MissionTimer({ startTime }) { const [d, sD] = useState('00:00:00'); useEffect(() => { const t = setInterval(() => { const df = Date.now() - startTime; const h = Math.floor(df / 3600000).toString().padStart(2, '0'); const m = Math.floor((df % 3600000) / 60000).toString().padStart(2, '0'); const s = Math.floor((df % 60000) / 1000).toString().padStart(2, '0'); sD(`${h}:${m}:${s}`); }, 1000); return () => clearInterval(t); }, [startTime]); return <span className="font-mono text-blue-400 font-bold bg-blue-900/30 px-2 py-0.5 text-[10px] border border-blue-900">T+{d}</span>; }
+        function StatusBtn({ label, active, color, onClick }) { const styles = { green: active ? 'bg-green-600 text-black' : 'bg-black text-green-700 border-green-900 hover:text-green-500', blue: active ? 'bg-blue-600 text-black' : 'bg-black text-blue-700 border-blue-900 hover:text-blue-500', orange: active ? 'bg-orange-600 text-black' : 'bg-black text-orange-700 border-orange-900 hover:text-orange-500', red: 'bg-black text-red-800 border-red-900 hover:text-red-500' }; return <button onClick={onClick} className={`text-[9px] font-black py-1 border ${styles[color]} transition-all uppercase rounded`}>{label}</button>; }
+        function MissionTimer({ startTime }) { const [d, sD] = useState('00:00:00'); useEffect(() => { const t = setInterval(() => { const df = Date.now() - startTime; const h = Math.floor(df / 3600000).toString().padStart(2, '0'); const m = Math.floor((df % 3600000) / 60000).toString().padStart(2, '0'); const s = Math.floor((df % 60000) / 1000).toString().padStart(2, '0'); sD(`${h}:${m}:${s}`); }, 1000); return () => clearInterval(t); }, [startTime]); return <span className="font-mono text-blue-400 font-bold bg-blue-900/30 px-2 py-0.5 text-[10px] border border-blue-900 rounded">T+{d}</span>; }
         
         function UnitCard({ unit, onStatusChange, onEndMission, onRTB, onShowLogs, Icons, readOnly, userIdentity, onStartMission, onRequestRTB, onValidateRTB, onAddCrew, onSitrep }) { 
             let borderColor='border-green-600'; let statusText='text-green-500';
@@ -292,69 +298,58 @@
 
             const IconComp=Icons[CATEGORIES[unit.cat]?.icon||'Truck']; const List=Icons['List']; const Clock=Icons['Clock']; const RotateCcw=Icons['RotateCcw']; const XCircle=Icons['XCircle']; const Send=Icons['Send']; const Check=Icons['Check']; const UserPlus=Icons['UserPlus']; const MessageSquare=Icons['MessageSquare'];
             
-            return (<div className={`relative border-l-2 ${borderColor} bg-green-900/5 p-3 flex flex-col h-auto border-t border-r border-b border-green-900/30 hover:bg-green-900/10 transition-all min-h-[9rem]`}>
-                <div className="flex justify-between items-start mb-2"><div className="flex gap-2 overflow-hidden"><div className={`p-1.5 bg-black border border-green-900 flex items-center justify-center h-8 w-8 shrink-0 ${statusText}`}>{IconComp && <IconComp size={16}/>}</div><div className="min-w-0"><h3 className={`font-black text-xs md:text-sm text-gray-300 truncate uppercase leading-tight ${unit.status === 'destroyed' && 'line-through opacity-50'}`}>{unit.name}</h3><div className="flex flex-col gap-0.5 mt-0.5"><span className="text-[9px] text-green-800 font-mono">{unit.cost} PTS</span>
+            return (<div className={`relative border-l-4 ${borderColor} bg-green-900/5 p-2 md:p-3 flex flex-col h-auto border-t border-r border-b border-green-900/30 hover:bg-green-900/10 transition-all rounded-r min-h-[8rem]`}>
+                <div className="flex justify-between items-start mb-2"><div className="flex gap-2 overflow-hidden"><div className={`p-1.5 bg-black border border-green-900 flex items-center justify-center h-8 w-8 shrink-0 rounded ${statusText}`}>{IconComp && <IconComp size={16}/>}</div><div className="min-w-0"><h3 className={`font-black text-xs md:text-sm text-gray-300 truncate uppercase leading-tight ${unit.status === 'destroyed' && 'line-through opacity-50'}`}>{unit.name}</h3><div className="flex flex-col gap-0.5 mt-0.5"><span className="text-[9px] text-green-800 font-mono hidden sm:block">{unit.cost} PTS</span>
                 {unit.responsible!=='BASE' && (
-                    <div className="flex flex-wrap gap-1">
-                        <span className={`text-[8px] px-1 border truncate max-w-[80px] ${isMyUnit?'bg-yellow-900/20 text-yellow-400 border-yellow-900':'bg-blue-900/20 text-blue-400 border-blue-900/50'}`}>{unit.responsible}</span>
-                        {/* Affichage des équipiers */}
+                    <div className="flex flex-wrap gap-1 mt-1">
+                        <span className={`text-[8px] px-1 border truncate max-w-[80px] rounded ${isMyUnit?'bg-yellow-900/20 text-yellow-400 border-yellow-900':'bg-blue-900/20 text-blue-400 border-blue-900/50'}`}>{unit.responsible}</span>
                         {unit.crew && unit.crew.map((c, idx) => (
-                            <span key={idx} className="text-[8px] px-1 border border-green-900/50 text-green-600 bg-green-900/10" title="Équipier">{c}</span>
+                            <span key={idx} className="text-[8px] px-1 border border-green-900/50 text-green-600 bg-green-900/10 rounded" title="Équipier">{c}</span>
                         ))}
                     </div>
                 )}
                 </div></div></div><button onClick={onShowLogs} className="text-green-900 hover:text-green-500 p-1 shrink-0">{List && <List size={14} />}</button></div>
                 
-                {/* CONTENU DYNAMIQUE */}
                 <div className="mt-auto space-y-2">
                     {unit.status === 'destroyed' ? (
-                        <div className="bg-red-900/10 border border-red-900/50 p-1 text-center mb-2"><p className="text-[8px] text-red-700 font-bold uppercase">CAUSE: {unit.reasonHS}</p></div>
+                        <div className="bg-red-900/10 border border-red-900/50 p-1 text-center mb-2 rounded"><p className="text-[8px] text-red-700 font-bold uppercase">CAUSE: {unit.reasonHS}</p></div>
                     ) : (
                         <>
-                            {/* PENDING */}
                             {unit.status === 'mission_pending' && (
                                 <div>
                                     {isMyUnit ? (
                                         <div className="flex gap-1">
-                                            <button onClick={onAddCrew} className="flex-1 py-1 bg-blue-900/20 border border-blue-700 text-blue-400 font-bold text-[10px] hover:bg-blue-900/40 flex items-center justify-center gap-1">{UserPlus && <UserPlus size={12}/>} ÉQUIP.</button>
-                                            <button onClick={onStartMission} className="flex-1 py-1 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 flex items-center justify-center gap-1">{Send && <Send size={12}/>} DÉPART</button>
+                                            <button onClick={onAddCrew} className="flex-1 py-1.5 bg-blue-900/20 border border-blue-700 text-blue-400 font-bold text-[10px] hover:bg-blue-900/40 flex items-center justify-center gap-1 rounded">{UserPlus && <UserPlus size={12}/>} +</button>
+                                            <button onClick={onStartMission} className="flex-1 py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 flex items-center justify-center gap-1 rounded">{Send && <Send size={12}/>} GO</button>
                                         </div>
                                     ) : isInCrew ? (
-                                        <span className="block text-center text-[10px] text-blue-400 font-bold border border-blue-900/50 px-2 py-1 bg-blue-900/10">AFFECTÉ (ÉQUIPAGE)</span>
+                                        <span className="block text-center text-[10px] text-blue-400 font-bold border border-blue-900/50 px-2 py-1 bg-blue-900/10 rounded">AFFECTÉ</span>
                                     ) : (
-                                        <span className="block text-center text-[10px] text-orange-500 font-bold border border-orange-900/50 px-2 py-1 bg-orange-900/10 animate-pulse">ORDRE EN ATTENTE...</span>
+                                        <span className="block text-center text-[10px] text-orange-500 font-bold border border-orange-900/50 px-2 py-1 bg-orange-900/10 animate-pulse rounded">ATTENTE...</span>
                                     )}
                                 </div>
                             )}
-                            {/* MISSION */}
                             {unit.status === 'mission' && (
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-1 justify-center">{Clock && <Clock size={10} className="text-blue-600"/>}<MissionTimer startTime={unit.missionStartTime} /></div>
-                                    
-                                    {/* SITREP BUTTON FOR CHIEF */}
                                     {isMyUnit && (
                                         <div className="grid grid-cols-2 gap-1">
-                                            <button onClick={onSitrep} className="py-1 bg-yellow-900/20 border border-yellow-700 text-yellow-500 font-black text-[10px] hover:bg-yellow-900/40 flex items-center justify-center gap-1">{MessageSquare && <MessageSquare size={12}/>} SITREP</button>
-                                            <button onClick={onRequestRTB} className="py-1 bg-blue-900/30 border border-blue-600 text-blue-400 font-black text-[10px] hover:bg-blue-900/50">RTB</button>
+                                            <button onClick={onSitrep} className="py-1 bg-yellow-900/20 border border-yellow-700 text-yellow-500 font-black text-[10px] hover:bg-yellow-900/40 flex items-center justify-center gap-1 rounded">{MessageSquare && <MessageSquare size={12}/>} SITREP</button>
+                                            <button onClick={onRequestRTB} className="py-1 bg-blue-900/30 border border-blue-600 text-blue-400 font-black text-[10px] hover:bg-blue-900/50 rounded">RTB</button>
                                         </div>
                                     )}
-                                    
-                                    {isInCrew && (
-                                         <span className="block text-center text-[9px] text-gray-500 font-mono">MISSION EN COURS...</span>
-                                    )}
+                                    {isInCrew && <span className="block text-center text-[9px] text-gray-500 font-mono">MISSION EN COURS</span>}
                                 </div>
                             )}
-                            {/* RTB REQUEST */}
                             {unit.status === 'mission_rtb' && (
                                 <div className="text-center">
                                     {isSL ? (
-                                        <button onClick={onValidateRTB} className="w-full py-1 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 flex items-center justify-center gap-1 animate-pulse">{Check && <Check size={12}/>} VALIDER RETOUR</button>
+                                        <button onClick={onValidateRTB} className="w-full py-1 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 flex items-center justify-center gap-1 animate-pulse rounded">{Check && <Check size={12}/>} VALIDER</button>
                                     ) : (
-                                        <span className="text-[10px] text-blue-400 font-bold border border-blue-900/50 px-2 py-1 bg-blue-900/10 animate-pulse">ATTENTE SL...</span>
+                                        <span className="text-[10px] text-blue-400 font-bold border border-blue-900/50 px-2 py-1 bg-blue-900/10 animate-pulse rounded">ATTENTE SL</span>
                                     )}
                                 </div>
                             )}
-                            {/* STANDARD STATUS */}
                             {(unit.status === 'operational' || unit.status === 'damaged') && (
                                 isSL ? (
                                     <div className="grid grid-cols-4 gap-1">
@@ -373,7 +368,7 @@
                 {isSL && (
                     <div className="flex justify-end pt-1 border-t border-green-900/20 mt-2">
                          {unit.status !== 'destroyed' ? 
-                            <button onClick={onRTB} className="text-[9px] font-bold text-green-800 hover:text-green-500 uppercase flex items-center gap-1">{RotateCcw && <RotateCcw size={10} />} RENTRER</button> :
+                            <button onClick={onRTB} className="text-[9px] font-bold text-green-800 hover:text-green-500 uppercase flex items-center gap-1">{RotateCcw && <RotateCcw size={10} />} RETOUR</button> :
                             <button onClick={onRTB} className="text-[9px] font-bold text-red-800 hover:text-red-500 uppercase flex items-center gap-1">{XCircle && <XCircle size={10} />} ARCHIVER</button>
                          }
                     </div>
@@ -386,64 +381,53 @@
             const [username, setUsername] = useState('');
             const [password, setPassword] = useState('');
             const [error, setError] = useState('');
-            const [mode, setMode] = useState('MAIN'); // MAIN, SL, LOGI
+            const [mode, setMode] = useState('MAIN'); 
             const [selectedMember, setSelectedMember] = useState('');
-            const Shield = Icons['Shield'];
-            const Lock = Icons['Lock'];
-            const User = Icons['User'];
+            const Shield = Icons['Shield']; const Lock = Icons['Lock']; const User = Icons['User'];
 
-            const handleSL = (e) => {
-                e.preventDefault();
-                if (username === 'SLLOGI' && password === 'sllogi') { onLogin('SL'); } else { setError('IDENTIFIANTS INCORRECTS'); }
-            };
-
-            const handleLogi = () => {
-                if(!selectedMember) return;
-                onLogin('LOGI', selectedMember);
-            };
+            const handleSL = (e) => { e.preventDefault(); if (username === 'SLLOGI' && password === 'sllogi') { onLogin('SL'); } else { setError('IDENTIFIANTS INCORRECTS'); } };
+            const handleLogi = () => { if(!selectedMember) return; onLogin('LOGI', selectedMember); };
 
             if (mode === 'MAIN') {
                 return (
                     <div className="min-h-screen bg-black flex items-center justify-center p-4 login-scan w-full h-full fixed inset-0 overflow-hidden">
-                        <div className="w-full max-w-md border border-green-800 bg-black relative p-8 shadow-[0_0_50px_rgba(0,255,0,0.1)] z-10 text-center space-y-6">
+                        <div className="w-full max-w-md border border-green-800 bg-black relative p-8 shadow-[0_0_50px_rgba(0,255,0,0.1)] z-10 text-center space-y-6 rounded">
                             <h1 className="text-2xl font-black text-green-500 tracking-[0.3em]">LOGI-OPS</h1>
                             <div className="space-y-4">
-                                <button onClick={() => setMode('SL')} className="w-full py-4 border border-green-600 text-green-500 font-bold hover:bg-green-900/20">COMMANDEMENT (SL)</button>
-                                <button onClick={() => setMode('LOGI')} className="w-full py-4 border border-blue-600 text-blue-500 font-bold hover:bg-blue-900/20">LOGISTICIEN</button>
+                                <button onClick={() => setMode('SL')} className="w-full py-4 border border-green-600 text-green-500 font-bold hover:bg-green-900/20 rounded">COMMANDEMENT (SL)</button>
+                                <button onClick={() => setMode('LOGI')} className="w-full py-4 border border-blue-600 text-blue-500 font-bold hover:bg-blue-900/20 rounded">LOGISTICIEN</button>
                             </div>
                         </div>
                     </div>
                 );
             }
-
             if (mode === 'SL') {
                 return (
                      <div className="min-h-screen bg-black flex items-center justify-center p-4 login-scan w-full h-full fixed inset-0 overflow-hidden">
-                        <div className="w-full max-w-md border border-green-800 bg-black relative p-8 shadow-[0_0_50px_rgba(0,255,0,0.1)] z-10">
+                        <div className="w-full max-w-md border border-green-800 bg-black relative p-8 shadow-[0_0_50px_rgba(0,255,0,0.1)] z-10 rounded">
                             <h2 className="text-xs font-bold text-green-600 uppercase mb-4 text-center">CONNEXION SL</h2>
                             <form onSubmit={handleSL} className="space-y-4">
-                                <input type="text" placeholder="ID" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-green-900/10 border border-green-800 p-3 text-green-400 text-xs font-bold outline-none focus:border-green-500 placeholder-green-900" />
-                                <input type="password" placeholder="MDP" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-green-900/10 border border-green-800 p-3 text-green-400 text-xs font-bold outline-none focus:border-green-500 placeholder-green-900" />
+                                <input type="text" placeholder="ID" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-green-900/10 border border-green-800 p-3 text-green-400 text-xs font-bold outline-none focus:border-green-500 rounded" />
+                                <input type="password" placeholder="MDP" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-green-900/10 border border-green-800 p-3 text-green-400 text-xs font-bold outline-none focus:border-green-500 rounded" />
                                 {error && <p className="text-red-500 text-center text-xs">{error}</p>}
-                                <button type="submit" className="w-full bg-green-600 text-black font-black py-3">ENTRER</button>
+                                <button type="submit" className="w-full bg-green-600 text-black font-black py-3 rounded">ENTRER</button>
                             </form>
                              <button onClick={() => setMode('MAIN')} className="text-xs text-green-800 mt-4 w-full text-center hover:text-green-500">RETOUR</button>
                         </div>
                     </div>
                 );
             }
-
             if (mode === 'LOGI') {
                  return (
                      <div className="min-h-screen bg-black flex items-center justify-center p-4 login-scan w-full h-full fixed inset-0 overflow-hidden">
-                        <div className="w-full max-w-md border border-blue-800 bg-black relative p-8 shadow-[0_0_50px_rgba(0,0,255,0.1)] z-10">
+                        <div className="w-full max-w-md border border-blue-800 bg-black relative p-8 shadow-[0_0_50px_rgba(0,0,255,0.1)] z-10 rounded">
                             <h2 className="text-xs font-bold text-blue-600 uppercase mb-4 text-center">IDENTIFICATION LOGISTICIEN</h2>
                             <div className="space-y-4">
-                                <select value={selectedMember} onChange={(e) => setSelectedMember(e.target.value)} className="w-full bg-blue-900/10 border border-blue-800 p-3 text-blue-400 outline-none font-bold">
+                                <select value={selectedMember} onChange={(e) => setSelectedMember(e.target.value)} className="w-full bg-blue-900/10 border border-blue-800 p-3 text-blue-400 outline-none font-bold rounded">
                                     <option value="">-- QUI ÊTES-VOUS ? --</option>
                                     {squad && squad.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
                                 </select>
-                                <button onClick={handleLogi} disabled={!selectedMember} className="w-full bg-blue-600 text-black font-black py-3 hover:bg-blue-500 disabled:opacity-50">VALIDER</button>
+                                <button onClick={handleLogi} disabled={!selectedMember} className="w-full bg-blue-600 text-black font-black py-3 hover:bg-blue-500 disabled:opacity-50 rounded">VALIDER</button>
                             </div>
                              <button onClick={() => setMode('MAIN')} className="text-xs text-blue-800 mt-4 w-full text-center hover:text-blue-500">RETOUR</button>
                         </div>
@@ -475,8 +459,8 @@
             const [showConfigModal, setShowConfigModal] = useState(false);
             const [showCreateVehicleModal, setShowCreateVehicleModal] = useState(false);
             const [showCrewModal, setShowCrewModal] = useState(false); 
-            const [showSitrepModal, setShowSitrepModal] = useState(false); // NEW SITREP
-            const [showMissionManagerModal, setShowMissionManagerModal] = useState(false); // NEW MISSION MANAGER
+            const [showSitrepModal, setShowSitrepModal] = useState(false); 
+            const [showMissionManagerModal, setShowMissionManagerModal] = useState(false); 
             const [currentConfigId, setCurrentConfigId] = useState(null);
             const [inputReason, setInputReason] = useState('');
             const [selectedMemberId, setSelectedMemberId] = useState('');
@@ -496,7 +480,6 @@
 
             const canEdit = userRole === 'SL';
 
-            // ... (Load/Save Effects)
             useEffect(() => {
                 let isMounted = true;
                 const timeout = setTimeout(() => {
@@ -749,7 +732,7 @@
                         <div className="flex items-center gap-4">
                             <div className="p-1.5 rounded">{Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}</div>
                             <div>
-                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V11.5</span></h1>
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V11.3</span></h1>
                                 <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
                                     <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}><div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>SL: {slName || "N/A"}</span>
                                     <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
@@ -782,37 +765,13 @@
                             
                             {activeTab === 'dashboard' && (
                                 <div className="space-y-6 animate-in fade-in flex flex-col h-full">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <div className="grid grid-cols-5 gap-2 md:gap-4 shrink-0 flex-1">
-                                            <StatCard color="gray" value={stats.totalVehicles} label="TOTAL" active={filterStatus === 'ALL'} onClick={() => setFilterStatus('ALL')} />
-                                            <StatCard color="green" value={stats.operationalCount} label="DISPO" active={filterStatus === 'operational'} onClick={() => setFilterStatus('operational')} />
-                                            <StatCard color="blue" value={stats.missionCount} label="MISSION" active={filterStatus === 'mission'} onClick={() => setFilterStatus('mission')} />
-                                            <StatCard color="orange" value={stats.repairCount} label="RÉP." active={filterStatus === 'damaged'} onClick={() => setFilterStatus('damaged')} />
-                                            <StatCard color="red" value={stats.destroyedCount} label="PERTES" active={filterStatus === 'destroyed'} onClick={() => setFilterStatus('destroyed')} />
-                                        </div>
-                                        {canEdit && (
-                                            <button onClick={() => setShowMissionManagerModal(true)} className="ml-4 h-full px-4 border border-blue-600 bg-blue-900/20 text-blue-400 font-bold hover:bg-blue-900/40 flex flex-col items-center justify-center gap-1">
-                                                {ClipboardList && <ClipboardList size={20}/>} <span className="text-[10px]">MISSIONS</span>
-                                            </button>
-                                        )}
+                                    <div className="grid grid-cols-5 gap-2 md:gap-4 shrink-0 mb-4">
+                                        <StatCard color="gray" value={stats.totalVehicles} label="TOTAL" active={filterStatus === 'ALL'} onClick={() => setFilterStatus('ALL')} />
+                                        <StatCard color="green" value={stats.operationalCount} label="DISPO" active={filterStatus === 'operational'} onClick={() => setFilterStatus('operational')} />
+                                        <StatCard color="blue" value={stats.missionCount} label="MISSION" active={filterStatus === 'mission'} onClick={() => setFilterStatus('mission')} />
+                                        <StatCard color="orange" value={stats.repairCount} label="RÉP." active={filterStatus === 'damaged'} onClick={() => setFilterStatus('damaged')} />
+                                        <StatCard color="red" value={stats.destroyedCount} label="PERTES" active={filterStatus === 'destroyed'} onClick={() => setFilterStatus('destroyed')} />
                                     </div>
-
-                                    {/* ACTIVE MISSIONS DISPLAY (TOP) */}
-                                    {missions.length > 0 && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                                            {missions.map(mission => (
-                                                <div key={mission.id} className="border border-blue-700/50 bg-blue-900/10 p-3 relative overflow-hidden">
-                                                    <div className="absolute top-0 right-0 bg-blue-700 text-black text-[9px] font-bold px-2 py-0.5">{mission.type}</div>
-                                                    <h4 className="text-blue-400 font-black uppercase text-sm mb-2">{mission.title}</h4>
-                                                    <div className="text-[10px] text-gray-400 space-y-1">
-                                                        <div className="flex items-center gap-1">{Truck && <Truck size={10}/>} {mission.vehicles.length} VÉHICULES</div>
-                                                        <div className="flex items-center gap-1">{User && <User size={10}/>} {mission.personnel.length} PERSONNELS</div>
-                                                        <div className="font-mono text-blue-600">DÉBUT: {new Date(mission.startTime).toLocaleTimeString()}</div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
 
                                     {/* LOGISTICIAN FILTERED VIEW */}
                                     {!canEdit && userIdentity ? (
@@ -1091,6 +1050,29 @@
                                 {squad.filter(m => m.name !== actionModal.unit.responsible && (!actionModal.unit.crew || !actionModal.unit.crew.includes(m.name))).length === 0 && (
                                     <p className="text-center text-gray-500 text-xs italic">Aucun personnel disponible.</p>
                                 )}
+                            </div>
+                        </Modal>
+                    )}
+                    {showSitrepModal && sitrepData.unit && (
+                        <Modal title="ENVOI SITREP" color="blue" onClose={() => setShowSitrepModal(false)} Icon={XCircle}>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">POSITION</label>
+                                    <input type="text" className="w-full bg-blue-900/10 border border-blue-800 p-2 text-blue-400 font-bold text-xs" value={sitrepData.location} onChange={(e) => setSitrepData({...sitrepData, location: e.target.value})} placeholder="EX: SUR ZONE, EN ROUTE..." />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">ÉTAT</label>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setSitrepData({...sitrepData, status: 'green'})} className={`flex-1 py-2 border text-xs font-bold ${sitrepData.status === 'green' ? 'bg-green-600 text-black border-green-600' : 'border-green-900 text-green-600'}`}>VERT</button>
+                                        <button onClick={() => setSitrepData({...sitrepData, status: 'orange'})} className={`flex-1 py-2 border text-xs font-bold ${sitrepData.status === 'orange' ? 'bg-orange-600 text-black border-orange-600' : 'border-orange-900 text-orange-600'}`}>ORANGE</button>
+                                        <button onClick={() => setSitrepData({...sitrepData, status: 'red'})} className={`flex-1 py-2 border text-xs font-bold ${sitrepData.status === 'red' ? 'bg-red-600 text-black border-red-600' : 'border-red-900 text-red-600'}`}>ROUGE</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">MESSAGE / BESOINS</label>
+                                    <textarea className="w-full bg-blue-900/10 border border-blue-800 p-2 text-blue-400 font-bold text-xs h-20" value={sitrepData.message} onChange={(e) => setSitrepData({...sitrepData, message: e.target.value})} placeholder="RAS ou DÉTAILS..." />
+                                </div>
+                                <button onClick={submitSitrep} className="w-full py-3 bg-blue-600 text-black font-black text-xs hover:bg-blue-500">ENVOYER RAPPORT</button>
                             </div>
                         </Modal>
                     )}
