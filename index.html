@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LOGI-OPS V11.6 (RP MISSIONS)</title>
+    <title>LOGI-OPS V11.7 (FIX MISSION)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -24,7 +24,7 @@
         }
     </script>
     
-    <!-- Lucide Icons (Version FIXÉE) -->
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
 
     <!-- FIREBASE -->
@@ -39,7 +39,6 @@
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #14532d; border-radius: 2px; }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-        
         .login-scan {
             background: linear-gradient(to bottom, transparent 50%, rgba(0, 255, 0, 0.02) 51%, transparent 51%);
             background-size: 100% 4px;
@@ -167,52 +166,16 @@
             'AIR': { label: 'AÉRIEN', icon: 'Plane', color: 'border-cyan-600 text-cyan-300 bg-cyan-900/10' },
         };
 
-        // --- DÉFINITION DES MISSIONS PAR CATÉGORIE (RP UPDATE) ---
         const MISSION_TYPES = {
-            'LOGI': [
-                'RAVITAILLEMENT (SUPPLY RUN)', 
-                'LOGISTIQUE INTERNE (DISPATCH)', 
-                'CONSTRUCTION / FORTIFICATION', 
-                'MAINTENANCE / RÉPARATIONS', 
-                'DÉMÉNAGEMENT BASE (RE-DEPLOY)',
-                'ORGANISATION GROUPES DE COMBAT' // Pour ADC/EM absent
-            ],
-            'TRANS': [
-                'RAVITAILLEMENT TROUPES (FRONT)', 
-                'DÉPLOIEMENT INFANTERIE', 
-                'EXTRACTION / ÉVACUATION', 
-                'NAVETTE TACTIQUE'
-            ],
-            'BLINDE': [
-                'SÉCURISATION (EOD/DÉMINAGE)', 
-                'ESCORTE CONVOI LOGI', 
-                'PATROUILLE SECTEUR', 
-                'RECONNAISSANCE'
-            ],
-            'VCI': [
-                'APPUI FEU DIRECT', 
-                'SÉCURISATION (EOD/DÉMINAGE)',
-                'TRANSPORT ASSAUT'
-            ],
-            'SANTE': [
-                'EVASAN (URGENCE)', 
-                'SOUTIEN MÉDICAL SUR ZONE', 
-                'TRIAGE / STABILISATION'
-            ],
-            'CHAR': [
-                'ASSAUT BLINDÉ', 
-                'DESTRUCTION OBJECTIF', 
-                'DÉFENSE DE ZONE'
-            ],
-            'AIR': [
-                'TRANSPORT AÉRIEN (SUPPLY)', 
-                'CAS (APPUI FEU)', 
-                'RECONNAISSANCE AÉRIENNE', 
-                'EVASAN AÉRIENNE'
-            ]
+            'LOGI': ['RAVITAILLEMENT (AMMO)', 'RAVITAILLEMENT (BUILD)', 'CONSTRUCTION FOB', 'RÉPARATION SITE', 'RÉCUPÉRATION ÉPAVE', 'ORGANISATION'],
+            'TRANS': ['DÉPLOIEMENT INFANTERIE', 'EXTRACTION', 'NAVETTE BASE/FRONT', 'RAVITAILLEMENT TROUPES'],
+            'BLINDE': ['APPUI FEU', 'ESCORTE CONVOI', 'PATROUILLE', 'RECONNAISSANCE', 'DÉMINAGE (EOD)'],
+            'VCI': ['ASSAUT MÉCANISÉ', 'TRANSPORT ASSAUT', 'APPUI INFANTERIE'],
+            'SANTE': ['EVASAN (URGENCE)', 'SOUTIEN MÉDICAL', 'VADROUILLE SANITAIRE'],
+            'CHAR': ['ASSAUT BLINDÉ', 'DESTRUCTION OBJECTIF', 'DÉFENSE DE ZONE'],
+            'AIR': ['TRANSPORT AÉRIEN', 'CAS (APPUI FEU)', 'RECONNAISSANCE AÉRIENNE', 'EVASAN AÉRIENNE']
         };
 
-        // --- SYSTÈME D'ICÔNES ---
         const SVG_PATHS = {
             'Power': <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />,
             'Activity': <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
@@ -249,19 +212,6 @@
         };
 
         const Icon = ({ name, size = 24, className, ...props }) => {
-            if (typeof lucide !== 'undefined' && lucide.icons) {
-                const keys = Object.keys(lucide.icons);
-                const key = keys.find(k => k.toLowerCase() === name.toLowerCase());
-                if (key) {
-                    const iconData = lucide.icons[key];
-                    if (Array.isArray(iconData)) {
-                        const [tag, attrs, children] = iconData;
-                        return React.createElement(tag, { ...attrs, width: size, height: size, className, ...props, stroke: props.color || "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }, 
-                            children.map(([childTag, childAttrs], i) => React.createElement(childTag, { ...childAttrs, key: i }))
-                        );
-                    }
-                }
-            }
             const fallbackContent = SVG_PATHS[name];
             if (fallbackContent) {
                 return (
@@ -279,7 +229,7 @@
         });
 
         // ==========================================
-        // 4. SOUS-COMPOSANTS (DÉFINIS AVANT USAGE)
+        // 4. SOUS-COMPOSANTS
         // ==========================================
         const ClockDisplay = () => {
             const [time, setTime] = useState(new Date());
@@ -398,7 +348,7 @@
                             {unit.status === 'mission_rtb_request' && (
                                 <div className="text-center">
                                     {isSL ? (
-                                        <button onClick={onValidateRTB} className="w-full py-1 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 flex items-center justify-center gap-1 animate-pulse rounded">{Check && <Check size={12}/>} AUTORISER RETOUR</button>
+                                        <button onClick={onValidateRTB} className="w-full py-1 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 flex items-center justify-center gap-1 animate-pulse rounded">{Check && <Check size={12}/>} VALIDER</button>
                                     ) : (
                                         <span className="text-[10px] text-blue-400 font-bold border border-blue-900/50 px-2 py-1 bg-blue-900/10 animate-pulse rounded">ATTENTE SL</span>
                                     )}
@@ -757,7 +707,7 @@
                         <div className="flex items-center gap-4">
                             <div className="p-1.5 rounded">{Activity && <Activity size={24} className="text-green-500 animate-pulse"/>}</div>
                             <div>
-                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V11.5</span></h1>
+                                <h1 className="font-black text-lg md:text-2xl tracking-[0.2em] text-green-500 leading-none">LOGI-OPS <span className="text-xs align-top text-green-700">V11.6</span></h1>
                                 <div className="flex items-center gap-3 text-[10px] md:text-xs font-bold text-green-700 mt-0.5">
                                     <span className={`flex items-center gap-1 ${isSlActive ? "text-green-400" : "text-red-500 animate-pulse"}`}><div className={`w-2 h-2 rounded-full ${isSlActive ? "bg-green-500" : "bg-red-500"}`}></div>SL: {slName || "N/A"}</span>
                                     <span className="border-l border-green-900 pl-3">SQD: {squad.length}</span>
@@ -1044,13 +994,25 @@
                     {/* OTHER MODALS (Mission, Destroy, etc.) same as before */}
                     {actionModal?.type === 'mission' && (
                         <Modal title="ORDRE DE MISSION" color="blue" onClose={()=>setActionModal(null)} Icon={XCircle}>
-                            <div className="mb-6">
-                                <label className="text-[10px] font-bold text-blue-800 block mb-1">CHEF DE BORD</label>
-                                <select value={selectedMemberId} onChange={(e) => setSelectedMemberId(e.target.value)} className="w-full bg-blue-900/10 border border-blue-800 p-3 text-blue-300 text-sm font-bold outline-none"><option value="">-- SÉLECTIONNER --</option>{slName&&<option value="SL">SL - {slName}</option>}{squad.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select>
+                            <div className="mb-6 space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">CHEF DE BORD</label>
+                                    <select value={selectedMemberId} onChange={(e) => setSelectedMemberId(e.target.value)} className="w-full bg-blue-900/10 border border-blue-800 p-3 text-blue-300 text-sm font-bold outline-none"><option value="">-- SÉLECTIONNER --</option>{slName&&<option value="SL">SL - {slName}</option>}{squad.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select>
+                                </div>
+                                {/* NEW: MISSION OBJECTIVE SELECTOR */}
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-800 block mb-1">OBJECTIF / TYPE DE MISSION</label>
+                                    <select value={selectedMissionType} onChange={(e) => setSelectedMissionType(e.target.value)} className="w-full bg-blue-900/10 border border-blue-800 p-3 text-blue-300 text-sm font-bold outline-none">
+                                        <option value="">-- SÉLECTIONNER TYPE --</option>
+                                        {MISSION_TYPES[actionModal.unit.cat] && MISSION_TYPES[actionModal.unit.cat].map(mission => (
+                                            <option key={mission} value={mission}>{mission}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <button onClick={() => setActionModal(null)} className="py-3 border border-blue-900 text-blue-500 font-bold text-xs">ANNULER</button>
-                                <button onClick={confirmMission} disabled={!selectedMemberId} className="py-3 bg-blue-600 text-black font-black text-xs hover:bg-blue-500">DÉPART</button>
+                                <button onClick={confirmMission} disabled={!selectedMemberId || !selectedMissionType} className="py-3 bg-blue-600 text-black font-black text-xs hover:bg-blue-500 disabled:opacity-50">DÉPART</button>
                             </div>
                         </Modal>
                     )}
