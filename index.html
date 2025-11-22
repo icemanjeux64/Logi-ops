@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V12.2 (TACTICAL)</title>
+    <title>LOGI-OPS V12.3 (TRACKING)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -373,7 +373,7 @@
                                         <div className="text-center space-y-2">
                                             <div className="text-[9px] text-blue-300 font-mono animate-pulse">RETOUR BASE EN COURS</div>
                                             {isMyUnit && (
-                                                <button onClick={onConfirmArrival} className="w-full py-1.5 bg-green-900/30 border border-green-600 text-green-400 font-black text-[10px] hover:bg-green-900/50 rounded flex items-center justify-center gap-1">{CheckSquare && <CheckSquare size={12}/>} ARRIVÉE BASE</button>
+                                                <button onClick={onConfirmArrival} className="w-full py-1.5 bg-green-900/30 border border-green-600 text-green-400 font-black text-[10px] hover:bg-green-900/50 rounded flex items-center justify-center gap-1">{Check && <CheckSquare size={12}/>} ARRIVÉE BASE</button>
                                             )}
                                         </div>
                                     )}
@@ -471,7 +471,6 @@
         // 5. APPLICATION PRINCIPALE
         // ==========================================
         function LogiOpsV9() {
-            // ... (States and Logic)
             const [userRole, setUserRole] = useState(null); 
             const [userIdentity, setUserIdentity] = useState(null); 
             const [activeTab, setActiveTab] = useState('dashboard'); 
@@ -516,13 +515,9 @@
             const [showReminderModal, setShowReminderModal] = useState(false);
             const [showShiftCheckModal, setShowShiftCheckModal] = useState(false);
             const [notification, setNotification] = useState(null);
-            
             const [incomingSitrep, setIncomingSitrep] = useState(null); 
             const [sitrepData, setSitrepData] = useState({ location: '', status: 'green', message: '' });
             
-            // Ancienne ref missions
-            const [newMissionData, setNewMissionData] = useState({ title: '', type: 'COMBAT', vehicles: [], personnel: [] });
-
             const canEdit = userRole === 'SL';
 
             // --- LOGIQUE TACTIQUE (New in V12) ---
@@ -1152,6 +1147,22 @@
                         <NavButton icon={Users} label="SQUAD" active={activeTab==='squad'} onClick={()=>setActiveTab('squad')} />
                         <NavButton icon={ScrollText} label="JMO" active={activeTab==='journal'} onClick={()=>canEdit&&setActiveTab('journal')} disabled={!canEdit} />
                     </nav>
+
+                    {/* MODAL: REMINDER (30 MIN) */}
+                    {showReminderModal && (
+                        <Modal title="RAPPEL SITUATION" color="orange" onClose={()=>setShowReminderModal(false)} Icon={AlertOctagon}>
+                            <div className="text-center space-y-4 animate-alert p-4 border border-orange-500/50 bg-orange-900/10 mb-4 rounded">
+                                <h3 className="text-lg font-black text-orange-500">POINT SITUATION (30 MIN)</h3>
+                                <p className="text-xs text-orange-200">IL EST TEMPS DE VÉRIFIER :</p>
+                                <ul className="text-xs font-bold text-left list-disc pl-8 space-y-2 text-orange-400">
+                                    <li>ÉTAT DU PARC VÉHICULES</li>
+                                    <li>NIVEAU DU SUPPLY</li>
+                                    <li>POSITION DES EFFECTIFS</li>
+                                </ul>
+                            </div>
+                            <button onClick={()=>setShowReminderModal(false)} className="w-full py-3 bg-orange-600 text-black font-black text-xs hover:bg-orange-500">REÇU</button>
+                        </Modal>
+                    )}
 
                     {/* MODAL: SHIFT START CHECK */}
                     {showShiftCheckModal && (
