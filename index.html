@@ -53,6 +53,7 @@
         let USE_FIREBASE = false;
         let IS_CUSTOM_DB = false;
         
+        // Initialisation Sécurisée
         try {
             if (!firebase.apps.length) {
                 const app = firebase.initializeApp(firebaseConfig);
@@ -63,7 +64,7 @@
             IS_CUSTOM_DB = true;
             console.log("Firebase connecté à :", firebaseConfig.projectId);
         } catch (e) {
-            console.warn("Erreur Initialisation Firebase:", e);
+            console.warn("Erreur Initialisation Firebase (Mode Local forcé):", e);
             USE_FIREBASE = false;
         }
 
@@ -77,14 +78,15 @@
 
         const StorageService = {
             save: (data) => {
+                // Sauvegarde Cloud si connecté
                 if (USE_FIREBASE && db && firebase.auth().currentUser) {
                     getRef().set(data, { merge: true }).catch(err => console.warn("Erreur sauvegarde Cloud:", err));
-                } else {
-                    try {
-                        const existing = JSON.parse(localStorage.getItem('logiops_v18') || '{}');
-                        localStorage.setItem('logiops_v18', JSON.stringify({ ...existing, ...data }));
-                    } catch (e) { console.warn(e); }
-                }
+                } 
+                // Sauvegarde LocalStorage (Toujours, par sécurité)
+                try {
+                    const existing = JSON.parse(localStorage.getItem('logiops_v18') || '{}');
+                    localStorage.setItem('logiops_v18', JSON.stringify({ ...existing, ...data }));
+                } catch (e) { console.warn(e); }
             },
             loadInitial: async (callback) => {
                 let useLocal = true;
@@ -95,18 +97,20 @@
                         if (!auth.currentUser) {
                             await auth.signInAnonymously();
                         }
-                        // Si on arrive ici, l'auth est OK
+                        // Si auth réussie, on tente le cloud
                         useLocal = false;
                         return getRef().onSnapshot((doc) => {
                             if (doc.exists) callback(doc.data());
                             else callback(null);
                         }, err => {
                             console.error("Erreur Lecture Cloud (Basculement Local):", err);
+                            // Fallback immédiat
                             const local = localStorage.getItem('logiops_v18');
                             if (local) callback(JSON.parse(local));
                         });
                     } catch (e) {
-                        console.warn("⚠️ Échec Auth Firebase (Erreur 400 = Auth Anonyme désactivée dans console). Passage en MODE LOCAL.", e);
+                        console.warn("⚠️ Échec Auth Firebase (Erreur 400 = Auth Anonyme non activée). Passage en MODE LOCAL.", e);
+                        // useLocal reste à true, on continue en bas
                     }
                 }
 
@@ -133,9 +137,9 @@
                     unsubscribe = await StorageService.loadInitial((newData) => {
                         if(newData) {
                             setData(prev => ({...prev, ...newData}));
-                            // Si on a des données et que Firebase est init, on suppose connecté, 
-                            // mais la vraie vérité est dans firebase.auth().currentUser
+                            // Vérification réelle de la connexion
                             if (USE_FIREBASE && firebase.auth().currentUser) setIsConnected(true);
+                            else setIsConnected(false);
                         }
                     });
                 };
@@ -581,7 +585,7 @@
                     <header className="h-14 border-b border-green-900 bg-black flex items-center justify-between px-4 z-20 shrink-0">
                         <div className="flex items-center gap-3">
                             <button onClick={()=>setMenuOpen(!menuOpen)} className="md:hidden text-green-500"><Icon name="List" size={24}/></button>
-                            <div className="font-black text-lg text-white tracking-widest">LOGI-OPS <span className="text-xs text-green-600 align-top">V18.5</span></div>
+                            <div className="font-black text-lg text-white tracking-widest">LOGI-OPS <span className="text-xs text-green-600 align-top">V18.7</span></div>
                             <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} title={isConnected ? "Connecté Cloud" : "Mode Local"}></div>
                         </div>
                         <button onClick={()=>setShowSupply(true)} className="text-right"><div className="text-[8px] text-green-600 font-bold uppercase">LOGISTIQUE GLOBALE</div><div className="text-xl font-mono text-white font-bold cursor-pointer hover:text-green-400">{totalSupply.toLocaleString()}</div></button>
