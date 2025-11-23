@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V18.7 (FULL SPECTRUM)</title>
+    <title>LOGI-OPS V18.8 (ROBUST)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -77,7 +77,7 @@
 
         const StorageService = {
             save: (data) => {
-                if (USE_FIREBASE && db) {
+                if (USE_FIREBASE && db && firebase.auth().currentUser) {
                     getRef().set(data, { merge: true }).catch(err => console.warn("Erreur sauvegarde Cloud:", err));
                 } else {
                     try {
@@ -87,21 +87,30 @@
                 }
             },
             loadInitial: async (callback) => {
+                let useLocal = true;
+
                 if (USE_FIREBASE && db) {
                     const auth = firebase.auth();
-                    if (!auth.currentUser) {
-                        try { await auth.signInAnonymously(); } 
-                        catch (e) { console.warn("Auth Anonyme ignorée", e); }
+                    try {
+                        if (!auth.currentUser) {
+                            await auth.signInAnonymously();
+                        }
+                        // Si on arrive ici, l'auth est OK
+                        useLocal = false;
+                        return getRef().onSnapshot((doc) => {
+                            if (doc.exists) callback(doc.data());
+                            else callback(null);
+                        }, err => {
+                            console.error("Erreur Lecture Cloud (Basculement Local):", err);
+                            const local = localStorage.getItem('logiops_v18');
+                            if (local) callback(JSON.parse(local));
+                        });
+                    } catch (e) {
+                        console.warn("⚠️ Échec Auth Firebase (Erreur 400 = Auth Anonyme désactivée dans console). Passage en MODE LOCAL.", e);
                     }
-                    return getRef().onSnapshot((doc) => {
-                        if (doc.exists) callback(doc.data());
-                        else callback(null);
-                    }, err => {
-                        console.error("Erreur Lecture:", err);
-                        const local = localStorage.getItem('logiops_v18');
-                        if (local) callback(JSON.parse(local));
-                    });
-                } else {
+                }
+
+                if (useLocal) {
                     const local = localStorage.getItem('logiops_v18');
                     if (local) callback(JSON.parse(local)); else callback(null);
                     return () => {};
@@ -124,7 +133,9 @@
                     unsubscribe = await StorageService.loadInitial((newData) => {
                         if(newData) {
                             setData(prev => ({...prev, ...newData}));
-                            setIsConnected(true);
+                            // Si on a des données et que Firebase est init, on suppose connecté, 
+                            // mais la vraie vérité est dans firebase.auth().currentUser
+                            if (USE_FIREBASE && firebase.auth().currentUser) setIsConnected(true);
                         }
                     });
                 };
