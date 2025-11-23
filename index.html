@@ -48,7 +48,7 @@
         let userPseudo = null;
         let userGrade = null;
         let currentUserId = null;
-        let lastNotificationTime = 0; 
+        let lastNotificationTime = Date.now(); // Initialize to NOW to prevent old alerts on fresh load
         let slSessionActive = false;
         
         // Filtering
@@ -77,9 +77,9 @@
         
         const getMillis = (d) => d && d.toMillis ? d.toMillis() : (new Date(d).getTime() || 0);
         const safeSetText = (id, text) => { 
-            const els = document.querySelectorAll(`.${id}`); // Class update for duplicates (mobile/desktop)
+            const els = document.querySelectorAll(`.${id}`); 
             els.forEach(el => el.innerText = text);
-            const el = document.getElementById(id); // ID update fallback
+            const el = document.getElementById(id);
             if(el) el.innerText = text; 
         };
 
@@ -147,7 +147,6 @@
                             localStorage.removeItem('logiops_uid');
                             location.reload();
                         }
-                        // Auto-update local role
                         if(d.role && d.role !== userRole) {
                             userRole = d.role;
                             loadInterface();
@@ -164,6 +163,10 @@
                 if(docSnap.exists() && docSnap.data().isOnline) {
                     const d = docSnap.data();
                     userRole = d.role; userPseudo = d.pseudo; userGrade = d.grade;
+                    
+                    // FIX: Set lastNotificationTime to NOW to ignore past alerts on restore
+                    lastNotificationTime = Date.now();
+                    
                     checkAppState();
                 } else {
                     localStorage.removeItem('logiops_uid');
@@ -215,11 +218,9 @@
             setupDepotsListener();
             setupPresenceListener();
             
-            // Only setup request listeners if SL
             if(userRole === 'SL') {
                 setupSLRequestListeners();
             }
-            // Everyone listens to mission transfers (as potential target)
             setupMissionTargetListener();
 
             if (userRole) loadInterface();
@@ -263,7 +264,6 @@
         // --- REQUESTS SYSTEM (SL SIDE) ---
         
         function setupSLRequestListeners() {
-            // 1. RTB Requests
             listeners.push(onSnapshot(query(publicPath('users'), where('rtbStatus', '==', 'REQUESTED')), (snap) => {
                 snap.forEach(doc => {
                     addPendingRequest({
@@ -277,7 +277,6 @@
                 updateRequestsUI();
             }));
 
-            // 2. Mission Leadership Requests (WAITING_SL)
             listeners.push(onSnapshot(query(publicPath('missions'), where('transferRequest.state', '==', 'WAITING_SL')), (snap) => {
                 snap.forEach(doc => {
                     const req = doc.data().transferRequest;
@@ -294,7 +293,6 @@
         }
 
         function addPendingRequest(req) {
-            // Avoid duplicates
             if(!pendingRequests.find(r => r.id === req.id)) {
                 pendingRequests.push(req);
             }
@@ -357,15 +355,13 @@
                     });
                     addLog(`SL a validé ${req.data.targetName} comme Chef de Mission.`, 'CMD');
                 } else {
-                    await updateDoc(publicDoc('missions', req.data.mId), { transferRequest: null }); // Cancel request
+                    await updateDoc(publicDoc('missions', req.data.mId), { transferRequest: null });
                 }
             }
 
-            // Remove from queue
             pendingRequests.splice(index, 1);
             updateRequestsUI();
             
-            // Refresh modal if open
             const m = document.getElementById('requests-modal');
             if(!m.classList.contains('hidden')) openRequestsModal();
         };
@@ -408,15 +404,14 @@
             }
         };
 
-        // ... (Helper Functions: Supply, Login, etc.) ...
         async function consumeGlobalSupply(amount) { const snap = await getDocs(publicPath('depots')); let targetDoc = null; snap.forEach(d => { if(d.data().amount >= amount && !targetDoc) targetDoc = d; }); if(!targetDoc) return false; await updateDoc(targetDoc.ref, { amount: targetDoc.data().amount - amount }); return true; }
         async function refundGlobalSupply(amount) { const snap = await getDocs(publicPath('depots')); if(snap.empty) return; const targetDoc = snap.docs[0]; await updateDoc(targetDoc.ref, { amount: targetDoc.data().amount + amount }); }
-        
+        async function addLog(message, type = 'INFO', isPriority = false) { if (!currentUserId) return; await addDoc(publicPath('logs'), { message, type, timestamp: serverTimestamp() }); await addDoc(publicPath('notifications'), { message, type, timestamp: serverTimestamp(), read: false, isPriority, senderName: `${userGrade} ${userPseudo}` }); }
+
         // UI Setup
         function loadInterface() {
             document.getElementById('main-interface').classList.remove('hidden');
             
-            // Populate Profile in Sidebar (Mobile view mostly)
             document.getElementById('profile-card').innerHTML = `
                 <div class="text-xs text-gray-500 mb-1">IDENTITÉ</div>
                 <div class="font-bold text-lg text-white">${userGrade} ${userPseudo}</div>
@@ -427,7 +422,6 @@
             setupVehiclesListener();
             setupMissionsListener();
 
-            // Controls Visibility
             const slDiv = document.getElementById('sl-controls');
             const logDiv = document.getElementById('log-controls');
             const btnLeavePost = document.getElementById('btn-leave-post');
@@ -440,7 +434,7 @@
                 btnLeavePost.classList.remove('hidden');
                 btnEndService.classList.remove('hidden');
                 if(btnCreateVeh) btnCreateVeh.classList.remove('hidden');
-                setupSLRequestListeners(); // Ensure listener is active
+                setupSLRequestListeners(); 
             } else {
                 slDiv.classList.add('hidden');
                 logDiv.classList.remove('hidden');
@@ -468,7 +462,6 @@
                     if(d.status === 'DESTROYED') stats.destroyed++;
                 });
 
-                // Update Stats UI (Multiple locations for Mobile/Desktop)
                 safeSetText('count-total', stats.total);
                 safeSetText('count-ops', stats.ops);
                 safeSetText('count-mission', stats.mission);
@@ -479,7 +472,7 @@
             }));
         }
 
-        // Standard functions re-injected
+        // Standard functions
         window.selectLoginMode = (mode) => {
             if(mode === 'SL') { document.getElementById('btn-login-log').classList.add('hidden'); document.getElementById('login-sl-form').classList.remove('hidden'); }
             else { document.getElementById('btn-login-sl').classList.add('hidden'); document.getElementById('login-log-form').classList.remove('hidden'); showLogLogin(); }
@@ -494,6 +487,7 @@
             await setDoc(publicDoc('settings', 'global'), { slSessionId: currentUserId, slName: `${g} ${p}`, serviceStatus: 'ACTIVE' }, {merge:true});
             await setDoc(publicDoc('users', currentUserId), { pseudo: p, grade: g, role: 'SL', isOnline: true });
             userRole = 'SL'; userPseudo = p; userGrade = g; localStorage.setItem('logiops_uid', currentUserId);
+            lastNotificationTime = Date.now();
             document.getElementById('auth-screen').classList.add('hidden'); loadInterface();
         };
         window.showLogLogin = () => {
@@ -504,7 +498,7 @@
                     const d = doc.data();
                     const btn = document.createElement('button');
                     btn.className = "w-full text-left border border-green-900 bg-black/40 p-4 mb-2 rounded flex justify-between items-center touch-manipulation hover:bg-green-900/20";
-                    btn.innerHTML = `<span class="font-bold text-green-400">${d.grade} ${d.pseudo}</span>`;
+                    btn.innerHTML = `<span class="font-bold text-green-400">${d.grade} ${d.pseudo}</span><i class="fas fa-fingerprint text-green-700"></i>`;
                     btn.onclick = () => loginLOG(doc.id, d.pseudo, d.grade);
                     list.appendChild(btn);
                 });
@@ -513,6 +507,7 @@
         window.loginLOG = async (rid, p, g) => {
             await setDoc(publicDoc('users', currentUserId), { pseudo: p, grade: g, role: 'LOG', rosterId: rid, isOnline: true, rtbStatus: 'NONE' });
             userRole = 'LOG'; userPseudo = p; userGrade = g; localStorage.setItem('logiops_uid', currentUserId);
+            lastNotificationTime = Date.now();
             document.getElementById('auth-screen').classList.add('hidden'); loadInterface();
         };
         window.leaveSLPost = () => {
@@ -584,8 +579,6 @@
         window.logoutSelf = async () => { hudConfirm("DÉCONNEXION", "Quitter ?", async () => { await updateDoc(publicDoc('users', currentUserId), { isOnline: false }); localStorage.removeItem('logiops_uid'); location.reload(); }); };
         window.endServiceGlobal = () => { hudConfirm("FIN SERVICE GLOBAL", "Déconnexion de TOUS ?", async () => { await updateDoc(publicDoc('settings', 'global'), { serviceStatus: 'ENDED' }); addLog("FIN DE SERVICE", "CMD", true); }); };
         window.unitCitrep = (n) => hudPrompt(`CITREP ${n}`, "Message :", (msg) => addLog(`[CITREP ${n}] ${msg}`, 'RADIO', true)); window.unitRtb = (n) => addLog(`ORDRE RTB POUR ${n}`, 'CMD', true); window.sendCitrep = (m) => hudPrompt(`CITREP MISSION`, "Message global :", (msg) => addLog(`[CITREP GLOBAL] ${msg}`, 'MISSION', true)); window.requestRTB = (m) => addLog(`ORDRE RTB GLOBAL MISSION ${m}`, 'MISSION', true);
-        // Re-add missions listeners and other minor utility functions to ensure completeness (openMissionModal, confirmMission, setupMissionsListener, openMissionDetails, requestLeadership, initiateTransfer, endMission)
-        // For brevity in this block, assumed present as they were in previous turn. Re-inserting key ones:
         window.openMissionModal = async () => { document.getElementById('mission-modal').classList.remove('hidden'); const list = document.getElementById('mission-vehicle-list'); list.innerHTML = '...'; const snap = await getDocs(publicPath('vehicles')); list.innerHTML = ''; let c = 0; snap.forEach(doc => { const d = doc.data(); if(d.status === 'OPS' && !d.missionId) { c++; const l = document.createElement('label'); l.className = "flex items-center gap-3 p-3 bg-black/40 border border-green-900/50 rounded cursor-pointer"; l.innerHTML = `<input type="checkbox" class="accent-green-500 w-5 h-5 m-chk" value="${doc.id}"><div class="text-sm font-bold text-green-400">${d.name} <span class="text-xs text-gray-500">(${d.category})</span></div>`; list.appendChild(l); } }); if(c===0) list.innerHTML = '<div class="text-center text-gray-500 py-4">Aucun véhicule OPS.</div>'; };
         window.confirmMission = async () => { const name = document.getElementById('mission-name').value; if(!name) return; const chks = document.querySelectorAll('.m-chk:checked'); const vIds = Array.from(chks).map(c => c.value); const mRef = await addDoc(publicPath('missions'), { name, status: 'ACTIVE', leaderId: null, leaderName: null, createdAt: serverTimestamp(), vehicleCount: vIds.length }); const batch = writeBatch(db); vIds.forEach(id => batch.update(publicDoc('vehicles', id), { status: 'MISSION', missionId: mRef.id })); await batch.commit(); addLog(`Mission lancée : ${name}`, 'MISSION'); document.getElementById('mission-modal').classList.add('hidden'); };
         window.setupMissionsListener = () => { const container = document.getElementById('mission-list'); onSnapshot(publicPath('missions'), (snap) => { container.innerHTML = ''; let docs = snap.docs.map(d => ({id: d.id, ...d.data()})); docs.sort((a, b) => getMillis(b.createdAt) - getMillis(a.createdAt)); docs.forEach(data => { if(data.status === 'ARCHIVED' || data.status === 'CANCELLED') return; const el = document.createElement('div'); el.className = "border border-green-500/50 p-3 mb-2 bg-green-900/10 rounded cursor-pointer hover:bg-green-900/30"; el.onclick = () => openMissionDetails(data.id); const leaderDisplay = data.leaderName ? `<div class="text-[10px] text-green-400 font-bold"><i class="fas fa-crown text-yellow-500 mr-1"></i>${data.leaderName}</div>` : `<div class="text-[10px] text-gray-500 italic">CHEF: AUCUN</div>`; const vehDisplay = data.vehicleCount ? `<span class="text-[9px] bg-gray-800 px-1 rounded text-gray-300 ml-2"><i class="fas fa-car"></i> ${data.vehicleCount}</span>` : ''; el.innerHTML = `<div class="flex justify-between items-start mb-1 pointer-events-none"><div><h3 class="font-bold text-green-400 truncate pr-2">${data.name}</h3>${leaderDisplay}</div><div class="flex items-center"><span class="text-[9px] bg-green-900 text-green-200 px-1 rounded flex-shrink-0">ACTIF</span>${vehDisplay}</div></div>`; container.appendChild(el); }); }); }
@@ -593,7 +586,6 @@
         window.requestLeadership = (mId) => { hudConfirm("COMMANDEMENT", "Voulez-vous prendre le commandement de cette mission ?", async () => { await updateDoc(publicDoc('missions', mId), { transferRequest: { targetId: currentUserId, targetName: `${userGrade} ${userPseudo}`, state: 'WAITING_SL' } }); hudAlert("ENVOYÉ", "Demande transmise au Squad Leader."); }); };
         window.initiateTransfer = async (mId) => { const modal = document.getElementById('transfer-select-modal'); const list = document.getElementById('transfer-list'); modal.classList.remove('hidden'); list.innerHTML = 'Chargement...'; const snap = await getDocs(query(publicPath('users'), where('isOnline', '==', true))); list.innerHTML = ''; snap.forEach(doc => { const d = doc.data(); if (doc.id !== currentUserId) { const btn = document.createElement('button'); btn.className = "w-full text-left p-3 bg-black/60 border border-green-900 hover:bg-green-900/30 mb-1 text-green-400 font-bold"; btn.innerText = `${d.grade} ${d.pseudo}`; btn.onclick = async () => { modal.classList.add('hidden'); await updateDoc(publicDoc('missions', mId), { transferRequest: { targetId: doc.id, targetName: `${d.grade} ${d.pseudo}`, state: 'WAITING_TARGET' } }); hudAlert("OFFRE ENVOYÉE", `Proposition de commandement envoyée à ${d.pseudo}.`); }; list.appendChild(btn); } }); };
         window.endMission = (mId, status) => { hudConfirm("FIN DE MISSION", "Confirmer la clôture ? Les véhicules repasseront OPS.", async () => { const batch = writeBatch(db); batch.update(publicDoc('missions', mId), { status: status === 'COMPLETED' ? 'ARCHIVED' : 'CANCELLED' }); const vSnap = await getDocs(query(publicPath('vehicles'), where('missionId', '==', mId))); vSnap.forEach(v => batch.update(v.ref, { status: 'OPS', missionId: null })); await batch.commit(); document.getElementById('mission-details-modal').classList.add('hidden'); }); };
-        // Other modals opening functions
         window.openRosterModal = () => { const m = document.getElementById('roster-modal'); m.classList.remove('hidden'); const list = document.getElementById('sl-roster-list'); onSnapshot(publicPath('roster'), async (snapRoster) => { const usersSnap = await getDocs(publicPath('users')); const usersMap = {}; usersSnap.forEach(u => usersMap[u.data().rosterId] = { id: u.id, ...u.data() }); list.innerHTML = ''; snapRoster.forEach(doc => { const d = doc.data(); const activeUser = usersMap[doc.id]; const isOnline = activeUser && activeUser.isOnline; const div = document.createElement('div'); div.className = "flex justify-between items-center bg-black/40 p-2 rounded mb-1 border border-green-900/30"; let actionBtn = ''; if(isOnline) { actionBtn = `<button onclick="kickUser('${activeUser.id}', '${d.pseudo}')" class="text-xs bg-red-900/50 text-red-400 border border-red-900 px-2 py-1 rounded">EXCLURE</button>`; } else { actionBtn = `<button onclick="deleteRosterEntry('${doc.id}')" class="text-gray-500 hover:text-red-500"><i class="fas fa-trash"></i></button>`; } div.innerHTML = `<div><span class="font-bold ${isOnline ? 'text-green-400' : 'text-gray-500'}">${d.grade} ${d.pseudo}</span>${isOnline ? '<span class="ml-2 text-[9px] bg-green-900 text-green-200 px-1 rounded">EN LIGNE</span>' : ''}</div><div>${actionBtn}</div>`; list.appendChild(div); }); }); };
         window.kickUser = (uid, name) => { hudConfirm("EXCLURE", `Forcer la déconnexion de ${name} ?`, async () => { await updateDoc(publicDoc('users', uid), { rtbStatus: 'KICKED', isOnline: false }); addLog(`${name} a été exclu par le Commandement.`, 'ADMIN', true); }); };
         window.deleteRosterEntry = (rid) => { hudConfirm("SUPPRIMER", "Retirer du registre ?", async () => await deleteDoc(publicDoc('roster', rid))); };
@@ -732,6 +724,7 @@
 
                         <button onclick="openMissionModal()" class="btn-tac py-3 text-xs font-bold rounded">CRÉER MISSION</button>
                         <button onclick="openRosterModal()" class="btn-tac py-3 text-xs font-bold rounded">GESTION LOGS</button>
+                        <button onclick="toggleModal('garage-modal')" class="btn-tac py-3 text-xs font-bold rounded md:hidden">GARAGE</button>
                         <button id="btn-leave-post" onclick="leaveSLPost()" class="btn-tac border-red-500 text-red-500 py-2 text-xs font-bold rounded mt-2">QUITTER POSTE</button>
                         <button id="btn-end-service" onclick="endServiceGlobal()" class="btn-tac bg-red-900/20 border-red-500 text-red-500 py-2 text-xs font-bold rounded">FIN SERVICE GLOBAL</button>
                     </div>
