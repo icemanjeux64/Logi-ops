@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V16.5 (COMMANDER + SQUAD)</title>
+    <title>LOGI-OPS V17 (HIERARCHY & PROTOCOL)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -15,10 +15,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Lucide Icons (Backup) -->
-    <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
-
-    <!-- FIREBASE (Compat) -->
+    <!-- Firebase (Compat) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -30,17 +27,18 @@
         ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #14532d; }
         ::-webkit-scrollbar-thumb { background: #14532d; border: 1px solid #000; }
         ::-webkit-scrollbar-thumb:hover { background: #22c55e; }
-        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
         .login-scan { background: linear-gradient(to bottom, transparent 50%, rgba(0, 255, 0, 0.02) 51%, transparent 51%); background-size: 100% 4px; animation: scan 2s linear infinite; }
         @keyframes scan { 0% { background-position: 0 0; } 100% { background-position: 0 100%; } }
         .grid-pattern { background-image: linear-gradient(rgba(0, 255, 0, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 255, 0, 0.05) 1px, transparent 1px); background-size: 20px 20px; }
+        .blink { animation: blinker 1s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useMemo, useEffect } = React;
+        const { useState, useEffect, useMemo } = React;
 
         // --- CONFIGURATION FIREBASE & STOCKAGE ---
         const firebaseConfig = {
@@ -79,709 +77,661 @@
             USE_FIREBASE = false;
         }
 
-        const SESSION_ID = typeof __app_id !== 'undefined' ? __app_id : "operation_actuelle";
-        const LOCAL_STORAGE_KEY = "logiops_data_v16_cmd";
-
-        const getCollectionRef = () => {
-            if (typeof __app_id !== 'undefined') {
-                return db.collection('artifacts').doc(__app_id).collection('public').doc('data').collection('logiops').doc('global');
-            }
-            return db.collection('logiops').doc(SESSION_ID);
-        };
-
-        const StorageService = {
-            save: (data) => {
-                if (USE_FIREBASE && db) {
-                    const auth = firebase.auth();
-                    if (!auth.currentUser) auth.signInAnonymously().catch(e => console.warn("Auth error", e));
-                    getCollectionRef().set(data, { merge: true }).catch(err => console.warn(err));
-                } else {
-                    try {
-                        const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
-                        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...existing, ...data }));
-                    } catch (e) { console.warn(e); }
-                }
-            },
-            loadLocal: () => {
-                try {
-                    const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-                    return local ? JSON.parse(local) : null;
-                } catch (e) { return null; }
-            },
-            loadInitial: async (callback) => {
-                if (USE_FIREBASE && db) {
-                    const auth = firebase.auth();
-                    if (!auth.currentUser) {
-                        try {
-                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                                await auth.signInWithCustomToken(__initial_auth_token);
-                            } else {
-                                await auth.signInAnonymously();
-                            }
-                        } catch (e) { console.warn("Auth failed", e); }
-                    }
-                    return getCollectionRef().onSnapshot((doc) => {
-                        if (doc.exists) callback(doc.data()); else callback(null);
-                    }, err => {
-                        console.warn("Firestore error, falling back to local", err);
-                        const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-                        if (local) callback(JSON.parse(local));
-                    });
-                } else {
-                    const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-                    if (local) callback(JSON.parse(local)); else callback(null);
-                    return () => {};
-                }
-            }
-        };
-
-        // --- DONNÉES ---
-        const INITIAL_CATALOG = [
-            { id: 'l1', cat: 'LOGI', name: 'JEEP EM', type: 'TRANSPORT EM', cost: 110, stock: 3, cap: 2 },
-            { id: 'l2', cat: 'LOGI', name: 'CAMION RÉPA.', type: 'MAINTENANCE', cost: 175, stock: 2, cap: 6 },
-            { id: 'l4', cat: 'LOGI', name: 'CAMION CITERNE', type: 'RAVITAILLEMENT', cost: 160, stock: 2, cap: 0 },
-            { id: 'l5', cat: 'LOGI', name: 'CAMION ARSENAL', type: 'RAVITAILLEMENT', cost: 380, stock: 2, cap: 10 },
-            { id: 't1', cat: 'TRANS', name: 'CAMION TROUPES', type: 'TRANSPORT', cost: 200, stock: 4, cap: 4 },
-            { id: 'b1', cat: 'BLINDE', name: 'JLTV M1280', type: 'LÉGER', cost: 650, stock: 2, cap: 2 },
-            { id: 'c1', cat: 'VCI', name: 'STRYKER M1126', type: 'COMBAT', cost: 2000, stock: 2, cap: 3 },
-            { id: 's1', cat: 'SANTE', name: 'STRYKER EVASAN', type: 'SANITAIRE', cost: 975, stock: 1, cap: 4 },
-            { id: 'h1', cat: 'CHAR', name: 'LECLERC', type: 'CHAR', cost: 8000, stock: 1, cap: 0 },
-            { id: 'a1', cat: 'AIR', name: 'NH90 CAÏMAN', type: 'TRANSPORT AIR', cost: 3000, stock: 1, cap: 8 },
+        // --- RANGS & HIÉRARCHIE (Ordre croissant pour les permissions) ---
+        const RANKS = [
+            { id: 0, label: 'Recrue', short: 'REC', color: 'text-gray-500' },
+            { id: 1, label: 'Soldat', short: 'SDT', color: 'text-green-700' }, // 2CL equiv
+            { id: 2, label: '1ere Classe', short: '1CL', color: 'text-red-700' },
+            { id: 3, label: 'Caporal', short: 'CPL', color: 'text-red-600' },
+            { id: 4, label: 'Caporal-Chef', short: 'CCH', color: 'text-yellow-600' },
+            { id: 5, label: 'Caporal-Chef 1CL', short: 'CCH1', color: 'text-yellow-500' },
+            { id: 6, label: 'Sergent', short: 'SGT', color: 'text-yellow-400' },
+            { id: 7, label: 'Sergent-Chef', short: 'SCH', color: 'text-yellow-300' },
+            { id: 8, label: 'Sergent-Chef BM2', short: 'SCH2', color: 'text-yellow-200' },
+            { id: 9, label: 'Adjudant', short: 'ADJ', color: 'text-white border-t border-red-500' },
+            { id: 10, label: 'Adjudant Chef', short: 'ADC', color: 'text-white border-t border-yellow-500' },
+            { id: 11, label: 'Major', short: 'MAJ', color: 'text-white border-b border-yellow-500' },
+            { id: 12, label: 'Modérateur', short: 'MOD', color: 'text-red-500 font-bold' },
+            { id: 13, label: 'Sous-Lieutenant', short: 'SLT', color: 'text-yellow-100' },
+            { id: 14, label: 'Lieutenant', short: 'LNT', color: 'text-yellow-100' },
+            { id: 15, label: 'Capitaine', short: 'CNE', color: 'text-yellow-100 font-black' }
         ];
 
-        const CATEGORIES = {
-            'LOGI': { label: 'LOGISTIQUE', icon: 'Truck', color: 'border-yellow-600 text-yellow-500 bg-yellow-900/10' },
-            'TRANS': { label: 'TRANSPORT', icon: 'Package', color: 'border-blue-600 text-blue-400 bg-blue-900/10' },
-            'BLINDE': { label: 'BLINDÉS', icon: 'Shield', color: 'border-orange-600 text-orange-400 bg-orange-900/10' },
-            'VCI': { label: 'VCI', icon: 'Crosshair', color: 'border-red-600 text-red-400 bg-red-900/10' },
-            'SANTE': { label: 'SANITAIRE', icon: 'Activity', color: 'border-emerald-600 text-emerald-400 bg-emerald-900/10' },
-            'CHAR': { label: 'LOURD', icon: 'Shield', color: 'border-purple-600 text-purple-400 bg-purple-900/10' },
-            'AIR': { label: 'AÉRIEN', icon: 'Plane', color: 'border-cyan-600 text-cyan-300 bg-cyan-900/10' },
-        };
+        // --- CATALOGUE MIS À JOUR (Selon image) ---
+        const INITIAL_CATALOG = [
+            // LOGI / TRANSPORT (Max 2 places)
+            { id: 'l1', cat: 'LOGI', name: 'JEEP EM', type: 'TRANSPORT EM', cost: 110, stock: 2, cap: 2, slots: 2, minRank: 0 },
+            { id: 'l2', cat: 'LOGI', name: 'CAMION RÉPA.', type: 'MAINTENANCE', cost: 175, stock: 1, cap: 6, slots: 2, minRank: 1 },
+            { id: 'l3', cat: 'LOGI', name: 'CAMION CITERNE', type: 'RAVITAILLEMENT', cost: 160, stock: 1, cap: 0, slots: 2, minRank: 1 },
+            { id: 'l4', cat: 'LOGI', name: 'CAMION ARSENAL', type: 'RAVITAILLEMENT', cost: 380, stock: 1, cap: 10, slots: 2, minRank: 1 },
+            { id: 'l5', cat: 'LOGI', name: 'CAMION CONST.', type: 'RAVITAILLEMENT', cost: 260, stock: 1, cap: 15, slots: 2, minRank: 1 },
+            { id: 't1', cat: 'TRANS', name: 'CAMION TROUPES', type: 'TRANSPORT', cost: 200, stock: 4, cap: 12, slots: 2, minRank: 1 }, // 2 crew, many passengers (treated as cargo abstractly or just 2 crew slots for ops)
+            { id: 't2', cat: 'TRANS', name: 'VAB', type: 'TRANSPORT', cost: 1200, stock: 1, cap: 8, slots: 2, minRank: 1 },
 
-        const CARGO_TYPES = {
-            'AMMO': { label: 'MUNITIONS', icon: 'Crosshair', cost: 100 },
-            'BUILD': { label: 'CONSTR.', icon: 'Hammer', cost: 100 },
-            'MEDS': { label: 'MÉDICAL', icon: 'HeartPulse', cost: 150 },
-        };
+            // BLINDÉS (Max 3 places)
+            { id: 'b1', cat: 'BLINDE', name: 'JLTV M1280', type: 'LÉGER NON-ARMÉ', cost: 650, stock: 1, cap: 4, slots: 3, minRank: 2 },
+            { id: 'b2', cat: 'BLINDE', name: 'JLTV M1281', type: 'LÉGER 12.7', cost: 1000, stock: 1, cap: 2, slots: 3, minRank: 2 },
+            { id: 'b3', cat: 'BLINDE', name: 'JLTV M1278', type: 'LÉGER 12.7 CROWS', cost: 1500, stock: 2, cap: 2, slots: 3, minRank: 2 },
+            { id: 'b4', cat: 'BLINDE', name: 'JLTV M1278 30MM', type: 'LÉGER 30MM', cost: 2750, stock: 1, cap: 0, slots: 3, minRank: 3 },
+            
+            // VCI (Max 3 places)
+            { id: 'c1', cat: 'VCI', name: 'STRYKER M1126', type: 'VCI 12.7', cost: 2000, stock: 2, cap: 0, slots: 3, minRank: 1 }, // "2CL" = Soldat (id 1)
+            { id: 'c2', cat: 'VCI', name: 'STRYKER M1296', type: 'VCI 30MM', cost: 3000, stock: 0, cap: 0, slots: 3, minRank: 3 }, // "2CL" marked but yellow/orange usually higher? Let's say CPL
+            
+            // SANITAIRE
+            { id: 's1', cat: 'SANTE', name: 'STRYKER EVASAN', type: 'SANITAIRE', cost: 975, stock: 1, cap: 4, slots: 3, minRank: 1 },
 
-        const COLOR_MAP = {
-            red: { text: 'text-red-500', bg: 'bg-red-600' },
-            orange: { text: 'text-orange-500', bg: 'bg-orange-600' },
-            yellow: { text: 'text-yellow-500', bg: 'bg-yellow-600' },
-            green: { text: 'text-green-500', bg: 'bg-green-600' },
-            blue: { text: 'text-blue-400', bg: 'bg-blue-600' }
-        };
+            // CHARS (Max 3 places)
+            { id: 'h1', cat: 'CHAR', name: 'LECLERC XLR', type: 'CHAR LOURD', cost: 8300, stock: 2, cap: 0, slots: 3, minRank: 3 }, // "CPL + TC1"
 
-        // --- SYSTEME D'ICÔNES ROBUSTE (SVG PATHS) ---
+            // AIR (Max 2 places : Pilote + Copilote)
+            { id: 'a1', cat: 'AIR', name: 'NH90 FAUCON', type: 'MEDEVAC/TRANS', cost: 3000, stock: 2, cap: 8, slots: 2, minRank: 6 }, // ALAT usually SGT+
+            { id: 'a2', cat: 'AIR', name: 'EC665 TIGRE', type: 'HÉLICO ATTAQUE', cost: 7000, stock: 1, cap: 0, slots: 2, minRank: 6 },
+        ];
+
+        // --- ICONS & HELPERS ---
         const SVG_PATHS = {
-            'Power': <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />,
-            'Activity': <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
-            'Shield': <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
-            'XCircle': <><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></>,
             'Truck': <><rect x="1" y="3" width="15" height="13" rx="2" ry="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></>,
-            'Package': <><path d="M16.5 9.4 7.55 4.24" /><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></>,
-            'Crosshair': <><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></>,
+            'Shield': <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
             'Plane': <path d="M20.38 3.4a1.6 1.6 0 0 1 2.36 2.26L20 8.4l-6.6 1.3-5.7-5.7-1.4 1.4 5 5.7-7.7 2.7-2.8-2.9L0 12.4l6.4 3.2 3.2 6.4 1.4-1.4-2.9-2.8 2.7-7.7 5.7 5 1.4-1.4-5.7-5.7 2.7-2.7z" />,
             'Wrench': <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />,
-            'ScrollText': <><path d="M15 12h-5" /><path d="M15 8h-5" /><path d="M19 17V5a2 2 0 0 0-2-2H4" /><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v2a2 2 0 0 0 2 2z" /></>,
-            'LayoutDashboard': <><rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" /><rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" /></>,
-            'Warehouse': <path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z" />,
-            'HeartPulse': <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />,
-            'Droplet': <path d="M12 2.69l5.74 5.87a6 6 0 0 1-8.48 8.48A6 6 0 0 1 5.26 8.56L12 2.69z" />,
             'Fuel': <><path d="M3 22v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8"/><path d="M8 12V7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v5"/><path d="M12 2v3"/></>,
-            'Hammer': <><path d="m15 12-8.5 8.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L12 9"/><path d="M17.64 15 22 10.64"/><path d="m20.91 11.7-1.25-1.25c-.6-.6-.93-1.4-.93-2.25V7.86c0-.55-.45-1-1-1H14.14c-.83 0-1.64.33-2.25.94L10.64 9"/><path d="m21 21-2.14-2.14"/><path d="m5 5 5 5"/></>,
-            'Briefcase': <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />,
-            'Check': <polyline points="20 6 9 17 4 12" />,
-            'X': <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
-            'PlusCircle': <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></>,
-            'Map': <><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></>,
-            'Users': <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
-            'UserPlus': <><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></>,
-            'Trash2': <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>
+            'User': <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+            'SteeringWheel': <><circle cx="12" cy="12" r="10"/><path d="M12 2v20"/><path d="M2 12h20"/></> // Simplified
         };
 
-        const Icon = ({ name, size = 16, className }) => {
-            const Fallback = SVG_PATHS[name];
-            if (!Fallback) return <span className="text-[8px] opacity-50">?</span>;
-            return (
-                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    {Fallback}
-                </svg>
-            );
-        };
+        const Icon = ({ name, size = 16, className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {SVG_PATHS[name] || <circle cx="12" cy="12" r="10" />}
+            </svg>
+        );
 
-        const Gauge = ({ value, colorKey, label, icon }) => {
-            const theme = COLOR_MAP[colorKey] || COLOR_MAP['green'];
-            return (
-                <div className="flex items-center gap-1 w-full">
-                    <div className="w-4 flex justify-center"><Icon name={icon} size={10} className={theme.text} /></div>
-                    <div className="flex-1 h-1.5 bg-gray-900 rounded-full overflow-hidden border border-gray-800">
-                        <div className={`h-full transition-all duration-500 ${theme.bg}`} style={{ width: `${value}%` }}></div>
-                    </div>
-                    <span className={`text-[8px] font-mono w-6 text-right ${theme.text}`}>{value}%</span>
-                </div>
-            );
-        };
+        // --- FIRESTORE & STORAGE (Déjà initialisé en haut) ---
+        
+        const SESSION_ID = typeof __app_id !== 'undefined' ? __app_id : "hierarchie_ops";
+        const getRef = () => db ? db.collection('artifacts').doc(SESSION_ID).collection('logiops').doc('data') : null;
 
-        const StatCard = ({ color, value, label, active, onClick }) => {
-            const colors = { 
-                gray: "border-gray-800 bg-gray-900/10 text-gray-400", 
-                green: "border-green-800 bg-green-900/10 text-green-500", 
-                blue: "border-blue-800 bg-blue-900/10 text-blue-500", 
-                orange: "border-orange-800 bg-orange-900/10 text-orange-500", 
-                red: "border-red-800 bg-red-900/10 text-red-500",
-                purple: "border-purple-800 bg-purple-900/10 text-purple-500" 
+        const useData = () => {
+            const [data, setData] = useState({ units: [], logs: [], missions: [], squad: [], supply: 5000 });
+            
+            useEffect(() => {
+                let unsub = () => {};
+
+                if (db) {
+                    const setup = async () => {
+                        const auth = firebase.auth();
+                        if (!auth.currentUser) {
+                             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                await auth.signInWithCustomToken(__initial_auth_token);
+                             } else {
+                                await auth.signInAnonymously();
+                             }
+                        }
+                        
+                        unsub = getRef().onSnapshot(snap => {
+                            if (snap.exists) setData(snap.data());
+                        }, err => {
+                            console.error("Firestore Error:", err);
+                            // Fallback local if permission error
+                            if (err.code === 'permission-denied') {
+                                const local = localStorage.getItem('logiops_v17');
+                                if (local) setData(JSON.parse(local));
+                            }
+                        });
+                    };
+                    setup();
+                } else {
+                    const local = localStorage.getItem('logiops_v17');
+                    if (local) setData(JSON.parse(local));
+                }
+
+                return () => unsub();
+            }, []);
+
+            const save = (newData) => {
+                const auth = firebase.auth();
+                // Ensure auth before saving to avoid permission errors
+                if (db && auth.currentUser) {
+                     getRef().set(newData, { merge: true }).catch(err => console.error("Save Error:", err));
+                } else if (!db) {
+                    const merged = { ...data, ...newData };
+                    setData(merged);
+                    localStorage.setItem('logiops_v17', JSON.stringify(merged));
+                }
             };
-            return <button onClick={onClick} className={`border p-2 text-center transition-all rounded ${colors[color]} ${active ? 'ring-1 ring-white/50 bg-opacity-30' : 'opacity-70 hover:opacity-100'} flex-1 min-w-[70px]`}>
-                <span className="text-2xl font-black block leading-none">{value}</span>
-                <span className="text-[9px] font-bold uppercase tracking-widest">{label}</span>
-            </button>;
+            return [data, save];
         };
 
-        // --- CARTE UNITÉ ---
-        const UnitCard = ({ unit, userIdentity, isSL, actions }) => {
-            const [view, setView] = useState('status'); // 'status' or 'cargo'
-            
-            // CORRECTION: Only the explicitly assigned logistician can control mission actions
-            // SL can see but not touch if unit is in mission
-            const isResponsible = unit.responsible === userIdentity;
-            const isMyUnit = isResponsible; 
-            
-            const catConfig = CATEGORIES[unit.cat];
-            
-            const fuelColor = unit.fuel < 30 ? 'red' : (unit.fuel < 60 ? 'orange' : 'green');
-            const ammoColor = unit.ammo < 30 ? 'red' : 'yellow';
-            
-            const currentLoad = (unit.cargo || []).length;
-            const maxLoad = unit.cap || 0;
+        // --- COMPONENTS ---
 
-            return (
-                <div className={`bg-[#0a0a0a] border-l-4 ${unit.status==='damaged'?'border-orange-600':(unit.status.includes('mission')?'border-blue-600':'border-green-600')} border-t border-r border-b border-white/10 p-3 rounded shadow-lg flex flex-col gap-2 relative overflow-hidden group hover:bg-white/5 transition-colors`}>
-                    
-                    {/* Header */}
-                    <div className="flex justify-between items-start">
-                        <div className="flex gap-2 w-full">
-                            <div className={`p-1.5 bg-black border border-white/10 rounded flex items-center justify-center h-9 w-9 shrink-0 ${catConfig.color.split(' ')[1]}`}>
-                                <Icon name={catConfig.icon} size={18} />
-                            </div>
-                            <div className="overflow-hidden w-full">
-                                <div className="flex justify-between items-center">
-                                    <h3 className="font-bold text-sm text-gray-200 truncate uppercase">{unit.name}</h3>
-                                    <button onClick={() => actions.showLogs(unit)}><Icon name="ScrollText" size={12} className="text-gray-600 hover:text-white"/></button>
-                                </div>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                    <span className={`text-[9px] px-1 rounded border ${isMyUnit ? 'border-yellow-600 text-yellow-500' : 'border-gray-700 text-gray-500'}`}>{unit.responsible}</span>
-                                    {unit.status === 'mission' && <span className="text-[9px] text-blue-400 animate-pulse">EN MISSION</span>}
-                                    {unit.status === 'damaged' && <span className="text-[9px] text-orange-500 animate-pulse">RÉPARATIONS REQUISES</span>}
-                                </div>
-                                {/* MISSION DISPLAY */}
-                                {unit.missionId && (
-                                    <div className="mt-1 text-[9px] bg-purple-900/20 text-purple-400 px-1 rounded border border-purple-900/50 flex items-center gap-1">
-                                        <Icon name="Briefcase" size={8}/> {unit.missionName}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+        // Login avec Grade
+        const LoginScreen = ({ onLogin, squad }) => {
+            const [role, setRole] = useState(null); // 'SL' or 'LOGI'
+            const [name, setName] = useState('');
+            const [rankId, setRankId] = useState(1); // Default Soldat
+
+            const handleLogin = () => {
+                const rankObj = RANKS.find(r => r.id === parseInt(rankId));
+                onLogin(role, { name: name.toUpperCase(), rank: rankObj });
+            };
+
+            if (!role) return (
+                <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 login-scan text-center">
+                    <h1 className="text-4xl font-black text-green-600 mb-2 tracking-[0.5em]">LOGI-OPS</h1>
+                    <div className="text-xs text-green-800 mb-8 border border-green-900 px-2 py-1">V17 PROTOCOL</div>
+                    <div className="flex gap-4">
+                        <button onClick={() => setRole('SL')} className="p-6 border border-green-600 hover:bg-green-900/20 w-40 font-bold text-green-500">COMMANDEMENT</button>
+                        <button onClick={() => setRole('LOGI')} className="p-6 border border-blue-600 hover:bg-blue-900/20 w-40 font-bold text-blue-500">LOGISTIQUE</button>
                     </div>
-
-                    {/* Navigation Tabs */}
-                    <div className="flex border-b border-white/10 text-[9px] font-bold mt-1">
-                        <button onClick={() => setView('status')} className={`flex-1 py-1 ${view==='status' ? 'text-green-500 border-b border-green-500' : 'text-gray-600 hover:text-gray-400'}`}>STATUT</button>
-                        <button onClick={() => setView('cargo')} className={`flex-1 py-1 ${view==='cargo' ? 'text-yellow-500 border-b border-yellow-500' : 'text-gray-600 hover:text-gray-400'}`}>CARGO ({currentLoad}/{maxLoad})</button>
-                    </div>
-
-                    {/* VIEW: STATUS (Gauges + Actions) */}
-                    {view === 'status' && (
-                        <div className="space-y-2 animate-in fade-in mt-1">
-                            <div className="bg-black/40 p-2 rounded border border-white/5 space-y-1">
-                                <Gauge value={unit.fuel} colorKey={fuelColor} icon="Droplet" label="F" />
-                                <Gauge value={unit.ammo} colorKey={ammoColor} icon="Crosshair" label="A" />
-                                <div className="flex items-center gap-1 pt-1 border-t border-white/5 mt-1">
-                                    <Icon name="HeartPulse" size={10} className="text-emerald-500" />
-                                    <div className="text-[9px] text-emerald-500">{unit.health}% INTÉGRITÉ</div>
-                                </div>
-                            </div>
-
-                            {/* Actions Maintenance - Visible at base, usually SL or Logi */}
-                            {unit.status !== 'mission' && (
-                                <div className="grid grid-cols-2 gap-1">
-                                    <button onClick={() => actions.resupplyUnit(unit, 'fuel')} disabled={unit.fuel >= 100} className="px-1 py-1 bg-green-900/20 border border-green-800 text-[8px] text-green-400 hover:bg-green-900/40 disabled:opacity-20 flex justify-center gap-1"><Icon name="Fuel" size={10}/> PLEIN</button>
-                                    <button onClick={() => actions.resupplyUnit(unit, 'repair')} disabled={unit.status !== 'damaged'} className="px-1 py-1 bg-orange-900/20 border border-orange-800 text-[8px] text-orange-400 hover:bg-orange-900/40 disabled:opacity-20 flex justify-center gap-1"><Icon name="Wrench" size={10}/> RÉPARER</button>
-                                </div>
-                            )}
-
-                            {/* Mission Control - RESTRICTED TO RESPONSIBLE */}
-                            <div className="pt-1">
-                                {unit.responsible === 'BASE' ? (
-                                    <button onClick={() => actions.takeDriver(unit)} className="w-full py-1 border border-dashed border-gray-700 text-gray-500 text-[9px] hover:text-green-500 hover:border-green-500">PRENDRE LE VOLANT</button>
-                                ) : (
-                                    // If Assigned
-                                    unit.status === 'mission' ? (
-                                        // IF IN MISSION: ONLY RESPONSIBLE CAN ACT
-                                        isResponsible ? (
-                                            <div className="grid grid-cols-2 gap-1">
-                                                <button onClick={() => actions.sitrep(unit)} className="py-1 bg-yellow-900/20 border border-yellow-700 text-yellow-500 font-bold text-[9px]">SITREP</button>
-                                                <button onClick={() => actions.rtb(unit)} className="py-1 bg-blue-900/20 border border-blue-700 text-blue-500 font-bold text-[9px]">RTB</button>
-                                            </div>
-                                        ) : (
-                                            <div className="text-center text-[9px] text-gray-500 py-1 italic border border-gray-800 bg-gray-900/20 rounded">
-                                                CONTRÔLE: {unit.responsible}
-                                            </div>
-                                        )
-                                    ) : (
-                                        // IF AT BASE BUT ASSIGNED
-                                        <div className="flex gap-1">
-                                            {/* SL can force unassign if needed, or Logi can start mission */}
-                                            {isResponsible && <button onClick={() => actions.startMission(unit)} disabled={unit.status === 'damaged' || unit.fuel < 10} className="flex-1 py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 disabled:opacity-50">DÉPART</button>}
-                                            {(isResponsible || isSL) && <button onClick={() => actions.releaseDriver(unit)} className="px-2 py-1 border border-red-900 text-red-500 hover:bg-red-900/20" title="Libérer"><Icon name="X" size={12}/></button>}
-                                        </div>
-                                    )
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* VIEW: CARGO */}
-                    {view === 'cargo' && (
-                        <div className="space-y-2 animate-in fade-in mt-1 min-h-[100px]">
-                            {maxLoad === 0 ? (
-                                <div className="text-center text-gray-600 text-[9px] py-4 italic">Véhicule sans soute.</div>
-                            ) : (
-                                <>
-                                    <div className="grid grid-cols-4 gap-1 p-1 bg-black/40 rounded border border-white/5">
-                                        {(unit.cargo || []).map((item, idx) => (
-                                            <div key={idx} className="aspect-square bg-gray-800 border border-gray-600 rounded flex items-center justify-center relative group/item">
-                                                <Icon name={CARGO_TYPES[item].icon} size={14} className="text-gray-300" />
-                                                {unit.status !== 'mission' && (isResponsible || isSL) && <button onClick={() => actions.unloadCargo(unit, idx)} className="absolute inset-0 bg-red-900/80 flex items-center justify-center opacity-0 group-hover/item:opacity-100"><Icon name="X" size={14} className="text-white"/></button>}
-                                            </div>
-                                        ))}
-                                        {Array.from({ length: maxLoad - currentLoad }).map((_, idx) => (
-                                            <div key={`e-${idx}`} className="aspect-square border border-dashed border-gray-800 rounded flex items-center justify-center"><span className="text-[7px] text-gray-800">VIDE</span></div>
-                                        ))}
-                                    </div>
-                                    {unit.status !== 'mission' && currentLoad < maxLoad && (
-                                        <div className="grid grid-cols-3 gap-1 mt-2">
-                                            {Object.entries(CARGO_TYPES).map(([key, type]) => (
-                                                <button key={key} onClick={() => actions.loadCargo(unit, key)} className="flex flex-col items-center justify-center p-1 border border-gray-800 hover:border-yellow-500 hover:bg-yellow-900/10 rounded">
-                                                    <Icon name={type.icon} size={12} className="text-gray-400 mb-1" />
-                                                    <span className="text-[7px] text-gray-500">{type.cost}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    )}
                 </div>
             );
-        };
-
-        // --- LOGIN SCREEN ---
-        function LoginScreen({ onLogin, squad }) {
-            const [userType, setUserType] = useState(null); // 'SL' or 'LOGI'
-            const [selectedMember, setSelectedMember] = useState('');
-            const [slName, setSlName] = useState('');
-
-            if (!userType) {
-                return (
-                    <div className="min-h-screen bg-black flex items-center justify-center p-4 login-scan">
-                        <div className="w-full max-w-md border border-green-800 p-8 bg-black z-10 text-center space-y-6 shadow-[0_0_50px_rgba(20,83,45,0.2)]">
-                            <h1 className="text-3xl font-black text-green-500 tracking-[0.3em]">LOGI-OPS <span className="text-sm text-green-700">V16.5</span></h1>
-                            <div className="grid grid-cols-1 gap-4">
-                                <button onClick={() => setUserType('SL')} className="py-4 border border-green-600 text-green-500 font-bold hover:bg-green-900/20">COMMANDEMENT (SL)</button>
-                                <button onClick={() => setUserType('LOGI')} className="py-4 border border-blue-600 text-blue-500 font-bold hover:bg-blue-900/20">LOGISTIQUE (SQUAD)</button>
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
 
             return (
                 <div className="min-h-screen bg-black flex items-center justify-center p-4 login-scan">
-                    <div className="w-full max-w-md border border-green-800 p-8 bg-black z-10 text-center space-y-6 shadow-[0_0_50px_rgba(20,83,45,0.2)]">
-                        <h2 className="text-xl font-bold text-gray-300 uppercase">IDENTIFICATION {userType}</h2>
+                    <div className="w-96 border border-gray-800 bg-black p-6 space-y-4 shadow-2xl">
+                        <h2 className="text-xl font-bold text-white text-center mb-4">IDENTIFICATION {role}</h2>
                         
-                        {userType === 'SL' && (
-                            <input type="text" placeholder="NOM DU SL" className="w-full bg-green-900/10 border border-green-800 p-3 text-green-400 text-center font-bold outline-none" onChange={e => setSlName(e.target.value.toUpperCase())} />
-                        )}
-
-                        {userType === 'LOGI' && (
-                            <select className="w-full bg-blue-900/10 border border-blue-800 p-3 text-blue-400 font-bold outline-none" onChange={e => setSelectedMember(e.target.value)} value={selectedMember}>
-                                <option value="">-- CHOISIR MEMBRE --</option>
-                                {squad.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                        <div>
+                            <label className="text-[10px] text-gray-500 block mb-1">GRADE</label>
+                            <select className="w-full bg-gray-900 border border-gray-700 text-white p-2 text-sm" value={rankId} onChange={e => setRankId(e.target.value)}>
+                                {RANKS.map(r => <option key={r.id} value={r.id}>{r.label} ({r.short})</option>)}
                             </select>
-                        )}
+                        </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <button onClick={() => setUserType(null)} className="py-3 border border-gray-700 text-gray-500 font-bold">RETOUR</button>
-                            <button disabled={userType==='SL'?!slName:!selectedMember} onClick={() => onLogin(userType, userType==='SL'?slName:selectedMember)} className="py-3 bg-green-600 text-black font-bold disabled:opacity-50">VALIDER</button>
+                        <div>
+                            <label className="text-[10px] text-gray-500 block mb-1">PSEUDO</label>
+                            {role === 'LOGI' && squad.length > 0 ? (
+                                <select className="w-full bg-gray-900 border border-gray-700 text-white p-2 text-sm" value={name} onChange={e => setName(e.target.value)}>
+                                    <option value="">-- CHOISIR --</option>
+                                    {squad.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                                </select>
+                            ) : (
+                                <input type="text" className="w-full bg-gray-900 border border-gray-700 text-white p-2 text-sm uppercase" value={name} onChange={e => setName(e.target.value)} placeholder="NOM..." />
+                            )}
+                        </div>
+
+                        <div className="flex gap-2 pt-4">
+                            <button onClick={() => setRole(null)} className="flex-1 py-2 border border-gray-800 text-gray-500 text-xs">RETOUR</button>
+                            <button onClick={handleLogin} disabled={!name} className="flex-1 py-2 bg-green-700 text-black font-bold text-xs hover:bg-green-600 disabled:opacity-50">CONFIRMER</button>
                         </div>
                     </div>
                 </div>
             );
-        }
+        };
 
-        // --- APP ---
-        function LogiOpsApp() {
+        // Modal RTB Check
+        const RTBCheckModal = ({ unit, onClose, onConfirm }) => {
+            const [fuel, setFuel] = useState(unit.fuel);
+            const [health, setHealth] = useState(unit.health);
+
+            const isPerfect = parseInt(fuel) === 100 && parseInt(health) === 100;
+
+            return (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur z-50 flex items-center justify-center">
+                    <div className="w-full max-w-sm border border-green-600 bg-black p-6 shadow-[0_0_30px_rgba(20,83,45,0.3)]">
+                        <h3 className="text-lg font-black text-green-500 mb-4 border-b border-green-900 pb-2">CHECK-LIST RETOUR BASE</h3>
+                        <div className="text-gray-400 text-xs mb-4">VÉHICULE: <span className="text-white font-bold">{unit.name}</span></div>
+                        
+                        <div className="space-y-4 mb-6">
+                            <div>
+                                <label className="flex justify-between text-xs font-bold text-green-700 mb-1">
+                                    <span>NIVEAU CARBURANT</span>
+                                    <span>{fuel}%</span>
+                                </label>
+                                <input type="range" min="0" max="100" value={fuel} onChange={e=>setFuel(e.target.value)} className="w-full accent-green-500 h-2 bg-gray-800 appearance-none rounded"/>
+                            </div>
+                            <div>
+                                <label className="flex justify-between text-xs font-bold text-green-700 mb-1">
+                                    <span>INTÉGRITÉ CHÂSSIS</span>
+                                    <span>{health}%</span>
+                                </label>
+                                <input type="range" min="0" max="100" value={health} onChange={e=>setHealth(e.target.value)} className="w-full accent-green-500 h-2 bg-gray-800 appearance-none rounded"/>
+                            </div>
+                        </div>
+
+                        <div className="p-3 bg-gray-900 border border-gray-700 mb-4">
+                            <div className="text-[10px] text-gray-500 uppercase">Diagnostique Auto</div>
+                            <div className={`text-sm font-bold ${isPerfect ? 'text-green-500' : 'text-orange-500'}`}>
+                                {isPerfect ? "VÉHICULE OPÉRATIONNEL" : "MAINTENANCE REQUISE"}
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button onClick={onClose} className="flex-1 py-3 border border-gray-700 text-gray-500 text-xs">ANNULER</button>
+                            <button onClick={() => onConfirm(parseInt(fuel), parseInt(health))} className="flex-1 py-3 bg-green-700 text-black font-bold text-xs hover:bg-green-600">VALIDER RETOUR</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const UnitCard = ({ unit, user, isSL, actions }) => {
+            const isDriver = unit.responsible?.name === user.name;
+            const isPassenger = (unit.passengers || []).some(p => p.name === user.name);
+            const isOnBoard = isDriver || isPassenger;
+            const rankReq = RANKS.find(r => r.id === unit.minRank);
+            const userRankVal = user.rank.id;
+            const canDrive = userRankVal >= unit.minRank;
+            
+            const occupiedSlots = (unit.responsible ? 1 : 0) + (unit.passengers || []).length;
+            const totalSlots = unit.slots || 2;
+            const hasSpace = occupiedSlots < totalSlots;
+
+            // Status Colors
+            let borderClass = 'border-green-800';
+            if (unit.status === 'damaged') borderClass = 'border-orange-600';
+            else if (unit.status === 'mission') {
+                if (unit.rtbStatus === 'pending') borderClass = 'border-yellow-500 dashed';
+                else if (unit.rtbStatus === 'approved') borderClass = 'border-blue-500 animate-pulse';
+                else borderClass = 'border-blue-700';
+            }
+
+            return (
+                <div className={`bg-[#080808] border-l-4 ${borderClass} border-t border-r border-b border-white/5 p-3 flex flex-col gap-2 relative group`}>
+                    
+                    {/* Header */}
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="text-[9px] text-gray-500 font-bold uppercase">{unit.cat} // <span className={rankReq.color}>{rankReq.short}+</span></div>
+                            <h3 className="font-bold text-gray-200 leading-tight">{unit.name}</h3>
+                        </div>
+                        <div className="text-right">
+                             {unit.status === 'mission' && <div className="text-[9px] bg-blue-900/30 text-blue-400 px-1 border border-blue-900 rounded">EN MISSION</div>}
+                             {unit.status === 'damaged' && <div className="text-[9px] bg-orange-900/30 text-orange-400 px-1 border border-orange-900 rounded">ATELIER</div>}
+                             {unit.status === 'operational' && <div className="text-[9px] text-green-600">PRÊT</div>}
+                        </div>
+                    </div>
+
+                    {/* Crew Display */}
+                    <div className="bg-black/40 p-2 rounded border border-white/5 space-y-1">
+                        <div className="flex justify-between text-[9px] text-gray-600 mb-1">
+                            <span>ÉQUIPAGE ({occupiedSlots}/{totalSlots})</span>
+                        </div>
+                        {/* Driver Slot */}
+                        <div className="flex items-center gap-2 border-b border-white/5 pb-1">
+                            <div className="w-4"><Icon name="SteeringWheel" size={12} className="text-gray-500"/></div>
+                            {unit.responsible ? (
+                                <span className={`text-xs ${unit.responsible.name === user.name ? 'text-yellow-400' : 'text-gray-300'}`}>
+                                    {unit.responsible.rank.short} {unit.responsible.name}
+                                </span>
+                            ) : (
+                                <span className="text-[10px] text-gray-600 italic">-- VIDE --</span>
+                            )}
+                        </div>
+                        {/* Passenger Slots */}
+                        {Array.from({ length: totalSlots - 1 }).map((_, i) => {
+                            const pass = (unit.passengers || [])[i];
+                            return (
+                                <div key={i} className="flex items-center gap-2">
+                                    <div className="w-4"><Icon name="User" size={12} className="text-gray-500"/></div>
+                                    {pass ? (
+                                        <div className="flex justify-between w-full">
+                                            <span className={`text-xs ${pass.name === user.name ? 'text-yellow-400' : 'text-gray-300'}`}>
+                                                {pass.rank.short} {pass.name}
+                                            </span>
+                                            {(isDriver || isSL || pass.name === user.name) && unit.status !== 'mission' && (
+                                                <button onClick={() => actions.kickPassenger(unit, i)} className="text-[9px] text-red-500 hover:text-red-400">X</button>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <span className="text-[10px] text-gray-700 italic">-- LIBRE --</span>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Gauges */}
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                        <div className="h-1 bg-gray-800 rounded overflow-hidden"><div style={{width: `${unit.fuel}%`}} className={`h-full ${unit.fuel < 30 ? 'bg-red-600' : 'bg-blue-600'}`}></div></div>
+                        <div className="h-1 bg-gray-800 rounded overflow-hidden"><div style={{width: `${unit.health}%`}} className={`h-full ${unit.health < 50 ? 'bg-orange-600' : 'bg-green-600'}`}></div></div>
+                    </div>
+
+                    {/* ACTIONS - Context Sensitive */}
+                    <div className="mt-2 grid grid-cols-2 gap-1">
+                        {/* BASE OPERATIONS */}
+                        {unit.status !== 'mission' && (
+                            <>
+                                {/* DRIVER ACTIONS */}
+                                {!unit.responsible ? (
+                                    <button 
+                                        onClick={() => actions.takeDriver(unit)} 
+                                        disabled={!canDrive}
+                                        className={`col-span-1 py-1 text-[9px] border ${canDrive ? 'border-green-800 text-green-500 hover:bg-green-900/20' : 'border-red-900/50 text-red-900 cursor-not-allowed'}`}>
+                                        {canDrive ? 'PRENDRE VOLANT' : `REQ: ${rankReq.short}`}
+                                    </button>
+                                ) : (
+                                    isDriver ? (
+                                        <button onClick={() => actions.releaseDriver(unit)} className="col-span-1 py-1 text-[9px] border border-red-800 text-red-500 hover:bg-red-900/20">LIBÉRER VOLANT</button>
+                                    ) : (
+                                        <div className="col-span-1 flex items-center justify-center text-[9px] text-gray-600 border border-gray-800">OCCUPÉ</div>
+                                    )
+                                )}
+
+                                {/* PASSENGER ACTIONS */}
+                                {!isPassenger && !isDriver ? (
+                                    <button onClick={() => actions.takeSeat(unit)} disabled={!hasSpace} className="col-span-1 py-1 text-[9px] border border-gray-600 text-gray-400 hover:text-white hover:border-white disabled:opacity-20">MONTER À BORD</button>
+                                ) : (
+                                    isPassenger && <button onClick={() => actions.leaveSeat(unit)} className="col-span-1 py-1 text-[9px] border border-gray-600 text-gray-400 hover:text-red-500">DESCENDRE</button>
+                                )}
+
+                                {/* MISSION START (Driver Only) */}
+                                {isDriver && unit.status === 'operational' && (
+                                    <button onClick={() => actions.startMission(unit)} className="col-span-2 py-2 bg-green-700 text-black font-bold text-xs hover:bg-green-600 mt-1">DÉPART MISSION</button>
+                                )}
+                                
+                                {/* REPAIRS */}
+                                {!isOnBoard && unit.status === 'damaged' && (
+                                    <button onClick={() => actions.repair(unit)} className="col-span-2 py-1 bg-orange-900/20 text-orange-500 text-[10px] border border-orange-800 hover:bg-orange-900/40">RÉPARER</button>
+                                )}
+                            </>
+                        )}
+
+                        {/* MISSION OPERATIONS */}
+                        {unit.status === 'mission' && isOnBoard && (
+                            <>
+                                <button onClick={() => actions.sitrep(unit)} className="col-span-2 py-1 bg-yellow-900/20 border border-yellow-700 text-yellow-500 text-[10px] font-bold">SITREP</button>
+                                
+                                {unit.rtbStatus === 'idle' && (
+                                    <button onClick={() => actions.requestRTB(unit)} className="col-span-2 py-1 bg-blue-900/20 border border-blue-700 text-blue-500 text-[10px] font-bold">DEMANDER RTB</button>
+                                )}
+                                {unit.rtbStatus === 'requested' && (
+                                    <div className="col-span-2 text-center text-[9px] text-blue-400 animate-pulse border border-blue-900 py-1">ATTENTE SL...</div>
+                                )}
+                                {unit.rtbStatus === 'pending' && (
+                                    <div className="col-span-2 text-center text-[9px] text-yellow-500 border border-yellow-900 py-1">RTB EN ATTENTE</div>
+                                )}
+                                {unit.rtbStatus === 'approved' && isDriver && (
+                                    <button onClick={() => actions.validateRTB(unit)} className="col-span-2 py-2 bg-green-600 text-black font-bold text-xs animate-bounce">VALIDER RETOUR</button>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [data, save] = useData();
             const [userRole, setUserRole] = useState(null);
-            const [userIdentity, setUserIdentity] = useState(null);
-            const [activeTab, setActiveTab] = useState('dashboard');
-            
-            // Data States
-            const [units, setUnits] = useState([]);
-            const [logs, setLogs] = useState([]);
-            const [supply, setSupply] = useState(5000);
-            const [squad, setSquad] = useState([]); // SQUAD STATE ADDED
-            const [missions, setMissions] = useState([]);
-            
-            // UI States
+            const [user, setUser] = useState(null); // {name, rank}
+            const [tab, setTab] = useState('dashboard');
             const [filter, setFilter] = useState('ALL');
-            const [modal, setModal] = useState(null);
-            const [showGlobalMissionModal, setShowGlobalMissionModal] = useState(false);
-            const [globalMissionData, setGlobalMissionData] = useState({ title: '', vehicles: [] });
-            const [newMemberName, setNewMemberName] = useState(''); // For squad management
-
-            const isSL = userRole === 'SL';
-
+            const [rtbModalUnit, setRtbModalUnit] = useState(null);
+            
+            // Initial Load for Catalog if empty
             useEffect(() => {
-                StorageService.loadInitial((data) => {
-                    if (data) {
-                        setUnits(data.units || []);
-                        setLogs(data.logs || []);
-                        setSupply(data.supply || 5000);
-                        setMissions(data.missions || []);
-                        setSquad(data.squad || []); // Load squad
-                    }
-                });
-            }, []);
-
-            useEffect(() => { if (userIdentity) StorageService.save({ units, logs, supply, missions, squad }); }, [units, logs, supply, missions, squad, userIdentity]);
-
-            const addLog = (msg, type='INFO') => {
-                setLogs(prev => [{ id: Date.now(), time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), type, msg }, ...prev].slice(0, 50));
-            };
+                if (data && (!data.units || data.units.length === 0)) {
+                    // Pre-load empty structures
+                    save({ 
+                        units: [], 
+                        logs: [], 
+                        missions: [], 
+                        squad: [], 
+                        supply: 5000 
+                    });
+                }
+            }, [data]);
 
             const actions = {
-                deployUnit: (modelId) => {
-                    const model = INITIAL_CATALOG.find(m => m.id === modelId);
-                    if (!model || supply < model.cost) return alert("Ressources insuffisantes");
+                buyUnit: (model) => {
+                    if (data.supply < model.cost) return alert("Pas assez de points");
                     const newUnit = {
-                        uuid: Date.now() + Math.random(),
+                        uuid: Date.now().toString(),
                         ...model,
                         status: 'operational',
-                        responsible: 'BASE',
-                        fuel: 100, ammo: 100, health: 100, cargo: [], logs: []
+                        fuel: 100, health: 100,
+                        responsible: null,
+                        passengers: [],
+                        logs: [],
+                        rtbStatus: 'idle'
                     };
-                    setUnits(prev => [newUnit, ...prev]);
-                    setSupply(s => s - model.cost);
-                    addLog(`ACHAT ${model.name}`, 'GARAGE');
+                    save({ 
+                        units: [newUnit, ...data.units], 
+                        supply: data.supply - model.cost,
+                        logs: [{ id: Date.now(), time: new Date().toLocaleTimeString(), msg: `ACHAT ${model.name}`, type: 'GARAGE' }, ...data.logs]
+                    });
                 },
                 takeDriver: (unit) => {
-                    setUnits(units.map(u => u.uuid === unit.uuid ? { ...u, responsible: userIdentity } : u));
-                    addLog(`${userIdentity} PREND LE VOLANT ${unit.name}`, 'OPS');
+                    const updated = data.units.map(u => u.uuid === unit.uuid ? { ...u, responsible: user } : u);
+                    save({ units: updated, logs: [{ id: Date.now(), time: new Date().toLocaleTimeString(), msg: `${user.name} PRIS VOLANT ${unit.name}`, type: 'OPS' }, ...data.logs] });
                 },
                 releaseDriver: (unit) => {
-                    setUnits(units.map(u => u.uuid === unit.uuid ? { ...u, responsible: 'BASE' } : u));
-                    addLog(`${userIdentity} LIBÈRE ${unit.name}`, 'OPS');
+                    const updated = data.units.map(u => u.uuid === unit.uuid ? { ...u, responsible: null } : u);
+                    save({ units: updated });
+                },
+                takeSeat: (unit) => {
+                    const updated = data.units.map(u => u.uuid === unit.uuid ? { ...u, passengers: [...(u.passengers || []), user] } : u);
+                    save({ units: updated });
+                },
+                leaveSeat: (unit) => {
+                    const updated = data.units.map(u => u.uuid === unit.uuid ? { ...u, passengers: (u.passengers || []).filter(p => p.name !== user.name) } : u);
+                    save({ units: updated });
+                },
+                kickPassenger: (unit, index) => {
+                    const newPass = [...(unit.passengers || [])];
+                    newPass.splice(index, 1);
+                    const updated = data.units.map(u => u.uuid === unit.uuid ? { ...u, passengers: newPass } : u);
+                    save({ units: updated });
                 },
                 startMission: (unit) => {
-                    const fuelCost = 5;
-                    setUnits(units.map(u => u.uuid === unit.uuid ? { ...u, status: 'mission', fuel: Math.max(0, u.fuel - fuelCost), logs: [...u.logs, {time: new Date().toLocaleTimeString(), msg: "DÉPART MISSION"}] } : u));
-                    addLog(`${unit.name} DÉPART MISSION`, 'OPS');
+                    const updated = data.units.map(u => u.uuid === unit.uuid ? { ...u, status: 'mission', rtbStatus: 'idle' } : u);
+                    save({ 
+                        units: updated,
+                        logs: [{ id: Date.now(), time: new Date().toLocaleTimeString(), msg: `DÉPART MISSION ${unit.name}`, type: 'MVT' }, ...data.logs] 
+                    });
                 },
-                rtb: (unit) => {
-                    const fuelCost = 5;
-                    setUnits(units.map(u => u.uuid === unit.uuid ? { ...u, status: 'operational', responsible: 'BASE', fuel: Math.max(0, u.fuel - fuelCost), logs: [...u.logs, {time: new Date().toLocaleTimeString(), msg: "RETOUR BASE"}] } : u));
-                    addLog(`${unit.name} RETOUR BASE`, 'OPS');
+                sitrep: (unit) => {
+                     save({ 
+                        logs: [{ id: Date.now(), time: new Date().toLocaleTimeString(), msg: `SITREP ${unit.name}: POSITION OK`, type: 'RADIO', highlight: true }, ...data.logs] 
+                    });
                 },
-                resupplyUnit: (unit, type) => {
-                    let cost = 0;
-                    let updates = {};
-                    if (type === 'fuel') {
-                        const needed = 100 - unit.fuel;
-                        cost = Math.floor(needed * 2);
-                        updates = { fuel: 100 };
-                    } else if (type === 'repair') {
-                        cost = 500;
-                        updates = { status: 'operational', health: 100 };
-                    }
-                    if (supply < cost) return alert(`Manque ${cost - supply} pts`);
-                    setSupply(s => s - cost);
-                    setUnits(units.map(u => u.uuid === unit.uuid ? { ...u, ...updates } : u));
-                    addLog(`${unit.name} MAINTENANCE (${type})`, 'MECA');
+                requestRTB: (unit) => {
+                    const updated = data.units.map(u => u.uuid === unit.uuid ? { ...u, rtbStatus: 'requested' } : u);
+                    save({ 
+                        units: updated,
+                        logs: [{ id: Date.now(), time: new Date().toLocaleTimeString(), msg: `DEMANDE RTB: ${unit.name}`, type: 'RADIO' }, ...data.logs] 
+                    });
                 },
-                loadCargo: (unit, typeKey) => {
-                    const item = CARGO_TYPES[typeKey];
-                    if (supply < item.cost) return alert("Pas assez de ressources");
-                    if ((unit.cargo || []).length >= unit.cap) return alert("Soute pleine");
-                    setSupply(s => s - item.cost);
-                    setUnits(units.map(u => u.uuid === unit.uuid ? { ...u, cargo: [...(u.cargo || []), typeKey] } : u));
-                    addLog(`${unit.name} CHARGEMENT ${item.label}`, 'LOGI');
+                approveRTB: (unit) => {
+                    const updated = data.units.map(u => u.uuid === unit.uuid ? { ...u, rtbStatus: 'approved' } : u);
+                    save({ units: updated });
                 },
-                unloadCargo: (unit, index) => {
-                    const removed = unit.cargo[index];
-                    const refund = Math.floor(CARGO_TYPES[removed].cost * 0.8);
-                    setSupply(s => s + refund);
-                    const newCargo = [...unit.cargo];
-                    newCargo.splice(index, 1);
-                    setUnits(units.map(u => u.uuid === unit.uuid ? { ...u, cargo: newCargo } : u));
-                    addLog(`${unit.name} DÉCHARGEMENT ${removed}`, 'LOGI');
+                holdRTB: (unit) => {
+                    const updated = data.units.map(u => u.uuid === unit.uuid ? { ...u, rtbStatus: 'pending' } : u);
+                    save({ units: updated });
                 },
-                showLogs: (unit) => setModal({ type: 'logs', unit }),
-                sitrep: (unit) => addLog(`SITREP ${unit.name}: EN POSITION`, 'RADIO'),
-                
-                // SQUAD ACTIONS
-                addMember: () => {
-                    if(!newMemberName) return;
-                    setSquad([...squad, { id: Date.now(), name: newMemberName.toUpperCase() }]);
-                    setNewMemberName('');
-                    addLog(`NOUVEAU MEMBRE: ${newMemberName.toUpperCase()}`, 'RH');
+                validateRTB: (unit) => {
+                    setRtbModalUnit(unit);
                 },
-                removeMember: (id) => {
-                    setSquad(squad.filter(m => m.id !== id));
+                finalizeRTB: (fuel, health) => {
+                    if (!rtbModalUnit) return;
+                    const needsRepair = fuel < 100 || health < 100;
+                    const updated = data.units.map(u => u.uuid === rtbModalUnit.uuid ? { 
+                        ...u, 
+                        status: needsRepair ? 'damaged' : 'operational',
+                        rtbStatus: 'idle',
+                        responsible: needsRepair ? null : u.responsible, // Kick driver if maintenance needed
+                        passengers: needsRepair ? [] : u.passengers,
+                        fuel, health
+                    } : u);
+                    save({ 
+                        units: updated,
+                        logs: [{ id: Date.now(), time: new Date().toLocaleTimeString(), msg: `RETOUR BASE ${rtbModalUnit.name} (Statut: ${needsRepair ? 'MAINTENANCE' : 'OK'})`, type: 'OPS' }, ...data.logs] 
+                    });
+                    setRtbModalUnit(null);
+                },
+                repair: (unit) => {
+                    const cost = 200;
+                    if (data.supply < cost) return alert("Pas de ressources");
+                    const updated = data.units.map(u => u.uuid === unit.uuid ? { ...u, status: 'operational', fuel: 100, health: 100 } : u);
+                    save({ 
+                        units: updated, 
+                        supply: data.supply - cost,
+                        logs: [{ id: Date.now(), time: new Date().toLocaleTimeString(), msg: `RÉPARATION ${unit.name}`, type: 'MECA' }, ...data.logs]
+                    });
+                },
+                addSquad: (name) => {
+                    if (!name) return;
+                    save({ squad: [...data.squad, { id: Date.now(), name: name.toUpperCase() }] });
+                },
+                removeSquad: (id) => {
+                    save({ squad: data.squad.filter(s => s.id !== id) });
                 }
             };
 
-            // ... Mission Logic (Same as before)
-            const toggleGlobalMissionVehicle = (uuid) => {
-                setGlobalMissionData(prev => ({
-                    ...prev,
-                    vehicles: prev.vehicles.includes(uuid) ? prev.vehicles.filter(id => id !== uuid) : [...prev.vehicles, uuid]
-                }));
-            };
+            if (!user) return <LoginScreen onLogin={(role, identity) => { setUserRole(role); setUser(identity); }} squad={data.squad} />;
 
-            const submitGlobalMission = () => {
-                if (!globalMissionData.title || globalMissionData.vehicles.length === 0) return alert("Titre ou véhicules manquants");
-                const missionId = `OP_${Date.now()}`;
-                const newMission = { id: missionId, title: globalMissionData.title, startTime: new Date().toLocaleTimeString() };
-                
-                setMissions([...missions, newMission]);
-                setUnits(units.map(u => {
-                    if (globalMissionData.vehicles.includes(u.uuid)) {
-                        return { ...u, missionId: missionId, missionName: globalMissionData.title };
-                    }
-                    return u;
-                }));
-                
-                addLog(`CRÉATION OPÉRATION: ${globalMissionData.title}`, 'C2');
-                setShowGlobalMissionModal(false);
-                setGlobalMissionData({ title: '', vehicles: [] });
-            };
-
-            const endWholeMission = (mId) => {
-                if(!confirm("TERMINER L'OPÉRATION ?")) return;
-                setUnits(units.map(u => u.missionId === mId ? { ...u, missionId: null, missionName: null } : u));
-                setMissions(missions.filter(m => m.id !== mId));
-                addLog(`FIN OPÉRATION`, 'C2');
-            };
-
-            const filteredUnits = units.filter(u => {
-                if (filter === 'ALL') return true;
-                if (filter === 'DAMAGED') return u.status === 'damaged';
-                return u.status === filter;
-            });
-
-            const stats = {
-                ops: units.filter(u => u.status === 'operational').length,
-                mis: units.filter(u => u.status === 'mission').length,
-                rep: units.filter(u => u.status === 'damaged').length
-            };
-
-            if (!userRole) return <LoginScreen onLogin={(r, i) => { setUserRole(r); setUserIdentity(i); }} squad={squad} />;
+            const filteredUnits = data.units.filter(u => filter === 'ALL' || u.status === filter);
+            const rtbRequests = data.units.filter(u => u.rtbStatus === 'requested');
 
             return (
-                <div className="h-screen bg-black text-green-500 flex flex-col overflow-hidden font-mono">
-                    {/* Header */}
-                    <header className="h-14 border-b border-green-900 flex justify-between items-center px-4 bg-black z-20">
-                        <div className="flex items-center gap-3">
-                            <Icon name="Activity" className="text-green-500 animate-pulse"/>
+                <div className="h-screen flex flex-col bg-[#050505] text-gray-300 select-none">
+                    {/* TOP BAR */}
+                    <header className="h-14 border-b border-green-900 bg-black flex items-center justify-between px-4 z-20">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-green-900/20 rounded flex items-center justify-center border border-green-800">
+                                <span className={`font-black text-lg ${user.rank.color.split(' ')[0]}`}>{user.rank.short}</span>
+                            </div>
                             <div>
-                                <h1 className="font-black text-lg tracking-widest leading-none">LOGI-OPS <span className="text-xs text-green-700">V16.5</span></h1>
-                                <div className="text-[10px] text-gray-500">{userIdentity} // {userRole}</div>
+                                <h1 className="font-bold text-white leading-none">{user.name}</h1>
+                                <div className="text-[10px] text-gray-500 uppercase tracking-widest">{userRole} // {user.rank.label}</div>
                             </div>
                         </div>
                         <div className="text-right">
-                            <div className="text-[9px] text-green-800 font-bold">SUPPLY</div>
-                            <div className="text-xl font-black text-white">{supply.toLocaleString()}</div>
+                             <div className="text-[9px] text-green-700 font-bold">LOGISTIQUE POINTS</div>
+                             <div className="text-xl font-mono text-white font-bold">{data.supply}</div>
                         </div>
                     </header>
 
-                    {/* Main Body */}
                     <div className="flex-1 flex overflow-hidden">
-                        {/* Sidebar */}
-                        <nav className="w-16 bg-black border-r border-green-900 flex flex-col items-center py-4 gap-4">
-                            <button onClick={()=>setActiveTab('dashboard')} className={`p-2 rounded ${activeTab==='dashboard'?'bg-green-900/30 text-white':'text-gray-600'}`}><Icon name="LayoutDashboard" size={24}/></button>
-                            <button onClick={()=>setActiveTab('missions')} className={`p-2 rounded ${activeTab==='missions'?'bg-green-900/30 text-white':'text-gray-600'}`}><Icon name="Briefcase" size={24}/></button>
-                            {isSL && <button onClick={()=>setActiveTab('garage')} className={`p-2 rounded ${activeTab==='garage'?'bg-green-900/30 text-white':'text-gray-600'}`}><Icon name="Warehouse" size={24}/></button>}
-                            <button onClick={()=>setActiveTab('squad')} className={`p-2 rounded ${activeTab==='squad'?'bg-green-900/30 text-white':'text-gray-600'}`}><Icon name="Users" size={24}/></button>
-                            <button onClick={()=>setActiveTab('journal')} className={`p-2 rounded ${activeTab==='journal'?'bg-green-900/30 text-white':'text-gray-600'}`}><Icon name="ScrollText" size={24}/></button>
-                            <div className="mt-auto"><button onClick={()=>StorageService.clear()} className="text-red-600 hover:text-red-400"><Icon name="Power" size={24}/></button></div>
+                        {/* SIDEBAR */}
+                        <nav className="w-16 border-r border-green-900 bg-black flex flex-col items-center py-4 gap-6">
+                            <button onClick={()=>setTab('dashboard')} className={`p-2 rounded transition-all ${tab==='dashboard' ? 'bg-green-800 text-white' : 'text-gray-600 hover:text-green-500'}`}><Icon name="Truck" size={24}/></button>
+                            <button onClick={()=>setTab('missions')} className={`p-2 rounded transition-all relative ${tab==='missions' ? 'bg-green-800 text-white' : 'text-gray-600 hover:text-green-500'}`}>
+                                <Icon name="Plane" size={24}/>
+                                {rtbRequests.length > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full animate-ping"></span>}
+                            </button>
+                            {userRole === 'SL' && <button onClick={()=>setTab('garage')} className={`p-2 rounded transition-all ${tab==='garage' ? 'bg-green-800 text-white' : 'text-gray-600 hover:text-green-500'}`}><Icon name="Shield" size={24}/></button>}
+                            <button onClick={()=>setTab('squad')} className={`p-2 rounded transition-all ${tab==='squad' ? 'bg-green-800 text-white' : 'text-gray-600 hover:text-green-500'}`}><Icon name="User" size={24}/></button>
                         </nav>
 
-                        {/* Content */}
-                        <main className="flex-1 relative p-4 overflow-y-auto bg-grid-pattern">
+                        {/* MAIN CONTENT */}
+                        <main className="flex-1 overflow-y-auto bg-grid-pattern p-4 relative">
                             
-                            {activeTab === 'dashboard' && (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-4 gap-2">
-                                        <StatCard color="gray" value={units.length} label="TOTAL" active={filter==='ALL'} onClick={()=>setFilter('ALL')} />
-                                        <StatCard color="green" value={stats.ops} label="DISPO" active={filter==='operational'} onClick={()=>setFilter('operational')} />
-                                        <StatCard color="blue" value={stats.mis} label="MISSION" active={filter==='mission'} onClick={()=>setFilter('mission')} />
-                                        <StatCard color="orange" value={stats.rep} label="ATELIER" active={filter==='damaged'} onClick={()=>setFilter('damaged')} />
+                            {/* DASHBOARD */}
+                            {tab === 'dashboard' && (
+                                <div className="space-y-4">
+                                    <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                                        {['ALL', 'operational', 'mission', 'damaged'].map(f => (
+                                            <button key={f} onClick={()=>setFilter(f)} className={`px-4 py-2 border text-xs font-bold uppercase ${filter===f ? 'bg-green-900/40 border-green-500 text-white' : 'border-gray-800 text-gray-600'}`}>
+                                                {f === 'operational' ? 'DISPO' : f}
+                                            </button>
+                                        ))}
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                        {filteredUnits.length === 0 && <div className="col-span-full text-center text-gray-600 py-10 italic">Aucune unité.</div>}
                                         {filteredUnits.map(u => (
-                                            <UnitCard key={u.uuid} unit={u} userIdentity={userIdentity} isSL={isSL} actions={actions} />
+                                            <UnitCard key={u.uuid} unit={u} user={user} isSL={userRole === 'SL'} actions={actions} />
                                         ))}
+                                        {filteredUnits.length === 0 && <div className="col-span-full text-center text-gray-600 py-10 italic">Aucun véhicule.</div>}
                                     </div>
                                 </div>
                             )}
 
-                            {activeTab === 'missions' && (
-                                <div className="space-y-6 animate-in fade-in">
-                                    <div className="flex justify-between items-center border-b border-green-900 pb-4">
-                                        <h2 className="text-xl font-black text-green-500">OPÉRATIONS EN COURS</h2>
-                                        {isSL && <button onClick={() => setShowGlobalMissionModal(true)} className="px-4 py-2 bg-green-600 text-black font-bold text-xs hover:bg-green-500 flex items-center gap-2"><Icon name="PlusCircle" size={16}/> CRÉER OP</button>}
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {missions.length === 0 && <div className="col-span-full text-center text-gray-600 italic py-10">Aucune opération en cours.</div>}
-                                        {missions.map(m => (
-                                            <div key={m.id} className="bg-black border border-green-600 p-4 relative group">
-                                                <div className="flex justify-between items-start mb-4">
-                                                    <h3 className="font-black text-white uppercase text-lg">{m.title}</h3>
-                                                    <span className="text-xs text-green-600 font-mono">{m.startTime}</span>
-                                                </div>
-                                                <div className="space-y-2 mb-4">
-                                                    <div className="text-xs text-gray-400">UNITÉS ASSIGNÉES :</div>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {units.filter(u => u.missionId === m.id).map(u => (
-                                                            <span key={u.uuid} className="text-[9px] border border-green-900 text-green-500 px-1 rounded">{u.name}</span>
-                                                        ))}
-                                                        {units.filter(u => u.missionId === m.id).length === 0 && <span className="text-[9px] text-gray-600">AUCUNE</span>}
+                            {/* MISSIONS & RTB CONTROL */}
+                            {tab === 'missions' && (
+                                <div className="max-w-4xl mx-auto">
+                                    {/* SL RTB APPROVAL */}
+                                    {userRole === 'SL' && rtbRequests.length > 0 && (
+                                        <div className="mb-8 border border-red-900 bg-red-900/10 p-4 rounded animate-pulse">
+                                            <h3 className="text-red-500 font-black mb-4 flex items-center gap-2">⚠️ DEMANDES RTB EN ATTENTE</h3>
+                                            <div className="grid gap-2">
+                                                {rtbRequests.map(u => (
+                                                    <div key={u.uuid} className="flex justify-between items-center bg-black p-3 border border-red-800">
+                                                        <span className="font-bold text-white">{u.name} <span className="text-xs text-gray-400">({u.responsible?.name})</span></span>
+                                                        <div className="flex gap-2">
+                                                            <button onClick={()=>actions.holdRTB(u)} className="px-3 py-1 border border-yellow-600 text-yellow-500 text-xs">ATTENTE</button>
+                                                            <button onClick={()=>actions.approveRTB(u)} className="px-3 py-1 bg-green-600 text-black font-bold text-xs">AUTORISER</button>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                {isSL && <button onClick={() => endWholeMission(m.id)} className="w-full py-2 border border-red-900 text-red-500 text-xs font-bold hover:bg-red-900/20">TERMINER MISSION</button>}
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === 'garage' && isSL && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                    {INITIAL_CATALOG.map((model, i) => (
-                                        <div key={i} className="bg-[#0f0f0f] border border-green-900/50 p-4 rounded flex flex-col gap-3 hover:border-green-500 transition-colors group">
-                                            <div className="flex justify-between items-start">
-                                                <span className="text-[9px] px-1.5 py-0.5 bg-green-900/20 text-green-500 rounded font-bold">{CATEGORIES[model.cat].label}</span>
-                                                <span className="text-[10px] text-gray-600">STOCK: {model.stock}</span>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className={`p-2 rounded bg-black border border-green-900 group-hover:text-green-400 ${CATEGORIES[model.cat].color.split(' ')[1]}`}>
-                                                    <Icon name={CATEGORIES[model.cat].icon} size={24} />
-                                                </div>
-                                                <div>
-                                                    <div className="font-bold text-white text-sm">{model.name}</div>
-                                                    <div className="text-[10px] text-gray-500">SOUTE: {model.cap} SLOTS</div>
-                                                </div>
-                                            </div>
-                                            <button onClick={() => actions.deployUnit(model.id)} className="mt-auto w-full py-2 bg-white text-black font-black text-xs hover:bg-green-400">ACHETER ({model.cost})</button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {activeTab === 'squad' && (
-                                <div className="max-w-2xl mx-auto bg-black border border-green-900 p-6">
-                                    <h2 className="text-lg font-black text-green-500 mb-4 flex items-center gap-2"><Icon name="Users" size={20}/> EFFECTIFS LOGISTIQUES</h2>
-                                    {isSL && (
-                                        <div className="flex gap-2 mb-6 border-b border-green-900 pb-6">
-                                            <input type="text" placeholder="NOM DU MEMBRE..." className="flex-1 bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold uppercase outline-none" value={newMemberName} onChange={e=>setNewMemberName(e.target.value)} />
-                                            <button onClick={actions.addMember} className="px-4 bg-green-600 text-black font-bold text-xs hover:bg-green-500">AJOUTER</button>
                                         </div>
                                     )}
-                                    <div className="space-y-2">
-                                        {squad.length === 0 && <div className="text-gray-600 italic text-center text-sm">Aucun membre.</div>}
-                                        {squad.map(m => (
-                                            <div key={m.id} className="flex justify-between items-center p-3 border border-green-900/30 bg-green-900/5">
-                                                <span className="font-bold text-green-400">{m.name}</span>
-                                                {isSL && <button onClick={() => actions.removeMember(m.id)} className="text-red-500 hover:text-red-400"><Icon name="Trash2" size={16}/></button>}
+
+                                    {/* LOGS */}
+                                    <div className="bg-black/80 border border-green-900 p-4 h-[600px] overflow-y-auto font-mono text-xs">
+                                        <h3 className="text-green-600 font-bold mb-4 sticky top-0 bg-black py-2 border-b border-green-900">JOURNAL DES OPÉRATIONS</h3>
+                                        {data.logs.map(l => (
+                                            <div key={l.id} className={`mb-1 p-1 flex gap-2 ${l.highlight ? 'bg-yellow-900/20 text-yellow-200 border-l-2 border-yellow-500 blink' : 'text-gray-400'}`}>
+                                                <span className="text-green-800 w-16 shrink-0">{l.time}</span>
+                                                <span className="font-bold w-12 shrink-0">{l.type}</span>
+                                                <span>{l.msg}</span>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             )}
 
-                            {activeTab === 'journal' && (
-                                <div className="max-w-3xl mx-auto space-y-1 font-mono text-xs">
-                                    {logs.map(log => (
-                                        <div key={log.id} className="grid grid-cols-[50px_80px_1fr] gap-4 border-b border-green-900/30 py-2 hover:bg-green-900/10 px-2">
-                                            <span className="text-green-700">{log.time}</span>
-                                            <span className="font-bold text-green-500">{log.type}</span>
-                                            <span className="text-gray-400">{log.msg}</span>
+                            {/* GARAGE (ACHAT) - SL ONLY */}
+                            {tab === 'garage' && userRole === 'SL' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    {INITIAL_CATALOG.map(model => (
+                                        <div key={model.id} className="bg-black border border-gray-800 p-4 flex flex-col hover:border-green-600 transition-colors">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className="text-[9px] bg-gray-900 text-gray-400 px-1 rounded">{model.cat}</span>
+                                                <span className="text-green-500 font-bold">{model.cost} PTS</span>
+                                            </div>
+                                            <h3 className="font-bold text-white mb-1">{model.name}</h3>
+                                            <div className="text-[10px] text-gray-500 mb-4">{model.type} • SLOTS: {model.slots} • GRADE: {RANKS[model.minRank].short}</div>
+                                            <button onClick={()=>actions.buyUnit(model)} className="mt-auto w-full py-2 bg-gray-900 text-white text-xs border border-gray-700 hover:bg-green-700 hover:border-green-600">ACHETER</button>
                                         </div>
                                     ))}
                                 </div>
                             )}
+
+                            {/* SQUAD MANAGEMENT */}
+                            {tab === 'squad' && (
+                                <div className="max-w-xl mx-auto bg-black border border-green-900 p-6">
+                                    <h2 className="text-green-500 font-bold mb-6">EFFECTIFS</h2>
+                                    {userRole === 'SL' && (
+                                        <div className="flex gap-2 mb-6">
+                                            <input type="text" id="newMember" className="flex-1 bg-gray-900 border border-green-800 p-2 text-white uppercase text-sm" placeholder="NOUVEAU MEMBRE..." />
+                                            <button onClick={()=>{
+                                                const el = document.getElementById('newMember');
+                                                actions.addSquad(el.value);
+                                                el.value = '';
+                                            }} className="bg-green-700 text-black font-bold px-4 text-xs">AJOUTER</button>
+                                        </div>
+                                    )}
+                                    <div className="space-y-1">
+                                        {data.squad.map(s => (
+                                            <div key={s.id} className="flex justify-between items-center p-2 bg-gray-900/50 border border-gray-800">
+                                                <span className="text-gray-300 font-mono">{s.name}</span>
+                                                {userRole === 'SL' && <button onClick={()=>actions.removeSquad(s.id)} className="text-red-500 text-xs">EXCLURE</button>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                         </main>
                     </div>
 
-                    {/* Modal Create Mission */}
-                    {showGlobalMissionModal && (
-                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                            <div className="bg-black border border-green-500 w-full max-w-lg p-6 shadow-2xl">
-                                <div className="flex justify-between items-center mb-6 border-b border-green-900 pb-2">
-                                    <h3 className="font-black text-lg text-green-500">NOUVELLE OPÉRATION</h3>
-                                    <button onClick={() => setShowGlobalMissionModal(false)}><Icon name="XCircle" className="text-green-700 hover:text-green-500"/></button>
-                                </div>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="text-[10px] font-bold text-green-800 block mb-1">NOM DE CODE</label>
-                                        <input type="text" className="w-full bg-green-900/10 border border-green-800 p-2 text-green-400 font-bold uppercase" placeholder="EX: OPÉRATION RUSTY" value={globalMissionData.title} onChange={e => setGlobalMissionData({...globalMissionData, title: e.target.value})} />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold text-green-800 block mb-1">SÉLECTIONNER VÉHICULES DISPONIBLES</label>
-                                        <div className="max-h-40 overflow-y-auto border border-green-900/30 p-2 space-y-1">
-                                            {units.filter(u => u.status === 'operational').length === 0 && <div className="text-gray-600 text-xs italic text-center">Aucun véhicule dispo.</div>}
-                                            {units.filter(u => u.status === 'operational').map(u => (
-                                                <div key={u.uuid} onClick={() => toggleGlobalMissionVehicle(u.uuid)} className={`p-2 border cursor-pointer flex justify-between items-center ${globalMissionData.vehicles.includes(u.uuid) ? 'bg-green-900/30 border-green-500' : 'border-green-900/30 hover:bg-green-900/10'}`}>
-                                                    <span className="text-xs font-bold text-gray-300">{u.name}</span>
-                                                    {globalMissionData.vehicles.includes(u.uuid) && <Icon name="Check" size={14} className="text-green-500"/>}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <button onClick={submitGlobalMission} className="w-full py-3 bg-green-600 text-black font-black text-sm hover:bg-green-500 mt-4">VALIDER L'ORDRE</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Modal Logs */}
-                    {modal?.type === 'logs' && (
-                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                            <div className="bg-[#0f0f0f] border border-green-800 w-full max-w-md max-h-[80vh] flex flex-col rounded p-4">
-                                <div className="flex justify-between mb-4 border-b border-green-900 pb-2">
-                                    <h3 className="font-bold text-white">HISTORIQUE {modal.unit.name}</h3>
-                                    <button onClick={()=>setModal(null)}><Icon name="X" className="text-gray-500"/></button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto space-y-2 text-xs font-mono">
-                                    {modal.unit.logs.slice().reverse().map((l, i) => (
-                                        <div key={i} className="text-gray-400"><span className="text-green-700 mr-2">{l.time}</span>{l.msg}</div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
+                    {/* MODALS */}
+                    {rtbModalUnit && (
+                        <RTBCheckModal 
+                            unit={rtbModalUnit} 
+                            onClose={()=>setRtbModalUnit(null)} 
+                            onConfirm={actions.finalizeRTB} 
+                        />
                     )}
                 </div>
             );
-        }
+        };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<LogiOpsApp />);
+        root.render(<App />);
     </script>
 </body>
 </html>
