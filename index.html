@@ -37,7 +37,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // --- CONFIGURATION FIREBASE ---
+        // --- CONFIGURATION FIREBASE (FORCÉE SUR logiops-data) ---
         const firebaseConfig = {
             apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
             authDomain: "logiops-data.firebaseapp.com",
@@ -50,27 +50,32 @@
 
         let db = null;
         let USE_FIREBASE = false;
-        const isConfigured = firebaseConfig.projectId !== "PROJECT_ID";
+        
+        // Modification ici : On vérifie D'ABORD ta config perso avant celle de l'environnement
+        const hasUserConfig = firebaseConfig.projectId !== "PROJECT_ID";
 
-        if (typeof __firebase_config !== 'undefined') {
-            try {
+        try {
+            if (hasUserConfig) {
+                console.log("Connexion à la Firebase PERSONNELLE:", firebaseConfig.projectId);
+                if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                USE_FIREBASE = true;
+            } else if (typeof __firebase_config !== 'undefined') {
+                console.log("Connexion à la Firebase ENVIRONNEMENT (Défaut)");
                 const envConfig = JSON.parse(__firebase_config);
                 if (!firebase.apps.length) firebase.initializeApp(envConfig);
                 db = firebase.firestore();
                 USE_FIREBASE = true;
-            } catch (e) { console.warn("Erreur init Canvas config", e); }
-        } else if (isConfigured) {
-            try {
-                if (!firebase.apps.length) {
-                    const app = firebase.initializeApp(firebaseConfig);
-                    if (firebase.analytics) { firebase.analytics(); }
-                }
-                db = firebase.firestore();
-                USE_FIREBASE = true;
-            } catch (e) { USE_FIREBASE = false; }
-        } else { USE_FIREBASE = false; }
+            } else {
+                console.warn("Aucune config Firebase valide trouvée. Mode LOCAL.");
+            }
+        } catch (e) {
+            console.error("Erreur Initialisation Firebase:", e);
+            USE_FIREBASE = false;
+        }
 
-        const SESSION_ID = typeof __app_id !== 'undefined' ? __app_id : "operation_full_spectrum";
+        // On remet l'ID de session de la V17 pour retrouver les données
+        const SESSION_ID = typeof __app_id !== 'undefined' ? __app_id : "operation_actuelle";
         
         const getRef = () => {
             if (!db) return null;
@@ -83,7 +88,8 @@
             save: (data) => {
                 if (USE_FIREBASE && db) {
                     const auth = firebase.auth();
-                    if(auth.currentUser) getRef().set(data, { merge: true }).catch(err => console.warn(err));
+                    // Tentative de sauvegarde même si auth anonyme en cours
+                    getRef().set(data, { merge: true }).catch(err => console.warn("Erreur sauvegarde Cloud:", err));
                 } else {
                     try {
                         const existing = JSON.parse(localStorage.getItem('logiops_v18') || '{}');
@@ -96,13 +102,20 @@
                     const auth = firebase.auth();
                     if (!auth.currentUser) {
                         try {
-                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await auth.signInWithCustomToken(__initial_auth_token);
-                            else await auth.signInAnonymously();
-                        } catch (e) { console.warn("Auth failed", e); }
+                            // On force l'anonyme si pas de token, car c'est souvent le cas sur les projets perso
+                            await auth.signInAnonymously();
+                        } catch (e) { console.warn("Auth Anonyme échouée (CORS?):", e); }
                     }
                     return getRef().onSnapshot((doc) => {
-                        if (doc.exists) callback(doc.data()); else callback(null);
+                        if (doc.exists) {
+                            console.log("Données Cloud récupérées !");
+                            callback(doc.data());
+                        } else {
+                            console.log("Aucune donnée Cloud trouvée pour cette session.");
+                            callback(null);
+                        }
                     }, err => {
+                        console.error("Erreur Lecture Cloud (Permissions?):", err);
                         const local = localStorage.getItem('logiops_v18');
                         if (local) callback(JSON.parse(local));
                     });
@@ -193,16 +206,19 @@
             Fuel: <path d="M3 22v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8M8 12V7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v5M12 2v3"/>,
             User: <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8"/>,
             Users: <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>,
-            SteeringWheel: <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm-1-7h2v6h-2zm-5-2l2 1l3-5l-2-1zm10 1l2-1l-2-1l-3 5z"/>, 
+            SteeringWheel: <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm-1-7h2v6h-2zm-5-2l2 1l3-5l-2-1zm10 1l2-1l-2-1l-3 5z"/>, // Simplified
             List: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>,
             Activity: <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
             Package: <path d="M16.5 9.4L7.55 4.24M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/>,
+            
+            /* CORRECTION: Ajout des fragments <> ... </> pour les éléments multiples */
             Crosshair: <><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></>,
             Warehouse: <path d="M3 21v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8M12 11v10"/>,
             Layout: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></>,
             Plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
             Trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>,
             Skull: <><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/><path d="M12.5 17l-.5-1l-.5 1h1z"/><path d="M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20"/></>,
+            
             MessageSquare: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         };
 
@@ -224,6 +240,7 @@
                 <div className="fixed inset-0 bg-black/90 backdrop-blur z-50 flex items-center justify-center p-4">
                     <div className="w-full max-w-sm bg-[#090909] border border-yellow-600 p-4 shadow-2xl rounded">
                         <h3 className="text-yellow-500 font-black text-lg mb-4 uppercase border-b border-yellow-900 pb-2">ENVOYER SITREP</h3>
+                        
                         <div className="space-y-4">
                             <div>
                                 <label className="text-[10px] text-gray-500 font-bold block mb-1">CODE ALERTE</label>
@@ -233,14 +250,17 @@
                                     <button onClick={()=>setCode('red')} className={`flex-1 py-2 border font-bold text-xs ${code==='red'?'bg-red-600 text-black border-red-500':'border-red-900 text-red-700'}`}>ROUGE</button>
                                 </div>
                             </div>
+
                             <div>
                                 <label className="text-[10px] text-gray-500 font-bold block mb-1">POSITION ACTUELLE</label>
                                 <input type="text" className="w-full bg-gray-900 border border-gray-700 p-2 text-white text-sm" value={location} onChange={e=>setLocation(e.target.value)} placeholder="Ex: Grille C4, FOB..." />
                             </div>
+
                             <div>
                                 <label className="text-[10px] text-gray-500 font-bold block mb-1">DÉTAILS / MESSAGE</label>
                                 <textarea className="w-full bg-gray-900 border border-gray-700 p-2 text-white text-sm h-20" value={details} onChange={e=>setDetails(e.target.value)} placeholder="Ex: Contact ennemi, demande munitions..." />
                             </div>
+
                             <div className="flex gap-2 pt-2">
                                 <button onClick={onClose} className="flex-1 py-2 border border-gray-700 text-gray-500 text-xs">ANNULER</button>
                                 <button onClick={()=>onSend(code, location, details)} disabled={!location} className="flex-1 py-2 bg-yellow-600 text-black font-bold text-xs hover:bg-yellow-500 disabled:opacity-50">ENVOYER</button>
@@ -263,6 +283,7 @@
                         <div className="absolute top-0 left-0 w-full h-1 bg-orange-600"></div>
                         <h3 className="text-orange-500 font-black text-xl mb-2 uppercase flex items-center gap-2"><Icon name="Wrench"/> ATELIER MÉCANIQUE</h3>
                         <p className="text-xs text-gray-400 mb-6">VÉHICULE: <span className="text-white font-bold">{unit.name}</span></p>
+
                         <div className="space-y-6 mb-8">
                             <div>
                                 <label className="flex justify-between text-xs font-bold text-blue-400 mb-2"><span>NIVEAU CARBURANT</span><span>{fuel}%</span></label>
@@ -273,9 +294,13 @@
                                 <input type="range" min="0" max="100" value={health} onChange={e=>setHealth(e.target.value)} className="w-full accent-green-500 h-4 bg-gray-800 appearance-none rounded cursor-pointer"/>
                             </div>
                         </div>
+
                         <div className="p-3 bg-gray-900 border border-gray-700 mb-6 text-center rounded">
-                            <div className={`text-sm font-bold uppercase ${isFixed ? 'text-green-500 animate-pulse' : 'text-red-500'}`}>{isFixed ? "RÉPARATIONS TERMINÉES" : "RÉPARATIONS EN COURS..."}</div>
+                            <div className={`text-sm font-bold uppercase ${isFixed ? 'text-green-500 animate-pulse' : 'text-red-500'}`}>
+                                {isFixed ? "RÉPARATIONS TERMINÉES" : "RÉPARATIONS EN COURS..."}
+                            </div>
                         </div>
+
                         <div className="flex gap-3">
                             <button onClick={onClose} className="flex-1 py-3 border border-gray-700 text-gray-500 text-xs font-bold hover:text-white">PAUSE</button>
                             <button onClick={onConfirm} disabled={!isFixed} className="flex-1 py-3 bg-green-600 text-black font-black text-xs hover:bg-green-500 disabled:opacity-20 disabled:bg-gray-800 disabled:text-gray-500">VALIDER SORTIE</button>
@@ -297,6 +322,7 @@
                             <h3 className="text-green-500 font-black text-lg uppercase">GESTION LOGISTIQUE (SUPPLY)</h3>
                             <button onClick={onClose} className="text-gray-500 hover:text-white"><Icon name="List"/></button>
                         </div>
+
                         <div className="flex-1 overflow-y-auto space-y-2 mb-6">
                             {sources.map(s => (
                                 <div key={s.id} className="flex justify-between items-center bg-gray-900 p-3 border border-gray-800 rounded">
@@ -308,6 +334,7 @@
                                 </div>
                             ))}
                         </div>
+
                         <div className="bg-green-900/10 p-3 border border-green-900 rounded">
                             <h4 className="text-xs font-bold text-green-600 mb-2">NOUVEAU LIEU DE STOCKAGE</h4>
                             <div className="flex gap-2">
