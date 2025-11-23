@@ -3,42 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V19.1 (ARMORY)</title>
+    <title>LOGIOPS - Centre Opérationnel</title>
     
-    <!-- React & ReactDOM -->
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        mil: {
+                            900: '#0a0f0d',
+                            800: '#111a16',
+                            700: '#1a2621',
+                            green: '#00ff41',
+                            dim: '#008F11',
+                            alert: '#ff3333',
+                            warn: '#ffcc00'
+                        }
+                    },
+                    backgroundImage: {
+                        'grid-pattern': "linear-gradient(to right, #1a2621 1px, transparent 1px), linear-gradient(to bottom, #1a2621 1px, transparent 1px)"
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- React & ReactDOM (UMD) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
     <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Firebase (Compat) -->
+
+    <!-- Firebase Compat SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics-compat.js"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
-        body { font-family: 'JetBrains Mono', monospace; background-color: #050505; overflow: hidden; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #14532d; }
-        ::-webkit-scrollbar-thumb { background: #14532d; border: 1px solid #000; }
-        ::-webkit-scrollbar-thumb:hover { background: #22c55e; }
-        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-        .login-scan { background: linear-gradient(to bottom, transparent 50%, rgba(0, 255, 0, 0.02) 51%, transparent 51%); background-size: 100% 4px; animation: scan 2s linear infinite; }
-        @keyframes scan { 0% { background-position: 0 0; } 100% { background-position: 0 100%; } }
-        .grid-pattern { background-image: linear-gradient(rgba(0, 255, 0, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 255, 0, 0.05) 1px, transparent 1px); background-size: 20px 20px; }
+        body {
+            background-color: #050807;
+            color: #e0e0e0;
+        }
+        .scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 10;
+            background: linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0, 255, 65, 0.04) 50%, rgba(0,0,0,0) 100%);
+            opacity: 0.1;
+            position: absolute;
+            bottom: 100%;
+            animation: scanline 10s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            100% { bottom: -100px; }
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #111a16; }
+        ::-webkit-scrollbar-thumb { background: #008F11; }
+        ::-webkit-scrollbar-thumb:hover { background: #00ff41; }
+        
+        .crt-flicker {
+            animation: flicker 0.15s infinite;
+        }
+        @keyframes flicker {
+            0% { opacity: 0.97; }
+            50% { opacity: 1; }
+            100% { opacity: 0.98; }
+        }
     </style>
 </head>
-<body>
+<body class="font-mono overflow-hidden h-screen w-screen text-sm">
     <div id="root"></div>
 
     <script type="text/babel">
-        // --- CONFIGURATION FIREBASE ---
+        /*******************************************************
+         * 1. CONFIGURATION & INITIALISATION FIREBASE
+         *******************************************************/
         const firebaseConfig = {
             apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
             authDomain: "logiops-data.firebaseapp.com",
@@ -52,872 +105,587 @@
         let db = null;
         let USE_FIREBASE = false;
         let IS_CUSTOM_DB = false;
-        
+
         try {
             if (!firebase.apps.length) {
                 const app = firebase.initializeApp(firebaseConfig);
-                if (typeof firebase.analytics === 'function') firebase.analytics(); 
+                if (typeof firebase.analytics === 'function') firebase.analytics();
             }
             db = firebase.firestore();
             USE_FIREBASE = true;
             IS_CUSTOM_DB = true;
-            console.log("Firebase connecté à :", firebaseConfig.projectId);
+            console.log("🔥 Firebase connecté à :", firebaseConfig.projectId);
         } catch (e) {
-            console.warn("Erreur Initialisation Firebase (Mode Local):", e);
+            console.warn("⚠️ Erreur Initialisation Firebase (Mode Local):", e);
             USE_FIREBASE = false;
         }
 
-        const SESSION_ID = "operation_actuelle";
+        /*******************************************************
+         * 2. SERVICE DE STOCKAGE (HYBRIDE)
+         *******************************************************/
+        const LOCAL_STORAGE_KEY = "logiops_v19_1";
         
-        const getRef = () => {
-            if (!db) return null;
-            if (IS_CUSTOM_DB) return db.collection('logiops').doc(SESSION_ID);
-            return db.collection('artifacts').doc('default').collection('public').doc('data').collection('logiops').doc('global');
+        const DEFAULT_DATA = {
+            units: [],
+            logs: [],
+            squad: [],
+            sitreps: [],
+            destroyedHistory: [],
+            missions: [],
+            supplySources: [{ id: "main", name: "BASE PRINCIPALE", amount: 5000 }]
         };
 
         const StorageService = {
-            save: (data) => {
-                if (USE_FIREBASE && db && firebase.auth().currentUser) {
-                    getRef().set(data, { merge: true }).catch(err => console.warn("Erreur Cloud:", err));
-                } else {
+            // Sauvegarde (Cloud ou Local)
+            save: async (newData) => {
+                const timestamp = new Date().toISOString();
+                if (USE_FIREBASE && db) {
                     try {
-                        const existing = JSON.parse(localStorage.getItem('logiops_v19_1') || '{}');
-                        localStorage.setItem('logiops_v19_1', JSON.stringify({ ...existing, ...data }));
-                    } catch (e) { console.warn(e); }
+                        await db.collection('logiops').doc('operation_actuelle').set(newData, { merge: true });
+                    } catch (err) {
+                        console.error("Save Error Firebase:", err);
+                    }
+                } else {
+                    // LocalStorage Fallback
+                    const current = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || JSON.stringify(DEFAULT_DATA));
+                    const merged = { ...current, ...newData };
+                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
                 }
             },
-            loadInitial: async (callback) => {
-                let useLocal = true;
+
+            // Chargement initial + Subscription
+            loadInitial: (onUpdate) => {
                 if (USE_FIREBASE && db) {
-                    const auth = firebase.auth();
-                    try {
-                        if (!auth.currentUser) await auth.signInAnonymously();
-                        useLocal = false;
-                        return getRef().onSnapshot((doc) => {
-                            if (doc.exists) callback(doc.data());
-                            else callback(null);
-                        }, err => {
-                            console.error("Erreur Lecture Cloud:", err);
-                            const local = localStorage.getItem('logiops_v19_1');
-                            if (local) callback(JSON.parse(local));
+                    // Mode Temps Réel
+                    return db.collection('logiops').doc('operation_actuelle')
+                        .onSnapshot((doc) => {
+                            if (doc.exists) {
+                                const data = doc.data();
+                                // Merge soft pour éviter d'écraser des champs manquants
+                                onUpdate({ ...DEFAULT_DATA, ...data });
+                            } else {
+                                // Init doc s'il n'existe pas
+                                db.collection('logiops').doc('operation_actuelle').set(DEFAULT_DATA);
+                                onUpdate(DEFAULT_DATA);
+                            }
+                        }, (error) => {
+                            console.error("Snapshot Error:", error);
+                            // Fallback si la co coupe en cours de route ?
                         });
-                    } catch (e) { console.warn("Auth Cloud échec (Mode Local):", e); }
-                }
-                if (useLocal) {
-                    const local = localStorage.getItem('logiops_v19_1');
-                    if (local) callback(JSON.parse(local)); else callback(null);
-                    return () => {};
+                } else {
+                    // Mode Local
+                    const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
+                    if (localData) {
+                        onUpdate(JSON.parse(localData));
+                    } else {
+                        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(DEFAULT_DATA));
+                        onUpdate(DEFAULT_DATA);
+                    }
+                    // Simulation d'un "listener" local rudimentaire via setInterval ou events si besoin
+                    // Ici on renvoie une fonction de cleanup vide
+                    return () => {}; 
                 }
             }
         };
 
-        const { useState, useEffect, useMemo } = React;
+        /*******************************************************
+         * 3. ICONS (SVG)
+         *******************************************************/
+        const Icons = {
+            Tank: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>,
+            Truck: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>,
+            Wrench: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+            Alert: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+            Check: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+            Refresh: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+            Trash: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+        };
 
-        const useData = () => {
-            const [data, setData] = useState({ 
-                units: [], logs: [], squad: [], sitreps: [], destroyedHistory: [], missions: [],
-                supplySources: [{id: 'main', name: 'BASE PRINCIPALE', amount: 5000}] 
-            });
-            const [isConnected, setIsConnected] = useState(false);
+        /*******************************************************
+         * 4. HOOKS & UTILS
+         *******************************************************/
+        
+        function useData() {
+            const [data, setData] = React.useState(null);
+            const [isConnected, setIsConnected] = React.useState(false);
 
-            useEffect(() => {
-                let unsubscribe = () => {};
-                const init = async () => {
-                    unsubscribe = await StorageService.loadInitial((newData) => {
-                        if(newData) {
-                            setData(prev => ({...prev, ...newData}));
-                            if (USE_FIREBASE && firebase.auth().currentUser) setIsConnected(true);
-                        }
-                    });
-                };
-                init();
-                return () => { if(typeof unsubscribe === 'function') unsubscribe(); };
+            React.useEffect(() => {
+                const unsubscribe = StorageService.loadInitial((newData) => {
+                    setData(newData);
+                    setIsConnected(USE_FIREBASE);
+                });
+                return () => unsubscribe();
             }, []);
 
-            const save = (newData) => {
-                setData(prev => {
-                    const updated = { ...prev, ...newData };
-                    StorageService.save(updated);
-                    return updated;
-                });
+            const save = (updatePayload) => {
+                // updatePayload doit contenir l'objet complet ou partiel pour Firestore merge
+                StorageService.save(updatePayload);
             };
 
-            return [data, save, isConnected];
-        };
+            const addLog = (message, author) => {
+                if (!data) return;
+                const newLog = {
+                    id: Date.now(),
+                    timestamp: new Date().toLocaleTimeString(),
+                    message,
+                    author
+                };
+                const updatedLogs = [newLog, ...data.logs].slice(0, 50); // Garder les 50 derniers
+                save({ logs: updatedLogs });
+            };
 
-        // --- CONSTANTS ---
-        const RANKS = [
-            { id: 0, label: 'Recrue', short: 'REC', color: 'text-gray-500' },
-            { id: 1, label: 'Soldat', short: 'SDT', color: 'text-green-700' },
-            { id: 2, label: '1ere Classe', short: '1CL', color: 'text-red-700' },
-            { id: 3, label: 'Caporal', short: 'CPL', color: 'text-red-600' },
-            { id: 4, label: 'Caporal-Chef', short: 'CCH', color: 'text-yellow-600' },
-            { id: 5, label: 'Sergent', short: 'SGT', color: 'text-yellow-400' },
-            { id: 6, label: 'Sergent-Chef', short: 'SCH', color: 'text-yellow-300' },
-            { id: 7, label: 'Adjudant', short: 'ADJ', color: 'text-white border-t border-red-500' },
-            { id: 8, label: 'Major', short: 'MAJ', color: 'text-white border-b border-yellow-500' },
-            { id: 9, label: 'Lieutenant', short: 'LNT', color: 'text-yellow-100' },
-            { id: 10, label: 'Capitaine', short: 'CNE', color: 'text-yellow-100 font-black' }
+            return { data, save, addLog, isConnected };
+        }
+
+        const VEHICLE_CATALOG = [
+            { id: 'logi_truck', name: 'Logi Truck (R-37)', cost: 0, type: 'logi', maxHp: 100, maxFuel: 1000 },
+            { id: 'transport', name: 'Transport Troop', cost: 0, type: 'transport', maxHp: 80, maxFuel: 600 },
+            { id: 'jeep_mg', name: 'Light Jeep MG', cost: 0, type: 'light', maxHp: 50, maxFuel: 400 },
+            { id: 'apc_wheel', name: 'BTR-80 (Wheeled)', cost: 0, type: 'armor', maxHp: 300, maxFuel: 800 },
+            { id: 'mbt', name: 'T-72 (MBT)', cost: 0, type: 'armor', maxHp: 1200, maxFuel: 1200 },
         ];
 
-        // --- CATALOGUE COMPLET (ARMORY) ---
-        const INITIAL_CATALOG = [
-            // LOGISTIQUE
-            { id: 'l1', cat: 'LOGI', name: 'JEEP EM', type: 'TRANSPORT EM', cost: 110, slots: 2, minRank: 0 },
-            { id: 'l2', cat: 'LOGI', name: 'CAMION RÉPA.', type: 'MAINTENANCE', cost: 175, slots: 2, minRank: 1 },
-            { id: 'l3', cat: 'LOGI', name: 'QG MOBILE', type: 'EM MOBILE', cost: 420, slots: 4, minRank: 5 },
-            { id: 'l4', cat: 'LOGI', name: 'CAMION CITERNE', type: 'RAVITAILLEMENT', cost: 160, slots: 2, minRank: 1 },
-            { id: 'l5', cat: 'LOGI', name: 'CAMION ARSENAL', type: 'RAVITAILLEMENT', cost: 380, slots: 2, minRank: 1 },
-            { id: 'l6', cat: 'LOGI', name: 'CAMION CONST.', type: 'RAVITAILLEMENT', cost: 260, slots: 2, minRank: 1 },
+        /*******************************************************
+         * 5. COMPOSANTS UI
+         *******************************************************/
 
-            // TRANSPORT
-            { id: 't1', cat: 'TRANS', name: 'CAMION TROUPES', type: 'TRANSPORT', cost: 200, slots: 2, minRank: 1 },
-            { id: 't2', cat: 'TRANS', name: 'VAB', type: 'TRANSPORT BLINDÉ', cost: 1200, slots: 2, minRank: 1 },
-            { id: 't3', cat: 'TRANS', name: 'STRYKER (NON ARMÉ)', type: 'TRANSPORT', cost: 1000, slots: 3, minRank: 1 },
+        // --- AUTHENTIFICATION ---
+        const AuthScreen = ({ onLogin }) => {
+            const [pseudo, setPseudo] = React.useState('');
+            const [role, setRole] = React.useState('SL');
+            const [grade, setGrade] = React.useState('Sgt');
 
-            // BLINDÉS LÉGERS (JLTV)
-            { id: 'b1', cat: 'BLINDE', name: 'JLTV M1280', type: 'LÉGER NON-ARMÉ', cost: 650, slots: 3, minRank: 1 },
-            { id: 'b2', cat: 'BLINDE', name: 'JLTV M1281 M2HB', type: 'LÉGER 12.7', cost: 1000, slots: 3, minRank: 1 },
-            { id: 'b3', cat: 'BLINDE', name: 'JLTV M1281 M134', type: 'LÉGER 7.62', cost: 2000, slots: 3, minRank: 1 },
-            { id: 'b4', cat: 'BLINDE', name: 'JLTV M1278 CROWS', type: 'LÉGER TÉLÉ-OP', cost: 1500, slots: 3, minRank: 1 },
-            { id: 'b5', cat: 'BLINDE', name: 'JLTV AN-MSY-2 v2', type: 'LÉGER 7.62 TÉLÉ', cost: 2750, slots: 3, minRank: 2 },
-            { id: 'b6', cat: 'BLINDE', name: 'JLTV M1278 30MM', type: 'LÉGER CANON', cost: 2750, slots: 3, minRank: 2 },
-            { id: 'b7', cat: 'BLINDE', name: 'JLTV 30MM JAVELIN', type: 'LÉGER ATGM', cost: 3700, slots: 3, minRank: 3 },
-            { id: 'b8', cat: 'BLINDE', name: 'JLTV 30MM STINGER', type: 'LÉGER AA', cost: 3700, slots: 3, minRank: 3 },
-
-            // VCI
-            { id: 'c1', cat: 'VCI', name: 'STRYKER M1126', type: 'VCI 12.7', cost: 2000, slots: 3, minRank: 2 },
-            { id: 'c2', cat: 'VCI', name: 'STRYKER M1296', type: 'VCI 30MM', cost: 3000, slots: 3, minRank: 3 },
-            { id: 'c3', cat: 'VCI', name: 'STRYKER M1128', type: 'VCI 105MM', cost: 5000, slots: 3, minRank: 3 },
-
-            // SANITAIRE
-            { id: 's1', cat: 'SANTE', name: 'STRYKER EVASAN', type: 'SANITAIRE', cost: 975, slots: 3, minRank: 1 },
-            { id: 's2', cat: 'SANTE', name: 'VAB EVASAN', type: 'SANITAIRE', cost: 900, slots: 3, minRank: 1 },
-
-            // CHARS
-            { id: 'h1', cat: 'CHAR', name: 'LECLERC', type: 'CHAR LOURD', cost: 8000, slots: 3, minRank: 3 },
-            { id: 'h2', cat: 'CHAR', name: 'LECLERC XLR', type: 'CHAR LOURD', cost: 8300, slots: 3, minRank: 3 },
-
-            // AIR
-            { id: 'a1', cat: 'AIR', name: 'NH90 FAUCON (MED)', type: 'MEDEVAC', cost: 3000, slots: 2, minRank: 6 },
-            { id: 'a2', cat: 'AIR', name: 'NH90 FAUCON (TRANS)', type: 'TRANSPORT', cost: 3000, slots: 2, minRank: 6 },
-            { id: 'a3', cat: 'AIR', name: 'GAZELLE (NON-ARMÉE)', type: 'RECO', cost: 2500, slots: 2, minRank: 6 },
-            { id: 'a4', cat: 'AIR', name: 'GAZELLE STRIKE', type: 'TIREUR ÉLITE', cost: 3000, slots: 2, minRank: 6 },
-            { id: 'a5', cat: 'AIR', name: 'GAZELLE 20MM', type: 'CANON', cost: 3500, slots: 2, minRank: 6 },
-            { id: 'a6', cat: 'AIR', name: 'GAZELLE HAP', type: 'ROQUETTES', cost: 3500, slots: 2, minRank: 6 },
-            { id: 'a7', cat: 'AIR', name: 'EC665 TIGRE', type: 'HÉLICO ATTAQUE', cost: 7000, slots: 2, minRank: 6 },
-        ];
-
-        const CATEGORIES = {
-            'LOGI': { label: 'LOGISTIQUE', icon: 'Truck', color: 'text-yellow-500' },
-            'TRANS': { label: 'TRANSPORT', icon: 'Package', color: 'text-blue-400' },
-            'BLINDE': { label: 'BLINDÉS', icon: 'Shield', color: 'text-orange-400' },
-            'VCI': { label: 'VCI', icon: 'Crosshair', color: 'text-red-400' },
-            'SANTE': { label: 'SANITAIRE', icon: 'Activity', color: 'text-emerald-400' },
-            'CHAR': { label: 'LOURD', icon: 'Shield', color: 'text-purple-400' },
-            'AIR': { label: 'AÉRIEN', icon: 'Plane', color: 'text-cyan-300' },
-        };
-
-        const Icons = {
-            Truck: <path d="M1 3h15v13h-15zM16 8l4 0l3 3l0 5l-7 0M5.5 18.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 1 0 0 5M18.5 18.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 1 0 0 5"/>,
-            Shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
-            Plane: <path d="M2 12h20M12 2l-3 10l3 10l3-10z"/>,
-            Wrench: <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />,
-            Fuel: <path d="M3 22v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8M8 12V7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v5M12 2v3"/>,
-            User: <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8"/>,
-            Users: <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>,
-            SteeringWheel: <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm-1-7h2v6h-2zm-5-2l2 1l3-5l-2-1zm10 1l2-1l-2-1l-3 5z"/>, 
-            List: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>,
-            Activity: <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
-            Package: <path d="M16.5 9.4L7.55 4.24M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/>,
-            Crosshair: <><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></>,
-            Warehouse: <path d="M3 21v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8M12 11v10"/>,
-            Layout: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></>,
-            Plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
-            Trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>,
-            Skull: <><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/><path d="M12.5 17l-.5-1l-.5 1h1z"/><path d="M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20"/></>,
-            MessageSquare: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>,
-            XCircle: <><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></>,
-            Radio: <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9m14.2 0c3.9 3.9 3.9 10.3 0 14.2M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5m8.4 0c2.3 2.3 2.3 6.1 0 8.5M12 12h0" />,
-            Swap: <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />,
-            Check: <polyline points="20 6 9 17 4 12" />
-        };
-
-        const Icon = ({ name, size = 16, className }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                {Icons[name] || <circle cx="12" cy="12" r="10"/>}
-            </svg>
-        );
-
-        // --- MODALS ---
-        const CreateMissionModal = ({ units, onClose, onCreate }) => {
-            const [title, setTitle] = useState('');
-            const [objective, setObjective] = useState('');
-            const [selectedUnits, setSelectedUnits] = useState([]);
-
-            const toggleUnit = (uuid) => {
-                if(selectedUnits.includes(uuid)) setSelectedUnits(selectedUnits.filter(id => id !== uuid));
-                else setSelectedUnits([...selectedUnits, uuid]);
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if(pseudo.trim()) onLogin({ pseudo, role, grade });
             };
 
             return (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur z-50 flex items-center justify-center p-4">
-                    <div className="w-full max-w-lg bg-[#090909] border border-purple-600 p-6 shadow-2xl rounded max-h-[90vh] flex flex-col">
-                        <h3 className="text-purple-500 font-black text-lg mb-4 border-b border-purple-900 pb-2">CRÉER OPÉRATION / CONVOI</h3>
-                        <div className="space-y-4 mb-4">
-                            <input type="text" className="w-full bg-black border border-purple-900 p-2 text-white text-sm uppercase" placeholder="NOM DE L'OPÉRATION (EX: CONVOI BRAVO)" value={title} onChange={e=>setTitle(e.target.value)} />
-                            <input type="text" className="w-full bg-black border border-purple-900 p-2 text-white text-sm uppercase" placeholder="OBJECTIF (EX: RAVITAILLEMENT FOB)" value={objective} onChange={e=>setObjective(e.target.value)} />
+                <div className="flex items-center justify-center h-screen bg-mil-900 bg-[size:20px_20px] bg-grid-pattern relative">
+                    <div className="scanline"></div>
+                    <div className="border border-mil-green/50 bg-mil-800 p-8 w-96 shadow-[0_0_15px_rgba(0,255,65,0.2)]">
+                        <h1 className="text-2xl font-bold text-mil-green mb-6 text-center tracking-widest">LOGIOPS ACCESS</h1>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-xs text-mil-green mb-1">IDENTIFIANT</label>
+                                <input 
+                                    type="text" 
+                                    value={pseudo} 
+                                    onChange={e => setPseudo(e.target.value.toUpperCase())}
+                                    className="w-full bg-mil-900 border border-mil-700 text-mil-green p-2 focus:outline-none focus:border-mil-green"
+                                    placeholder="CALLSIGN..."
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs text-mil-green mb-1">ROLE</label>
+                                    <select value={role} onChange={e => setRole(e.target.value)} className="w-full bg-mil-900 border border-mil-700 text-mil-green p-2">
+                                        <option value="SL">SQUAD LEAD</option>
+                                        <option value="LOGI">LOGISTIQUE</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-mil-green mb-1">GRADE</label>
+                                    <select value={grade} onChange={e => setGrade(e.target.value)} className="w-full bg-mil-900 border border-mil-700 text-mil-green p-2">
+                                        <option value="Cpl">Cpl</option>
+                                        <option value="Sgt">Sgt</option>
+                                        <option value="Lt">Lt</option>
+                                        <option value="Cpt">Cpt</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" className="w-full bg-mil-dim hover:bg-mil-green text-black font-bold py-2 px-4 transition-colors">
+                                CONNEXION SYSTÈME
+                            </button>
+                        </form>
+                        <div className="mt-4 text-xs text-center text-mil-green/50">
+                            {USE_FIREBASE ? "CLOUD UPLINK: ACTIF" : "CLOUD UPLINK: ERREUR (MODE LOCAL)"}
                         </div>
-                        <div className="flex-1 overflow-y-auto border border-purple-900/30 p-2 mb-4">
-                            <div className="text-xs text-gray-400 mb-2">SÉLECTIONNER VÉHICULES DISPONIBLES :</div>
-                            <div className="grid grid-cols-1 gap-2">
-                                {units.filter(u => u.status === 'operational').map(u => (
-                                    <div key={u.uuid} onClick={() => toggleUnit(u.uuid)} className={`flex justify-between items-center p-2 border cursor-pointer ${selectedUnits.includes(u.uuid) ? 'border-purple-500 bg-purple-900/20' : 'border-gray-800 bg-black'}`}>
-                                        <span className="text-xs font-bold text-white">{u.name}</span>
-                                        {selectedUnits.includes(u.uuid) && <Icon name="Check" className="text-purple-500"/>}
-                                    </div>
-                                ))}
-                                {units.filter(u => u.status === 'operational').length === 0 && <div className="text-gray-600 text-xs italic">Aucun véhicule dispo.</div>}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- DASHBOARD VEHICULE ---
+        const UnitCard = ({ unit, user, onUpdate, onDelete }) => {
+            const getStatusColor = (s) => {
+                switch(s) {
+                    case 'operational': return 'text-mil-green border-mil-green';
+                    case 'mission': return 'text-blue-400 border-blue-400';
+                    case 'rtb_requested': return 'text-yellow-400 border-yellow-400 animate-pulse';
+                    case 'maintenance': return 'text-orange-500 border-orange-500';
+                    case 'destroyed': return 'text-red-600 border-red-600';
+                    default: return 'text-gray-500 border-gray-500';
+                }
+            };
+
+            const handleAction = (action) => {
+                let updates = {};
+                if (action === 'start_mission') updates = { status: 'mission' };
+                if (action === 'request_rtb') updates = { status: 'rtb_requested' };
+                if (action === 'validate_rtb') {
+                    // Logic check
+                    if (unit.hp < unit.maxHp * 0.9) updates = { status: 'maintenance' };
+                    else updates = { status: 'operational' };
+                }
+                if (action === 'finish_maintenance') updates = { status: 'operational', hp: unit.maxHp, fuel: unit.maxFuel };
+                if (action === 'report_destroyed') updates = { status: 'destroyed' };
+                
+                onUpdate(unit.id, updates);
+            };
+
+            const handleDamage = (amount) => {
+                const newHp = Math.max(0, unit.hp - amount);
+                onUpdate(unit.id, { hp: newHp });
+            }
+
+            return (
+                <div className={`border p-2 mb-2 bg-mil-900/80 flex flex-col gap-2 ${getStatusColor(unit.status)}`}>
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2 font-bold">
+                            {unit.type === 'armor' ? <Icons.Tank /> : <Icons.Truck />}
+                            {unit.name} <span className="text-xs opacity-70">#{unit.id.slice(-4)}</span>
+                        </div>
+                        <span className="text-xs uppercase px-1 border border-current">{unit.status.replace('_', ' ')}</span>
+                    </div>
+
+                    {/* Barres de vie / fuel */}
+                    <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                            <span>INTÉGRITÉ</span>
+                            <span>{Math.round((unit.hp/unit.maxHp)*100)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-800 h-1">
+                            <div className="bg-current h-1" style={{ width: `${(unit.hp/unit.maxHp)*100}%` }}></div>
+                        </div>
+                        
+                        <div className="flex justify-between text-blue-300">
+                            <span>CARBURANT</span>
+                            <span>{Math.round((unit.fuel/unit.maxFuel)*100)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-800 h-1">
+                            <div className="bg-blue-500 h-1" style={{ width: `${(unit.fuel/unit.maxFuel)*100}%` }}></div>
+                        </div>
+                    </div>
+
+                    {/* Actions contextuelles */}
+                    <div className="grid grid-cols-2 gap-1 mt-1">
+                        {user.role === 'SL' && unit.status === 'operational' && (
+                            <button onClick={() => handleAction('start_mission')} className="bg-blue-900/50 hover:bg-blue-900 text-xs p-1">DEPART MISSION</button>
+                        )}
+                        {user.role === 'SL' && unit.status === 'mission' && (
+                            <button onClick={() => handleAction('request_rtb')} className="bg-yellow-900/50 hover:bg-yellow-900 text-xs p-1">DEMANDE RTB</button>
+                        )}
+                        {user.role === 'SL' && unit.status !== 'destroyed' && (
+                            <button onClick={() => handleAction('report_destroyed')} className="bg-red-900/50 hover:bg-red-900 text-xs p-1 col-span-2">SIGNALER DÉTRUIT</button>
+                        )}
+
+                        {user.role === 'LOGI' && unit.status === 'rtb_requested' && (
+                            <button onClick={() => handleAction('validate_rtb')} className="bg-mil-dim hover:bg-mil-green text-black text-xs p-1 col-span-2">VALIDER RETOUR</button>
+                        )}
+                        {user.role === 'LOGI' && unit.status === 'maintenance' && (
+                            <button onClick={() => handleAction('finish_maintenance')} className="bg-mil-dim hover:bg-mil-green text-black text-xs p-1 col-span-2">FIN MAINTENANCE</button>
+                        )}
+                         {user.role === 'LOGI' && unit.status !== 'destroyed' && (
+                             <>
+                                <button onClick={() => handleDamage(10)} className="border border-red-500 text-red-500 text-xs p-1">-10 HP</button>
+                                <button onClick={() => onDelete(unit.id)} className="border border-red-900 text-red-900 text-xs p-1">SUPPRIMER</button>
+                             </>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- GARAGE (Modal) ---
+        const GaragePanel = ({ isOpen, onClose, onBuy }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+                    <div className="border border-mil-green bg-mil-900 w-full max-w-2xl p-4 max-h-[80vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4 border-b border-mil-green/30 pb-2">
+                            <h2 className="text-xl font-bold text-mil-green">RÉQUISITION VÉHICULE</h2>
+                            <button onClick={onClose} className="text-red-500 font-bold">X</button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {VEHICLE_CATALOG.map(v => (
+                                <div key={v.id} className="border border-mil-green/50 p-3 hover:bg-mil-green/10 cursor-pointer" 
+                                     onClick={() => { onBuy(v); onClose(); }}>
+                                    <div className="font-bold text-mil-green">{v.name}</div>
+                                    <div className="text-xs text-gray-400">HP: {v.maxHp} | Fuel: {v.maxFuel}</div>
+                                    <div className="text-xs text-mil-green mt-2 text-right">REQUISITIONNER &gt;</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- SITREP MODAL ---
+        const SitrepModal = ({ isOpen, onClose, onSend }) => {
+            const [text, setText] = React.useState('');
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-red-900/20 backdrop-blur-sm z-50 flex items-center justify-center">
+                    <div className="border-2 border-red-600 bg-black p-6 w-full max-w-lg shadow-[0_0_50px_rgba(255,0,0,0.3)]">
+                        <h2 className="text-red-500 font-bold text-2xl mb-4 animate-pulse">ALERTE SITREP</h2>
+                        <textarea 
+                            className="w-full bg-mil-900 border border-red-500/50 p-2 text-red-100 h-32 focus:outline-none"
+                            placeholder="NATURE DE L'ALERTE / CONTACT / POSITION..."
+                            value={text} onChange={e => setText(e.target.value)}
+                        />
+                        <div className="flex gap-2 mt-4">
+                            <button onClick={() => { onSend(text); onClose(); setText(''); }} className="flex-1 bg-red-600 text-black font-bold py-2">DIFFUSER L'ALERTE</button>
+                            <button onClick={onClose} className="border border-red-600 text-red-600 px-4">ANNULER</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MAIN APP COMPONENT ---
+        const App = () => {
+            const [user, setUser] = React.useState(null);
+            const { data, save, addLog, isConnected } = useData();
+            
+            // UI States
+            const [showGarage, setShowGarage] = React.useState(false);
+            const [showSitrep, setShowSitrep] = React.useState(false);
+            const [activeFilter, setActiveFilter] = React.useState('all');
+
+            if (!user) return <AuthScreen onLogin={setUser} />;
+            if (!data) return <div className="h-screen flex items-center justify-center text-mil-green animate-pulse">INITIALISATION DATALINK...</div>;
+
+            // Logique Métier
+            const handleBuyVehicle = (template) => {
+                const newUnit = {
+                    ...template,
+                    id: `${template.id}_${Date.now().toString().slice(-4)}`,
+                    status: 'operational',
+                    hp: template.maxHp,
+                    fuel: template.maxFuel
+                };
+                save({ units: [...data.units, newUnit] });
+                addLog(`Réquisition véhicule : ${newUnit.name}`, user.pseudo);
+            };
+
+            const handleUpdateUnit = (id, updates) => {
+                const newUnits = data.units.map(u => {
+                    if (u.id === id) {
+                        const updated = { ...u, ...updates };
+                        // Si détruit, déplacer vers historique
+                        if (updated.status === 'destroyed') {
+                            // On le supprime de units dans le useEffect ou ici ? 
+                            // Pour simplifier, on le garde en status 'destroyed' jusqu'à nettoyage, ou on bouge direct.
+                            // Bougeons le direct pour l'archive.
+                            return null;
+                        }
+                        return updated;
+                    }
+                    return u;
+                }).filter(Boolean);
+
+                // Gestion destruction
+                const destroyedUnit = data.units.find(u => u.id === id);
+                let newHistory = data.destroyedHistory || [];
+                if (updates.status === 'destroyed' && destroyedUnit) {
+                    newHistory = [...newHistory, { ...destroyedUnit, destroyedAt: new Date().toISOString(), destroyedBy: user.pseudo }];
+                    addLog(`PERTE CONFIRMÉE: ${destroyedUnit.name}`, user.pseudo);
+                }
+
+                save({ units: newUnits, destroyedHistory: newHistory });
+                
+                // Logs auto pour changement de status
+                if(updates.status && updates.status !== 'destroyed') {
+                    const unitName = data.units.find(u => u.id === id)?.name || id;
+                    addLog(`Unit ${unitName} status: ${updates.status}`, "SYS");
+                }
+            };
+
+            const handleDeleteUnit = (id) => {
+                 const newUnits = data.units.filter(u => u.id !== id);
+                 save({ units: newUnits });
+                 addLog(`Véhicule supprimé manuellement`, user.pseudo);
+            }
+
+            const handleSitrep = (msg) => {
+                const newSitrep = { id: Date.now(), msg, time: new Date().toLocaleTimeString(), author: user.pseudo };
+                save({ sitreps: [newSitrep, ...data.sitreps] });
+                addLog(`SITREP: ${msg}`, user.pseudo);
+            };
+
+            const handleSupplyUpdate = (id, amount) => {
+                const newSources = data.supplySources.map(s => s.id === id ? { ...s, amount: parseInt(amount) } : s);
+                save({ supplySources: newSources });
+            };
+
+            const filteredUnits = data.units.filter(u => activeFilter === 'all' || u.type === activeFilter);
+
+            // Stats
+            const stats = {
+                ops: data.units.filter(u => u.status === 'operational').length,
+                mission: data.units.filter(u => u.status === 'mission').length,
+                maint: data.units.filter(u => u.status === 'maintenance' || u.status === 'rtb_requested').length,
+                loss: (data.destroyedHistory || []).length
+            };
+
+            return (
+                <div className="flex h-screen bg-mil-900 bg-[size:30px_30px] bg-grid-pattern overflow-hidden relative">
+                    {/* Scanline Effect */}
+                    <div className="scanline"></div>
+
+                    {/* --- LEFT SIDEBAR (NAV & STATS) --- */}
+                    <aside className="w-64 border-r border-mil-green/30 bg-mil-800/50 flex flex-col p-4 z-20 backdrop-blur-sm">
+                        <div className="mb-6 border-b border-mil-green pb-2">
+                            <h1 className="text-xl font-bold text-mil-green tracking-widest">LOGIOPS V1</h1>
+                            <div className="text-xs text-mil-green/60 mt-1">
+                                {user.grade} {user.pseudo} [{user.role}]
+                                <div className={`w-2 h-2 rounded-full inline-block ml-2 ${isConnected ? 'bg-mil-green' : 'bg-red-500'}`}></div>
                             </div>
                         </div>
-                        <div className="flex gap-2">
-                            <button onClick={onClose} className="flex-1 py-3 border border-gray-700 text-gray-500 text-xs font-bold">ANNULER</button>
-                            <button onClick={() => onCreate(title, objective, selectedUnits)} disabled={!title || selectedUnits.length === 0} className="flex-1 py-3 bg-purple-600 text-black font-black text-xs hover:bg-purple-500 disabled:opacity-50">LANCER OPÉRATION</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
 
-        const SitrepModal = ({ unit, onClose, onSend }) => {
-            const [code, setCode] = useState('green');
-            const [location, setLocation] = useState('');
-            const [details, setDetails] = useState('');
-            return (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur z-50 flex items-center justify-center p-4">
-                    <div className="w-full max-w-sm bg-[#090909] border border-yellow-600 p-4 shadow-2xl rounded">
-                        <h3 className="text-yellow-500 font-black text-lg mb-4 uppercase border-b border-yellow-900 pb-2">ENVOYER SITREP</h3>
-                        <div className="space-y-4">
-                            <div><label className="text-[10px] text-gray-500 font-bold block mb-1">CODE ALERTE</label><div className="flex gap-2"><button onClick={()=>setCode('green')} className={`flex-1 py-2 border font-bold text-xs ${code==='green'?'bg-green-600 text-black border-green-500':'border-green-900 text-green-700'}`}>VERT (RAS)</button><button onClick={()=>setCode('orange')} className={`flex-1 py-2 border font-bold text-xs ${code==='orange'?'bg-orange-600 text-black border-orange-500':'border-orange-900 text-orange-700'}`}>ORANGE</button><button onClick={()=>setCode('red')} className={`flex-1 py-2 border font-bold text-xs ${code==='red'?'bg-red-600 text-black border-red-500':'border-red-900 text-red-700'}`}>ROUGE</button></div></div>
-                            <div><label className="text-[10px] text-gray-500 font-bold block mb-1">POSITION ACTUELLE</label><input type="text" className="w-full bg-gray-900 border border-gray-700 p-2 text-white text-sm" value={location} onChange={e=>setLocation(e.target.value)} placeholder="Ex: Grille C4, FOB..." /></div>
-                            <div><label className="text-[10px] text-gray-500 font-bold block mb-1">DÉTAILS / MESSAGE</label><textarea className="w-full bg-gray-900 border border-gray-700 p-2 text-white text-sm h-20" value={details} onChange={e=>setDetails(e.target.value)} placeholder="Ex: Contact ennemi, demande munitions..." /></div>
-                            <div className="flex gap-2 pt-2"><button onClick={onClose} className="flex-1 py-2 border border-gray-700 text-gray-500 text-xs">ANNULER</button><button onClick={()=>onSend(code, location, details)} disabled={!location} className="flex-1 py-2 bg-yellow-600 text-black font-bold text-xs hover:bg-yellow-500 disabled:opacity-50">ENVOYER</button></div>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
+                        <div className="space-y-4 flex-1">
+                            <div className="border border-mil-green/30 p-2">
+                                <h3 className="text-xs text-mil-green mb-2 border-b border-mil-green/20">ÉTAT FLOTTE</h3>
+                                <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                                    <div className="bg-mil-green/10 p-1 rounded">
+                                        <div className="text-mil-green font-bold text-lg">{stats.ops}</div>
+                                        <div className="text-gray-400">PRÊT</div>
+                                    </div>
+                                    <div className="bg-blue-900/30 p-1 rounded">
+                                        <div className="text-blue-400 font-bold text-lg">{stats.mission}</div>
+                                        <div className="text-gray-400">MSN</div>
+                                    </div>
+                                    <div className="bg-orange-900/30 p-1 rounded">
+                                        <div className="text-orange-400 font-bold text-lg">{stats.maint}</div>
+                                        <div className="text-gray-400">MAINT</div>
+                                    </div>
+                                    <div className="bg-red-900/30 p-1 rounded">
+                                        <div className="text-red-500 font-bold text-lg">{stats.loss}</div>
+                                        <div className="text-gray-400">PERTE</div>
+                                    </div>
+                                </div>
+                            </div>
 
-        const MaintenanceModal = ({ unit, onClose, onConfirm }) => {
-            const [fuel, setFuel] = useState(unit.fuel || 0);
-            const [health, setHealth] = useState(unit.health || 0);
-            const isFixed = parseInt(fuel) === 100 && parseInt(health) === 100;
-            return (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur z-50 flex items-center justify-center p-4">
-                    <div className="w-full max-w-md bg-[#090909] border border-orange-600 p-6 shadow-2xl rounded relative">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-orange-600"></div>
-                        <h3 className="text-orange-500 font-black text-xl mb-2 uppercase flex items-center gap-2"><Icon name="Wrench"/> ATELIER MÉCANIQUE</h3>
-                        <p className="text-xs text-gray-400 mb-6">VÉHICULE: <span className="text-white font-bold">{unit.name}</span></p>
-                        <div className="space-y-6 mb-8">
-                            <div><label className="flex justify-between text-xs font-bold text-blue-400 mb-2"><span>NIVEAU CARBURANT</span><span>{fuel}%</span></label><input type="range" min="0" max="100" value={fuel} onChange={e=>setFuel(e.target.value)} className="w-full accent-blue-500 h-4 bg-gray-800 appearance-none rounded cursor-pointer"/></div>
-                            <div><label className="flex justify-between text-xs font-bold text-green-400 mb-2"><span>INTÉGRITÉ STRUCTURE</span><span>{health}%</span></label><input type="range" min="0" max="100" value={health} onChange={e=>setHealth(e.target.value)} className="w-full accent-green-500 h-4 bg-gray-800 appearance-none rounded cursor-pointer"/></div>
-                        </div>
-                        <div className="p-3 bg-gray-900 border border-gray-700 mb-6 text-center rounded"><div className={`text-sm font-bold uppercase ${isFixed ? 'text-green-500 animate-pulse' : 'text-red-500'}`}>{isFixed ? "RÉPARATIONS TERMINÉES" : "RÉPARATIONS EN COURS..."}</div></div>
-                        <div className="flex gap-3"><button onClick={onClose} className="flex-1 py-3 border border-gray-700 text-gray-500 text-xs font-bold hover:text-white">PAUSE</button><button onClick={onConfirm} disabled={!isFixed} className="flex-1 py-3 bg-green-600 text-black font-black text-xs hover:bg-green-500 disabled:opacity-20 disabled:bg-gray-800 disabled:text-gray-500">VALIDER SORTIE</button></div>
-                    </div>
-                </div>
-            );
-        };
+                            <nav className="space-y-1">
+                                <button onClick={() => setActiveFilter('all')} className={`w-full text-left px-2 py-1 text-sm ${activeFilter === 'all' ? 'bg-mil-green text-black' : 'text-mil-green hover:bg-mil-green/20'}`}>TOUS LES VÉHICULES</button>
+                                <button onClick={() => setActiveFilter('logi')} className={`w-full text-left px-2 py-1 text-sm ${activeFilter === 'logi' ? 'bg-mil-green text-black' : 'text-mil-green hover:bg-mil-green/20'}`}>LOGISTIQUES</button>
+                                <button onClick={() => setActiveFilter('armor')} className={`w-full text-left px-2 py-1 text-sm ${activeFilter === 'armor' ? 'bg-mil-green text-black' : 'text-mil-green hover:bg-mil-green/20'}`}>BLINDÉS</button>
+                            </nav>
 
-        const RTBCheckModal = ({ onClose, onConfirm }) => {
-            const [fuel, setFuel] = useState(100);
-            const [health, setHealth] = useState(100);
-            const isPerfect = parseInt(fuel) === 100 && parseInt(health) === 100;
-            return (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur z-50 flex items-center justify-center p-4">
-                    <div className="w-full max-w-sm bg-[#090909] border border-blue-600 p-6 shadow-2xl rounded">
-                        <h3 className="text-blue-500 font-black text-lg mb-4 border-b border-blue-900 pb-2">CHECK-LIST RETOUR</h3>
-                        <div className="space-y-6 mb-6">
-                            <div><label className="flex justify-between text-xs font-bold text-blue-400 mb-2"><span>CARBURANT</span><span>{fuel}%</span></label><input type="range" min="0" max="100" value={fuel} onChange={e=>setFuel(e.target.value)} className="w-full accent-blue-500 h-2 bg-gray-800 appearance-none rounded"/></div>
-                            <div><label className="flex justify-between text-xs font-bold text-green-400 mb-2"><span>INTÉGRITÉ</span><span>{health}%</span></label><input type="range" min="0" max="100" value={health} onChange={e=>setHealth(e.target.value)} className="w-full accent-green-500 h-2 bg-gray-800 appearance-none rounded"/></div>
+                            <div className="mt-auto border-t border-mil-green/30 pt-4 space-y-2">
+                                {user.role === 'SL' && (
+                                    <>
+                                        <button onClick={() => setShowGarage(true)} className="w-full border border-mil-green text-mil-green py-2 hover:bg-mil-green hover:text-black font-bold transition-all">
+                                            + RÉQUISITION
+                                        </button>
+                                        <button onClick={() => setShowSitrep(true)} className="w-full border border-red-500 text-red-500 py-2 hover:bg-red-500 hover:text-black font-bold animate-pulse">
+                                            ! SITREP !
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         </div>
-                        <div className="p-3 bg-gray-900 border border-gray-700 mb-4 text-center"><div className={`text-sm font-bold uppercase ${isPerfect ? 'text-green-500' : 'text-orange-500'}`}>{isPerfect ? "STATUS: OPÉRATIONNEL" : "STATUS: MAINTENANCE REQUISE"}</div></div>
-                        <div className="grid grid-cols-2 gap-2"><button onClick={onClose} className="py-3 border border-gray-700 text-gray-500 text-xs font-bold">ANNULER</button><button onClick={() => onConfirm(parseInt(fuel), parseInt(health))} className="py-3 bg-blue-600 text-black font-black text-xs hover:bg-blue-500">VALIDER</button></div>
-                    </div>
-                </div>
-            );
-        };
+                    </aside>
 
-        const TransferModal = ({ unit, onClose, onTransfer }) => {
-            return (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur z-50 flex items-center justify-center p-4">
-                    <div className="w-full max-w-sm bg-[#090909] border border-purple-600 p-6 shadow-2xl rounded">
-                        <h3 className="text-purple-500 font-black text-lg mb-4 border-b border-purple-900 pb-2">PASSATION COMMANDEMENT</h3>
-                        <div className="text-xs text-gray-400 mb-4">Choisissez un membre de l'équipage pour prendre le volant :</div>
-                        
-                        <div className="space-y-2 mb-6">
-                            {(!unit.crew || unit.crew.length === 0) ? (
-                                <div className="text-center text-red-500 text-xs italic py-2">Aucun passager à bord.</div>
+                    {/* --- CENTER (DASHBOARD) --- */}
+                    <main className="flex-1 p-4 overflow-y-auto z-10 relative">
+                        {/* ALERTS BANNER */}
+                        {data.sitreps.length > 0 && (
+                            <div className="mb-4 space-y-2">
+                                {data.sitreps.slice(0, 2).map(s => (
+                                    <div key={s.id} className="bg-red-900/40 border-l-4 border-red-600 p-2 flex justify-between items-start animate-pulse">
+                                        <div>
+                                            <span className="font-bold text-red-400">SITREP [{s.time}] {s.author}:</span>
+                                            <span className="ml-2 text-red-200">{s.msg}</span>
+                                        </div>
+                                        <button onClick={() => save({ sitreps: data.sitreps.filter(x => x.id !== s.id) })} className="text-red-500 hover:text-white">x</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                            {filteredUnits.length === 0 ? (
+                                <div className="col-span-3 text-center text-gray-600 py-10 border border-gray-800 border-dashed">AUCUNE UNITÉ DANS CE SECTEUR</div>
                             ) : (
-                                unit.crew.map((p, i) => (
-                                    <button key={i} onClick={() => onTransfer(p)} className="w-full text-left p-3 border border-gray-800 bg-gray-900 hover:border-purple-500 hover:bg-purple-900/20 flex justify-between items-center">
-                                        <span className="text-white font-bold text-xs">{p.name}</span>
-                                        <span className="text-[10px] text-gray-500">{p.rank}</span>
-                                    </button>
+                                filteredUnits.map(unit => (
+                                    <UnitCard 
+                                        key={unit.id} 
+                                        unit={unit} 
+                                        user={user} 
+                                        onUpdate={handleUpdateUnit}
+                                        onDelete={handleDeleteUnit}
+                                    />
                                 ))
                             )}
                         </div>
+                    </main>
 
-                        <button onClick={onClose} className="w-full py-3 border border-gray-700 text-gray-500 text-xs font-bold hover:text-white">ANNULER</button>
-                    </div>
-                </div>
-            );
-        };
-
-        const SLSitrepAlert = ({ sitrep, onAck }) => (
-            <div className="fixed top-4 right-4 z-[100] w-80 animate-pulse">
-                <div className={`border-l-4 p-4 shadow-2xl bg-black text-white ${sitrep.code==='red'?'border-red-500 bg-red-900/20':sitrep.code==='orange'?'border-orange-500 bg-orange-900/20':'border-green-500 bg-green-900/20'}`}>
-                    <div className="flex justify-between items-start mb-2"><h4 className={`font-black text-sm uppercase ${sitrep.code==='red'?'text-red-500':sitrep.code==='orange'?'text-orange-500':'text-green-500'}`}>NOUVEAU SITREP REÇU</h4><span className="text-[10px] text-gray-400">{sitrep.time}</span></div>
-                    <div className="text-xs font-bold mb-1">UNITÉ: {sitrep.unitName}</div>
-                    <div className="text-xs mb-1">LOC: <span className="text-gray-300">{sitrep.location}</span></div>
-                    <div className="text-xs italic text-gray-400 mb-3">"{sitrep.details}"</div>
-                    <button onClick={onAck} className={`w-full py-2 text-black font-bold text-xs uppercase ${sitrep.code==='red'?'bg-red-600':'bg-gray-200'} hover:opacity-80`}>REÇU / TERMINÉ</button>
-                </div>
-            </div>
-        );
-
-        const SLRTBAlert = ({ unit, onValidate }) => (
-            <div className="fixed top-24 right-4 z-[100] w-80 animate-bounce-in">
-                <div className="border-l-4 border-blue-500 bg-blue-900/20 p-4 shadow-2xl bg-black text-white">
-                    <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-black text-sm uppercase text-blue-500 flex items-center gap-2"><Icon name="Radio"/> DEMANDE RTB</h4>
-                        <span className="text-[10px] text-gray-400">MAINTENANT</span>
-                    </div>
-                    <div className="text-xs font-bold mb-3">UNITÉ: {unit.name}</div>
-                    <button onClick={onValidate} className="w-full py-2 bg-blue-600 text-black font-bold text-xs uppercase hover:bg-blue-500">
-                        AUTORISER RETOUR
-                    </button>
-                </div>
-            </div>
-        );
-
-        const SupplyModal = ({ sources, onClose, onUpdate, onAdd, onDelete }) => {
-            const [newName, setNewName] = useState('');
-            const [newAmount, setNewAmount] = useState(0);
-
-            return (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur z-50 flex items-center justify-center p-4">
-                    <div className="w-full max-w-lg bg-[#090909] border border-green-600 p-6 shadow-2xl rounded max-h-[80vh] flex flex-col">
-                        <div className="flex justify-between items-center mb-6 border-b border-green-900 pb-2">
-                            <h3 className="text-green-500 font-black text-lg uppercase">GESTION LOGISTIQUE</h3>
-                            <button onClick={onClose} className="text-red-500 hover:text-red-400"><Icon name="XCircle" size={24}/></button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto space-y-2 mb-6">
-                            {sources.map(s => (
-                                <div key={s.id} className="flex justify-between items-center bg-gray-900 p-3 border border-gray-800 rounded">
-                                    <span className="font-bold text-green-400 text-sm">{s.name}</span>
+                    {/* --- RIGHT SIDEBAR (LOGS & SUPPLY) --- */}
+                    <aside className="w-72 bg-mil-800/80 border-l border-mil-green/30 flex flex-col z-20 backdrop-blur-sm">
+                        
+                        {/* SUPPLY PANEL */}
+                        <div className="h-1/3 border-b border-mil-green/30 p-2 overflow-y-auto">
+                            <h3 className="text-xs text-mil-green font-bold mb-2 sticky top-0 bg-mil-800">LOGISTIQUE / RESSOURCES</h3>
+                            {data.supplySources.map(source => (
+                                <div key={source.id} className="mb-2 bg-black/40 p-2 border border-mil-green/20">
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-gray-300">{source.name}</span>
+                                    </div>
                                     <div className="flex items-center gap-2">
-                                        <input type="number" value={s.amount} onChange={(e)=>onUpdate(s.id, parseInt(e.target.value))} className="w-24 bg-black border border-gray-700 text-white text-right p-1 font-mono text-sm"/>
-                                        <button onClick={()=>onDelete(s.id)} className="text-red-500 hover:text-red-400 p-1"><Icon name="Trash"/></button>
+                                        <div className="text-mil-green font-bold text-lg">{source.amount}</div>
+                                        {user.role === 'LOGI' && (
+                                            <div className="flex gap-1 ml-auto">
+                                                <button onClick={() => handleSupplyUpdate(source.id, source.amount + 500)} className="bg-mil-green/20 text-mil-green px-1 text-xs">+</button>
+                                                <button onClick={() => handleSupplyUpdate(source.id, Math.max(0, source.amount - 500))} className="bg-red-900/20 text-red-400 px-1 text-xs">-</button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}
                         </div>
 
-                        <div className="bg-green-900/10 p-3 border border-green-900 rounded mb-4">
-                            <h4 className="text-xs font-bold text-green-600 mb-2">NOUVEAU LIEU DE STOCKAGE</h4>
-                            <div className="flex gap-2">
-                                <input type="text" placeholder="Nom (ex: FOB Alpha)" className="flex-1 bg-black border border-gray-700 p-2 text-xs text-white" value={newName} onChange={e=>setNewName(e.target.value)}/>
-                                <input type="number" placeholder="Qté" className="w-20 bg-black border border-gray-700 p-2 text-xs text-white" value={newAmount} onChange={e=>setNewAmount(e.target.value)}/>
-                                <button onClick={()=>{onAdd(newName, newAmount); setNewName(''); setNewAmount(0);}} className="bg-green-700 text-black font-bold px-3 text-xs rounded hover:bg-green-600">+</button>
-                            </div>
-                        </div>
-
-                        <button onClick={onClose} className="w-full py-3 border border-gray-700 text-gray-400 font-bold text-xs hover:bg-gray-800 hover:text-white">FERMER</button>
-                    </div>
-                </div>
-            );
-        };
-
-        // --- UNIT CARD ---
-        const UnitCard = ({ unit, userIdentity, userRankId, isSL, actions, Icons, missionData }) => {
-            const minRank = unit.minRank || 0;
-            const canDrive = userRankId >= minRank;
-            const rankLabel = RANKS.find(r => r.id === minRank)?.short || "REC";
-            
-            const driver = unit.responsible !== 'BASE' ? unit.responsible : null; // Object {name, rank} or null
-            const passengers = unit.crew || []; // Array of objects {name, rank}
-            const totalSlots = unit.slots || 2;
-            const occupiedSlots = (driver ? 1 : 0) + passengers.length;
-            const hasSpace = occupiedSlots < totalSlots;
-
-            const isDriver = driver?.name === userIdentity;
-            const isPax = passengers.some(p => p.name === userIdentity);
-            const isOnBoard = isDriver || isPax;
-
-            let statusColor = "green";
-            let statusText = "DISPO";
-            if (unit.status === 'damaged') { statusColor = "orange"; statusText = "ATELIER"; }
-            else if (unit.status === 'destroyed') { statusColor = "red"; statusText = "DÉTRUIT"; }
-            else if (unit.status.includes('mission')) { statusColor = "blue"; statusText = "EN MISSION"; }
-
-            // Custom Visual Bar
-            const renderCrewBar = () => {
-                const bars = [];
-                for(let i=0; i < totalSlots; i++) {
-                    const isOccupied = i < occupiedSlots;
-                    bars.push(<div key={i} className={`h-2 flex-1 rounded-sm mx-0.5 ${isOccupied ? 'bg-cyan-500 shadow-[0_0_5px_rgba(6,182,212,0.8)]' : 'border border-green-600/50 bg-green-900/20'}`}></div>);
-                }
-                return <div className="flex w-full mt-1">{bars}</div>;
-            };
-
-            return (
-                <div className={`relative border-l-4 border-${statusColor}-600 bg-gray-900/30 p-3 flex flex-col gap-2 border-t border-r border-b border-gray-800 hover:bg-gray-900/50 transition-all rounded`}>
-                    {/* Mission Banner */}
-                    {missionData && (
-                        <div className="absolute -top-3 left-0 right-0 bg-purple-900/80 border border-purple-500 text-purple-200 text-[9px] font-bold text-center px-2 py-0.5 rounded-t uppercase">
-                            OP: {missionData.title}
-                        </div>
-                    )}
-
-                    <div className="flex justify-between items-start mt-1">
-                        <div className="flex gap-2">
-                            <div className={`w-8 h-8 flex items-center justify-center border border-${statusColor}-800 bg-${statusColor}-900/20 text-${statusColor}-500 rounded`}>
-                                <Icon name={CATEGORIES[unit.cat]?.icon || 'Truck'}/>
-                            </div>
-                            <div>
-                                <div className="text-[9px] text-gray-500 font-bold uppercase">{unit.cat} // REQ: {rankLabel}+</div>
-                                <h3 className="font-bold text-gray-200 text-xs uppercase leading-tight">{unit.name}</h3>
-                            </div>
-                        </div>
-                        <div className={`text-[9px] font-bold px-2 py-0.5 rounded border border-${statusColor}-900 bg-${statusColor}-900/20 text-${statusColor}-500`}>{statusText}</div>
-                    </div>
-
-                    {unit.status !== 'destroyed' && (
-                        <div className="bg-black/50 p-2 rounded border border-gray-800 space-y-1">
-                            <div className="flex justify-between items-end">
-                                <span className="text-[9px] text-gray-500 font-bold uppercase">ÉQUIPAGE ({occupiedSlots}/{totalSlots})</span>
-                                {driver && <span className="text-[9px] text-cyan-400 font-bold">{driver.name} (PIL)</span>}
-                            </div>
-                            {renderCrewBar()}
-                        </div>
-                    )}
-
-                    <div className="mt-auto space-y-1">
-                         {/* FORCE TAKEOVER / DRIVING LOGIC */}
-                        {unit.status === 'operational' && (
-                            <div className="grid grid-cols-2 gap-1">
-                                {!isDriver && (
-                                    <button onClick={actions.onTakeDriver} disabled={!canDrive} className={`py-1.5 border text-[9px] font-bold uppercase flex items-center justify-center gap-1 ${canDrive ? 'border-green-800 text-green-500 hover:bg-green-900/20' : 'border-red-900/30 text-red-900 cursor-not-allowed'} ${driver ? 'col-span-2 border-orange-600 text-orange-500' : 'col-span-1'}`}>
-                                        <Icon name="SteeringWheel" size={12}/> {driver ? 'CONDUIRE (FORCE)' : (canDrive ? 'CONDUIRE' : 'GRADE NOK')}
-                                    </button>
-                                )}
-                                {!driver && !isDriver && hasSpace && (
-                                    <button onClick={actions.onTakePax} className={`py-1.5 border border-blue-800 text-blue-500 text-[9px] font-bold uppercase hover:bg-blue-900/20 flex items-center justify-center gap-1 col-span-1`}>
-                                        <Icon name="Users" size={12}/> MONTER
-                                    </button>
+                        {/* JMO / LOGS */}
+                        <div className="flex-1 p-2 overflow-hidden flex flex-col">
+                            <div className="flex justify-between items-center mb-2">
+                                <h3 className="text-xs text-mil-green font-bold">JMO (LOGS)</h3>
+                                {user.role === 'SL' && (
+                                    <button onClick={() => save({ logs: [] })} className="text-[10px] text-red-500 border border-red-900 px-1 hover:bg-red-900">CLEAR</button>
                                 )}
                             </div>
-                        )}
-
-                        {isDriver && unit.status === 'operational' && (
-                            <div className="grid grid-cols-2 gap-1">
-                                <button onClick={actions.onStartMission} className="col-span-2 py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 uppercase">DÉPART MISSION</button>
-                                <button onClick={actions.onReleaseDriver} className="col-span-1 py-1 border border-red-900 text-red-500 text-[9px] hover:bg-red-900/20 uppercase">DESCENDRE</button>
-                                {passengers.length > 0 && (
-                                    <button onClick={actions.onTransferRole} className="col-span-1 py-1 border border-purple-900 text-purple-400 text-[9px] hover:bg-purple-900/20 uppercase">TRANSFÉRER RÔLE</button>
-                                )}
+                            <div className="flex-1 overflow-y-auto font-mono text-xs space-y-1 pr-1 bg-black/20 p-1">
+                                {data.logs.map(log => (
+                                    <div key={log.id} className="border-b border-gray-800 pb-1">
+                                        <span className="text-gray-500">[{log.timestamp}]</span>
+                                        <span className="text-mil-dim font-bold ml-1">{log.author}:</span>
+                                        <span className="text-gray-300 ml-1">{log.message}</span>
+                                    </div>
+                                ))}
                             </div>
-                        )}
-                        
-                        {isPax && unit.status === 'operational' && (
-                            <button onClick={actions.onLeavePax} className="w-full py-1.5 border border-red-900 text-red-500 text-[9px] hover:bg-red-900/20 uppercase font-bold">DESCENDRE</button>
-                        )}
-
-                        {unit.status.includes('mission') && isDriver && (
-                            <div className="grid grid-cols-2 gap-1">
-                                <button onClick={actions.onSitrep} className="py-1 bg-yellow-900/20 border border-yellow-700 text-yellow-500 font-bold text-[9px]">SITREP</button>
-                                <button onClick={actions.onRequestRTB} className="py-1 bg-blue-900/20 border border-blue-700 text-blue-500 font-bold text-[9px]">RTB</button>
-                                <button onClick={actions.onReportDestroyed} className="w-full py-1 border border-red-900 text-red-500 text-[9px] mt-1 hover:bg-red-900/20 col-span-2">SIGNALER DESTRUCTION</button>
-                            </div>
-                        )}
-                        
-                        {unit.status.includes('mission') && isPax && (
-                             <div className="text-center text-[9px] text-gray-500 italic py-1">PASSAGER EN MISSION</div>
-                        )}
-
-                        {unit.status === 'mission_rtb_transit' && isDriver && (
-                            <button onClick={actions.onConfirmArrival} className="w-full py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 uppercase">VALIDER ARRIVÉE</button>
-                        )}
-                        
-                        {unit.status === 'mission_rtb_request' && (
-                             <div className="text-center text-[9px] text-blue-400 animate-pulse border border-blue-900/30 bg-blue-900/10 py-1">ATTENTE SL...</div>
-                        )}
-
-                        {unit.status === 'damaged' && (
-                             <div className="text-center text-[9px] text-orange-500 font-bold border border-orange-900/30 py-1 bg-orange-900/10">MAINTENANCE REQUISE</div>
-                        )}
-                        {unit.status === 'damaged' && (
-                            <button onClick={actions.onEnterMaintenance} className="w-full py-2 bg-orange-600 text-black font-black text-[10px] hover:bg-orange-500 mt-1">ENTRER ATELIER</button>
-                        )}
-                        {unit.status === 'destroyed' && isSL && (
-                             <button onClick={actions.onArchive} className="w-full py-1 border border-gray-700 text-gray-500 text-[9px] hover:text-white uppercase">NETTOYER & ARCHIVER</button>
-                        )}
-                    </div>
-                </div>
-            );
-        };
-
-        // --- APP ---
-        const App = () => {
-            const [data, save, isConnected] = useData();
-            const [userRole, setUserRole] = useState(null);
-            const [user, setUser] = useState(null);
-            const [tab, setTab] = useState('dashboard');
-            const [filter, setFilter] = useState('ALL');
-            const [menuOpen, setMenuOpen] = useState(false);
-            
-            const [sitrepModalUnit, setSitrepModalUnit] = useState(null);
-            const [maintenanceUnit, setMaintenanceUnit] = useState(null);
-            const [rtbModalUnit, setRtbModalUnit] = useState(null);
-            const [showSupply, setShowSupply] = useState(false);
-            const [showCreateMission, setShowCreateMission] = useState(false);
-            const [incomingSitrep, setIncomingSitrep] = useState(null);
-            const [pendingRTB, setPendingRTB] = useState(null);
-            const [notification, setNotification] = useState(null);
-            const [transferUnit, setTransferUnit] = useState(null);
-
-            // Logic for notifications
-            useEffect(() => {
-                if (userRole === 'SL' && data.sitreps) {
-                    const pending = data.sitreps.find(s => !s.acked);
-                    if (pending) setIncomingSitrep(pending);
-                }
-                if (userRole === 'LOGI' && data.sitreps && user) {
-                    const myAckedSitrep = data.sitreps.find(s => s.acked && s.author === user.name && !s.seenByAuthor);
-                    if (myAckedSitrep) {
-                        setNotification({type: 'success', message: `SITREP ${myAckedSitrep.unitName} PRIS EN COMPTE PAR SL`});
-                        const updated = data.sitreps.map(s => s.id === myAckedSitrep.id ? {...s, seenByAuthor: true} : s);
-                        save({sitreps: updated});
-                    }
-                }
-                if (userRole === 'SL' && data.units) {
-                    const rtbRequest = data.units.find(u => u.status === 'mission_rtb_request');
-                    if (rtbRequest) setPendingRTB(rtbRequest); else setPendingRTB(null);
-                }
-            }, [data, userRole, user]);
-
-            const appActions = {
-                addLog: (msg, type='INFO') => save({ logs: [{ id: Date.now(), time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), type, msg }, ...(data.logs||[])].slice(0,50) }),
-                clearLogs: () => { if(confirm("VIDER LE JOURNAL ?")) save({ logs: [] }); },
-                archiveDestroyed: (unit) => {
-                    const entry = { ...unit, archivedAt: new Date().toLocaleString() };
-                    save({ 
-                        units: data.units.filter(u => u.uuid !== unit.uuid), 
-                        destroyedHistory: [entry, ...(data.destroyedHistory||[])] 
-                    });
-                    appActions.addLog(`ARCHIVAGE ÉPAVE ${unit.name}`, 'LOG');
-                },
-                deployUnit: (model) => {
-                    const totalSupply = (data.supplySources||[]).reduce((acc,s)=>acc+s.amount,0);
-                    if (totalSupply < model.cost) return alert("Supply insuffisant");
-                    const newSources = [...data.supplySources];
-                    if(newSources[0]) newSources[0].amount -= model.cost;
-                    save({ units: [{uuid: Date.now().toString(), ...model, status: 'operational', fuel: 100, health: 100, responsible: 'BASE', crew: [], logs: []}, ...(data.units||[])], supplySources: newSources });
-                    appActions.addLog(`ACHAT ${model.name}`, 'GARAGE');
-                },
-                // Force Takeover Logic
-                takeDriver: (u) => { 
-                    // Eject previous driver to pax if exists (optional, simplified to just overwrite here)
-                    save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, responsible: {name:user.name, rank:user.rankShort}} : x) }); 
-                    appActions.addLog(`${user.name} PREND VOLANT ${u.name} (FORCE)`, 'OPS'); 
-                },
-                releaseDriver: (u) => save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, responsible: 'BASE'} : x) }),
-                takePax: (u) => save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, crew: [...(x.crew || []), { name: user.name, rank: user.rankShort }]} : x) }),
-                leavePax: (u) => save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, crew: (x.crew || []).filter(p => p.name !== user.name)} : x) }),
-                
-                // Transfer Command
-                transferCommand: (pax) => {
-                    if (!transferUnit) return;
-                    // Current driver becomes pax (if we want), let's say current driver swaps or just leaves driver seat
-                    // Implementation: Swap roles. Old Driver -> Pax list, Pax -> Driver slot.
-                    const oldDriver = transferUnit.responsible;
-                    const newDriver = pax;
-                    
-                    // Remove new driver from pax list
-                    let newCrew = transferUnit.crew.filter(p => p.name !== pax.name);
-                    // Add old driver to pax list
-                    if (oldDriver && oldDriver !== 'BASE') newCrew.push(oldDriver);
-                    
-                    const updatedUnits = data.units.map(u => u.uuid === transferUnit.uuid ? { ...u, responsible: newDriver, crew: newCrew } : u);
-                    save({ units: updatedUnits });
-                    appActions.addLog(`PASSATION ${transferUnit.name}: ${oldDriver.name} -> ${newDriver.name}`, 'OPS');
-                    setTransferUnit(null);
-                },
-
-                startMission: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission'} : x) }); appActions.addLog(`DÉPART MISSION ${u.name}`, 'OPS'); },
-                
-                // Missions Groupées
-                createMission: (title, obj, vehicleIds) => {
-                    const missionId = `OP_${Date.now()}`;
-                    const newMission = { id: missionId, title, objective: obj, status: 'active' };
-                    // Update vehicles
-                    const updatedUnits = data.units.map(u => vehicleIds.includes(u.uuid) ? { ...u, missionId: missionId } : u);
-                    save({ missions: [...(data.missions||[]), newMission], units: updatedUnits });
-                    appActions.addLog(`DÉBUT OPÉRATION: ${title}`, 'CMD');
-                    setShowCreateMission(false);
-                },
-
-                openSitrep: (u) => setSitrepModalUnit(u),
-                sendSitrep: (code, loc, det) => {
-                    if(!sitrepModalUnit) return;
-                    save({ sitreps: [...(data.sitreps||[]), { id: Date.now(), unitName: sitrepModalUnit.name, code, location: loc, details: det, time: new Date().toLocaleTimeString(), acked: false, author: user.name, seenByAuthor: false }] });
-                    setSitrepModalUnit(null);
-                    appActions.addLog(`SITREP: ${sitrepModalUnit.name} [${code.toUpperCase()}] - ${det}`, 'RADIO');
-                },
-                ackSitrep: () => { if(!incomingSitrep) return; save({ sitreps: (data.sitreps||[]).map(s => s.id===incomingSitrep.id ? {...s, acked: true} : s) }); setIncomingSitrep(null); },
-                requestRTB: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission_rtb_request'} : x) }); appActions.addLog(`DEMANDE RTB ${u.name}`, 'RADIO'); },
-                approveRTB: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission_rtb_transit'} : x) }); setPendingRTB(null); appActions.addLog(`RTB AUTORISÉ ${u.name}`, 'RADIO'); },
-                finalizeRTB: (fuel, health) => {
-                    if (!rtbModalUnit) return;
-                    const needsRepair = fuel < 100 || health < 100;
-                    const updated = data.units.map(u => u.uuid === rtbModalUnit.uuid ? { 
-                        ...u, status: needsRepair ? 'damaged' : 'operational', responsible: needsRepair ? 'BASE' : u.responsible, crew: needsRepair ? [] : u.crew, fuel, health
-                    } : u);
-                    save({ units: updated });
-                    appActions.addLog(`RETOUR BASE ${rtbModalUnit.name}: ${needsRepair?'ATELIER':'RAS'}`, 'OPS');
-                    setRtbModalUnit(null);
-                },
-                enterMaintenance: (u) => setMaintenanceUnit(u),
-                finishMaintenance: () => { if(!maintenanceUnit) return; save({ units: (data.units||[]).map(x => x.uuid===maintenanceUnit.uuid ? {...x, status: 'operational', fuel: 100, health: 100} : x) }); setMaintenanceUnit(null); appActions.addLog(`SORTIE ATELIER ${maintenanceUnit.name}`, 'MECA'); },
-                reportDestroyed: (u) => { 
-                    const reason = prompt("CAUSE DE LA DESTRUCTION ? (IED, Ennemi, Accident...)");
-                    if(!reason) return;
-                    save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'destroyed', responsible: 'BASE', crew: [], reasonHS: reason} : x) }); 
-                    appActions.addLog(`PERTE ${u.name}: ${reason}`, 'ALERTE'); 
-                },
-                updateSupply: (id, val) => save({ supplySources: (data.supplySources||[]).map(s => s.id===id ? {...s, amount: val} : s) }),
-                addSupply: (n, a) => save({ supplySources: [...(data.supplySources||[]), {id: Date.now(), name: n, amount: parseInt(a)}] }),
-                deleteSupply: (id) => save({ supplySources: (data.supplySources||[]).filter(s => s.id!==id) }),
-                addSquad: (name) => { if(!name) return; save({ squad: [...(data.squad||[]), {id: Date.now(), name: name.toUpperCase()}] }); },
-                removeSquad: (id) => save({ squad: (data.squad||[]).filter(m => m.id !== id) }),
-            };
-
-            const filteredUnits = (data.units||[]).filter(u => filter === 'ALL' || u.status === filter || (filter === 'mission' && u.status.includes('mission')));
-            const totalSupply = (data.supplySources||[]).reduce((acc,s)=>acc+parseInt(s.amount||0), 0);
-
-            if (!user) return (
-                <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 login-scan text-center text-white">
-                    <h1 className="text-4xl font-black text-green-600 tracking-widest mb-8">LOGI-OPS V19</h1>
-                    <div className="text-xs text-green-800 mb-8">{isConnected ? "CONNEXION CLOUD OK" : "MODE LOCAL (HORS LIGNE)"}</div>
-                    <div className="grid grid-cols-2 gap-4 w-full max-w-md"><button onClick={()=>setUserRole('SL')} className="p-6 border border-green-600 text-green-500 font-bold hover:bg-green-900/20">COMMANDEMENT</button><button onClick={()=>setUserRole('LOGI')} className="p-6 border border-blue-600 text-blue-500 font-bold hover:bg-blue-900/20">LOGISTICIEN</button></div>
-                    {userRole && (
-                        <div className="mt-8 w-full max-w-md space-y-4 animate-in fade-in">
-                            <select id="rank" className="w-full bg-gray-900 border border-gray-700 p-3 text-white">{RANKS.map(r=><option key={r.id} value={r.id}>{r.label}</option>)}</select>
-                            {userRole === 'LOGI' && (data.squad||[]).length > 0 ? (
-                                <select id="name" className="w-full bg-gray-900 border border-gray-700 p-3 text-white"><option value="">-- CHOISIR --</option>{(data.squad||[]).map(m=><option key={m.id} value={m.name}>{m.name}</option>)}</select>
-                            ) : (
-                                <input id="name" type="text" placeholder="PSEUDO" className="w-full bg-gray-900 border border-gray-700 p-3 text-white uppercase"/>
-                            )}
-                            <button onClick={()=>{ const rId = document.getElementById('rank').value; const n = document.getElementById('name').value; if(n) setUser({name: n.toUpperCase(), rankId: parseInt(rId), rankShort: RANKS[rId].short}); }} className="w-full bg-white text-black font-bold py-3">VALIDER</button>
                         </div>
-                    )}
-                </div>
-            );
 
-            return (
-                <div className="h-screen flex flex-col bg-[#050505] text-gray-300 select-none overflow-hidden">
-                    <header className="h-14 border-b border-green-900 bg-black flex items-center justify-between px-4 z-20 shrink-0">
-                        <div className="flex items-center gap-3">
-                            <button onClick={()=>setMenuOpen(!menuOpen)} className="md:hidden text-green-500"><Icon name="List" size={24}/></button>
-                            <div className="font-black text-lg text-white tracking-widest">LOGI-OPS <span className="text-xs text-green-600 align-top">V19.1</span></div>
-                            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} title={isConnected ? "Connecté Cloud" : "Mode Local"}></div>
+                        {/* CHAT INPUT (SIMPLE LOG) */}
+                        <div className="p-2 border-t border-mil-green/30">
+                            <input 
+                                type="text" 
+                                placeholder="Ajouter entrée JMO..."
+                                className="w-full bg-black border border-mil-green/30 text-mil-green text-xs p-2 focus:outline-none focus:border-mil-green"
+                                onKeyDown={(e) => {
+                                    if(e.key === 'Enter' && e.target.value.trim()) {
+                                        addLog(e.target.value, user.pseudo);
+                                        e.target.value = '';
+                                    }
+                                }}
+                            />
                         </div>
-                        <button onClick={()=>setShowSupply(true)} className="text-right"><div className="text-[8px] text-green-600 font-bold uppercase">LOGISTIQUE GLOBALE</div><div className="text-xl font-mono text-white font-bold cursor-pointer hover:text-green-400">{totalSupply.toLocaleString()}</div></button>
-                    </header>
+                    </aside>
 
-                    {/* NOTIFICATION TOAST */}
-                    {notification && (
-                        <div className="fixed top-16 right-4 z-50 bg-green-600 text-white px-4 py-2 rounded shadow-lg animate-bounce-in flex items-center gap-2">
-                            <Icon name="Check"/> {notification.message}
-                            <button onClick={()=>setNotification(null)} className="ml-2">x</button>
-                        </div>
-                    )}
+                    {/* MODALS */}
+                    <GaragePanel isOpen={showGarage} onClose={() => setShowGarage(false)} onBuy={handleBuyVehicle} />
+                    <SitrepModal isOpen={showSitrep} onClose={() => setShowSitrep(false)} onSend={handleSitrep} />
 
-                    {/* SL ALERTS */}
-                    {incomingSitrep && (
-                        <div className="fixed top-20 right-4 z-50 w-80 bg-black border-l-4 border-yellow-500 p-4 shadow-2xl animate-pulse">
-                            <div className="font-black text-yellow-500 mb-1">SITREP REÇU</div>
-                            <div className="text-xs text-white mb-1">UNITÉ: {incomingSitrep.unitName}</div>
-                            <div className="text-xs text-gray-400 italic mb-2">"{incomingSitrep.details}"</div>
-                            <button onClick={appActions.ackSitrep} className="w-full bg-yellow-600 text-black font-bold text-xs py-1">REÇU</button>
-                        </div>
-                    )}
-                    {pendingRTB && (
-                        <div className="fixed top-44 right-4 z-50 w-80 bg-black border-l-4 border-blue-500 p-4 shadow-2xl animate-pulse">
-                            <div className="font-black text-blue-500 mb-1">DEMANDE RTB</div>
-                            <div className="text-xs text-white mb-2">UNITÉ: {pendingRTB.name}</div>
-                            <button onClick={()=>appActions.approveRTB(pendingRTB)} className="w-full bg-blue-600 text-black font-bold text-xs py-1">AUTORISER</button>
-                        </div>
-                    )}
-
-                    <div className="flex-1 flex overflow-hidden relative">
-                        <nav className={`absolute md:relative inset-y-0 left-0 z-10 bg-black border-r border-green-900 w-64 transform ${menuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-200 flex flex-col p-4 gap-2`}>
-                            <button onClick={()=>{setTab('dashboard');setMenuOpen(false)}} className={`flex items-center gap-3 p-3 rounded text-sm font-bold ${tab==='dashboard'?'bg-green-900/20 text-green-400':'text-gray-500 hover:text-white'}`}><Icon name="Layout"/> OPÉRATIONS</button>
-                            {userRole==='SL' && <button onClick={()=>{setTab('garage');setMenuOpen(false)}} className={`flex items-center gap-3 p-3 rounded text-sm font-bold ${tab==='garage'?'bg-green-900/20 text-green-400':'text-gray-500 hover:text-white'}`}><Icon name="Warehouse"/> GARAGE (ACHAT)</button>}
-                            <button onClick={()=>{setTab('squad');setMenuOpen(false)}} className={`flex items-center gap-3 p-3 rounded text-sm font-bold ${tab==='squad'?'bg-green-900/20 text-green-400':'text-gray-500 hover:text-white'}`}><Icon name="Users"/> EFFECTIFS</button>
-                            <button onClick={()=>{setTab('logs');setMenuOpen(false)}} className={`flex items-center gap-3 p-3 rounded text-sm font-bold ${tab==='logs'?'bg-green-900/20 text-green-400':'text-gray-500 hover:text-white'}`}><Icon name="List"/> JMO (LOGS)</button>
-                            <div className="mt-auto pt-4 border-t border-gray-900"><div className="flex items-center gap-3 p-2"><div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center text-xs font-bold text-white">{user.rankShort}</div><div><div className="text-xs font-bold text-white">{user.name}</div><div className="text-[10px] text-gray-500">{userRole}</div></div></div></div>
-                        </nav>
-
-                        <main className="flex-1 overflow-y-auto bg-grid-pattern p-4">
-                            {tab === 'dashboard' && (
-                                <>
-                                    <div className="flex justify-between items-center mb-4">
-                                        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-                                            {[['ALL','TOUS'],['operational','DISPO'],['mission','MISSION'],['damaged','ATELIER'],['destroyed','DÉTRUIT']].map(([k,l]) => (
-                                                <button key={k} onClick={()=>setFilter(k)} className={`px-4 py-2 border text-xs font-bold rounded whitespace-nowrap ${filter===k ? 'bg-green-900/40 border-green-500 text-white' : 'border-gray-800 text-gray-600 bg-black'}`}>{l}</button>
-                                            ))}
-                                        </div>
-                                        {userRole === 'SL' && <button onClick={()=>setShowCreateMission(true)} className="bg-purple-900/20 border border-purple-500 text-purple-400 px-3 py-2 text-xs font-bold hover:bg-purple-900/40 flex items-center gap-2"><Icon name="Plus"/> CRÉER MISSION</button>}
-                                    </div>
-
-                                    {/* GROUP BY CATEGORY LOGIC */}
-                                    <div className="space-y-6">
-                                        {Object.keys(CATEGORIES).map(cat => {
-                                            const unitsInCat = filteredUnits.filter(u => u.cat === cat);
-                                            if (unitsInCat.length === 0) return null;
-                                            const catInfo = CATEGORIES[cat];
-                                            return (
-                                                <div key={cat} className="border border-gray-800 bg-gray-900/20">
-                                                    <div className={`p-2 border-b border-gray-800 flex items-center gap-2 ${catInfo.color}`}>
-                                                        <Icon name={catInfo.icon}/> <span className="font-black text-sm">{catInfo.label}</span>
-                                                        <span className="text-xs bg-gray-800 px-2 rounded ml-auto">{unitsInCat.length}</span>
-                                                    </div>
-                                                    <div className="p-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                                        {unitsInCat.map(u => (
-                                                            <UnitCard 
-                                                                key={u.uuid} unit={u} userIdentity={user.name} userRankId={user.rankId} isSL={userRole==='SL'} Icons={Icons}
-                                                                missionData={data.missions?.find(m => m.id === u.missionId)}
-                                                                actions={{
-                                                                    onTakeDriver: () => appActions.takeDriver(u),
-                                                                    onReleaseDriver: () => appActions.releaseDriver(u),
-                                                                    onTakePax: () => appActions.takePax(u),
-                                                                    onLeavePax: () => appActions.leavePax(u),
-                                                                    onStartMission: () => appActions.startMission(u),
-                                                                    onSitrep: () => appActions.openSitrep(u),
-                                                                    onRequestRTB: () => appActions.requestRTB(u),
-                                                                    onValidateRTB: () => appActions.validateRTB(u),
-                                                                    onConfirmArrival: () => setRtbModalUnit(u),
-                                                                    onReportDestroyed: () => appActions.reportDestroyed(u),
-                                                                    onEnterMaintenance: () => appActions.enterMaintenance(u),
-                                                                    onArchive: () => appActions.archiveDestroyed(u),
-                                                                    onTransferRole: () => setTransferUnit(u)
-                                                                }}
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                        {filteredUnits.length === 0 && <div className="text-center text-gray-600 py-10 italic">Aucune unité.</div>}
-                                    </div>
-                                </>
-                            )}
-
-                            {tab === 'garage' && userRole === 'SL' && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    {INITIAL_CATALOG.map(m => (
-                                        <div key={m.id} className="bg-black border border-gray-800 p-4 flex flex-col gap-2 hover:border-green-600 transition-colors">
-                                            <div className="flex justify-between"><span className="text-[10px] bg-gray-900 text-gray-400 px-2 py-0.5 rounded">{m.cat}</span><span className="text-green-500 font-bold text-xs">{m.cost} PTS</span></div>
-                                            <h3 className="font-bold text-white">{m.name}</h3>
-                                            <div className="text-[10px] text-gray-500">{m.type} • {m.slots} PLACES</div>
-                                            <button onClick={()=>appActions.deployUnit(m)} className="mt-auto w-full py-2 bg-green-900/20 border border-green-800 text-green-500 text-xs font-bold hover:bg-green-900/40">ACHETER</button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {tab === 'squad' && (
-                                <div className="max-w-xl mx-auto bg-black border border-green-900 p-6">
-                                    <h2 className="text-lg font-black text-green-500 mb-4 uppercase">Gestion des Effectifs</h2>
-                                    {userRole === 'SL' && (
-                                        <div className="flex gap-2 mb-6">
-                                            <input id="newMember" type="text" className="flex-1 bg-gray-900 border border-green-800 p-3 text-green-400 font-bold outline-none uppercase" placeholder="NOUVEAU SOLDAT..." />
-                                            <button onClick={()=>{ const el = document.getElementById('newMember'); appActions.addSquad(el.value); el.value = ''; }} className="bg-green-600 text-black font-bold px-6">AJOUTER</button>
-                                        </div>
-                                    )}
-                                    <div className="space-y-2">
-                                        {(data.squad||[]).map(m => (
-                                            <div key={m.id} className="flex justify-between items-center p-3 border border-green-900/30 bg-green-900/10">
-                                                <span className="text-green-300 font-bold flex items-center gap-3"><Icon name="User"/> {m.name}</span>
-                                                {userRole === 'SL' && <button onClick={()=>appActions.removeSquad(m.id)} className="text-red-500 text-xs border border-red-900/30 px-2 py-1 hover:bg-red-900/20">RENVOYER</button>}
-                                            </div>
-                                        ))}
-                                        {(data.squad||[]).length === 0 && <div className="text-center text-gray-600 py-4 italic">Aucun effectif enregistré.</div>}
-                                    </div>
-                                </div>
-                            )}
-
-                            {tab === 'logs' && (
-                                <div className="max-w-4xl mx-auto space-y-6">
-                                    <div className="bg-black border border-green-900 p-4 h-[50vh] overflow-y-auto font-mono text-xs">
-                                        <div className="flex justify-between border-b border-green-900 pb-2 mb-2">
-                                            <h3 className="text-green-500 font-bold">JOURNAL DE MARCHE (JMO)</h3>
-                                            {userRole === 'SL' && <button onClick={appActions.clearLogs} className="text-red-500 hover:text-white" title="Vider JMO"><Icon name="Trash"/></button>}
-                                        </div>
-                                        {(data.logs||[]).map(l => (
-                                            <div key={l.id} className="flex gap-2 mb-1 text-gray-400 border-b border-gray-900 pb-1">
-                                                <span className="text-green-700 w-16 flex-shrink-0">{l.time}</span>
-                                                <span className="font-bold w-20 flex-shrink-0 text-green-600">[{l.type}]</span>
-                                                <span className="break-words">{l.msg}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    
-                                    <div className="bg-black border border-red-900/50 p-4 h-[30vh] overflow-y-auto">
-                                        <h3 className="text-red-500 font-bold border-b border-red-900 pb-2 mb-2">HISTORIQUE DES PERTES</h3>
-                                        {(data.destroyedHistory||[]).map((u, i) => (
-                                            <div key={i} className="flex justify-between items-center text-xs py-2 border-b border-red-900/20 text-gray-400">
-                                                <div>
-                                                    <span className="text-white font-bold mr-2">{u.name}</span>
-                                                    <span className="text-gray-600 text-[10px]">({u.cat})</span>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="text-red-400 font-bold uppercase">{u.reasonHS || "INCONNUE"}</div>
-                                                    <div className="text-[9px] text-gray-600">{u.archivedAt}</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {(data.destroyedHistory||[]).length === 0 && <div className="text-center text-gray-700 italic py-4">Aucune perte archivée.</div>}
-                                    </div>
-                                </div>
-                            )}
-                        </main>
-                    </div>
-
-                    {sitrepModalUnit && <SitrepModal unit={sitrepModalUnit} onClose={()=>setSitrepModalUnit(null)} onSend={appActions.sendSitrep} />}
-                    {rtbUnit && <RTBCheckModal onClose={()=>setRtbUnit(null)} onConfirm={appActions.confirmRTB} />}
-                    {maintenanceUnit && <MaintenanceModal unit={maintenanceUnit} onClose={()=>setMaintenanceUnit(null)} onConfirm={appActions.finishMaintenance} />}
-                    {showSupply && <SupplyModal sources={data.supplySources||[]} onClose={()=>setShowSupply(false)} onUpdate={appActions.updateSupply} onAdd={appActions.addSupply} onDelete={appActions.deleteSupply} />}
-                    {rtbModalUnit && <RTBCheckModal onClose={()=>setRtbModalUnit(null)} onConfirm={appActions.finalizeRTB} />}
-                    {showCreateMission && <CreateMissionModal units={data.units} onClose={()=>setShowCreateMission(false)} onCreate={appActions.createMission} />}
-                    {transferUnit && <TransferModal unit={transferUnit} onClose={()=>setTransferUnit(null)} onTransfer={appActions.transferCommand} />}
-                    
-                    {/* ALERTS LAYER */}
-                    <div className="pointer-events-none fixed inset-0 z-[200]">
-                        <div className="pointer-events-auto">
-                            {notification && (
-                                <div className="fixed top-16 right-4 z-50 bg-green-600 text-white px-4 py-2 rounded shadow-lg animate-bounce-in flex items-center gap-2">
-                                    <Icon name="Check"/> {notification.message}
-                                    <button onClick={()=>setNotification(null)} className="ml-2">x</button>
-                                </div>
-                            )}
-                            {incomingSitrep && <SLSitrepAlert sitrep={incomingSitrep} onAck={appActions.ackSitrep} />}
-                            {pendingRTB && <SLRTBAlert unit={pendingRTB} onValidate={()=>appActions.approveRTB(pendingRTB)} />}
-                        </div>
-                    </div>
                 </div>
             );
         };
