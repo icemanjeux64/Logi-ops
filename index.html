@@ -61,11 +61,45 @@
         // Cleanups
         let listeners = [];
 
-        // Data Constants
+        // --- DATA CONSTANTS ---
         const RANKS = [
             "Sdt", "1re Cl", "Cpl", "Cpl-Chef", 
             "Sgt", "Sgt-Chef", "Adj", "Adj-Chef", "Major", 
             "Asp", "S-Lt", "Lt", "Cne", "Cdt", "Lt-Col", "Col", "Gen"
+        ];
+
+        const VEHICLE_DATABASE = [
+            { name: "Jeep EM", category: "Transport EM", cost: 110 },
+            { name: "Camion réparation", category: "Maintenance", cost: 175 },
+            { name: "QG Mobile", category: "EM", cost: 420 },
+            { name: "Camion Citerne", category: "Ravitaillement", cost: 160 },
+            { name: "Camion Arsenal", category: "Ravitaillement", cost: 380 },
+            { name: "Camion Construction", category: "Ravitaillement", cost: 260 },
+            { name: "Camion", category: "Transport de troupes", cost: 200 },
+            { name: "VAB", category: "Transport de troupes", cost: 1200 },
+            { name: "Stryker (non armé)", category: "Transport de troupes", cost: 1000 },
+            { name: "JLTV M1280 (non-armée)", category: "Véhicule blindé multi-rôle", cost: 650 },
+            { name: "JLTV M1281 - M2HB (12,7)", category: "Véhicule blindé multi-rôle", cost: 1000 },
+            { name: "JLTV M1281 - M134 (7,62)", category: "Véhicule blindé multi-rôle", cost: 2000 },
+            { name: "JLTV M1278 - M2HB (12,7 télé-opéré)", category: "Véhicule blindé multi-rôle", cost: 1500 },
+            { name: "JLTV AN-MSY-2 v2 (7,62 télé-opéré)", category: "Véhicule blindé multi-rôle", cost: 2750 },
+            { name: "JLTV M1278 - M230LF (30mm)", category: "Véhicule blindé multi-rôle", cost: 2750 },
+            { name: "JLTV M1278 M230LF FGM147 (30mm + javeline)", category: "Véhicule blindé multi-rôle", cost: 3700 },
+            { name: "JLTV AN-MSY-2 v1 (30mm + stinger)", category: "Véhicule blindé multi-rôle", cost: 3700 },
+            { name: "Stryker M1126 - M2HB (12,7 télé-opéré)", category: "Véhicule de combat d’infanterie", cost: 2000 },
+            { name: "Stryker M1296 (30mm)", category: "Véhicule de combat d’infanterie", cost: 3000 },
+            { name: "Stryker M1128 (105mm)", category: "Véhicule de combat d’infanterie", cost: 5000 },
+            { name: "Stryker EVASAN", category: "Véhicule sanitaire (EVASAN)", cost: 975 },
+            { name: "VAB EVASAN", category: "Véhicule sanitaire (EVASAN)", cost: 1200 },
+            { name: "Leclerc", category: "Char de bataille", cost: 8000 },
+            { name: "Leclerc XLR", category: "Char de bataille", cost: 8300 },
+            { name: "NH90 “Faucon” (MEDEVAC)", category: "MEDEVAC", cost: 3000 },
+            { name: "NH90 “Faucon” (Transport)", category: "Appui aérien / Transport", cost: 3000 },
+            { name: "Gazelle SA342L (non-armée)", category: "Appui aérien / Transport", cost: 2500 },
+            { name: "Gazelle SA342L Strike (Barret M82)", category: "Appui aérien / Transport", cost: 3000 },
+            { name: "Gazelle SA342L Canon (20 mm)", category: "Appui aérien / Transport", cost: 3500 },
+            { name: "Gazelle SA342L HAP (Roquette 68mm)", category: "Appui aérien / Transport", cost: 3500 },
+            { name: "EC665 Tigre", category: "Appui aérien / Transport", cost: 7000 }
         ];
 
         // --- UTILS ---
@@ -129,7 +163,7 @@
                 currentUser = user;
                 currentUserId = user.uid;
                 
-                const storedUid = localStorage.getItem('logiops_sl_uid'); // Changed key to highlight SL only
+                const storedUid = localStorage.getItem('logiops_sl_uid');
                 if(storedUid) restoreSession(user.uid);
                 else checkAppState();
 
@@ -147,11 +181,8 @@
                             localStorage.removeItem('logiops_sl_uid');
                             location.reload();
                         }
-                        // Auto-update local role if changed remotely
                         if(d.role && d.role !== userRole) {
                             userRole = d.role;
-                            // If I become SL remotely, save persistence
-                            if(userRole === 'SL') localStorage.setItem('logiops_sl_uid', currentUserId);
                             loadInterface();
                         }
                     }
@@ -162,14 +193,11 @@
 
         async function restoreSession(uid) {
             try {
-                // Check Global Status First
                 const settingsSnap = await getDoc(publicDoc('settings', 'global'));
                 const isServiceActive = settingsSnap.exists() && settingsSnap.data().serviceStatus === 'ACTIVE';
 
-                // If Service is ENDED, destroy persistence and reload to Auth
                 if (!isServiceActive) {
                     localStorage.removeItem('logiops_sl_uid');
-                    console.log("Service ended, clearing persistence.");
                     checkAppState();
                     return;
                 }
@@ -181,7 +209,6 @@
                     lastNotificationTime = Date.now();
                     checkAppState();
                 } else {
-                    // User not found, not online, or not SL -> Clear persistence
                     localStorage.removeItem('logiops_sl_uid');
                     checkAppState();
                 }
@@ -192,7 +219,6 @@
         }
 
         // --- APP LOGIC ---
-
         function checkAppState() {
             const unsub = onSnapshot(publicDoc('settings', 'global'), (docSnap) => {
                 if (docSnap.exists()) {
@@ -242,14 +268,23 @@
             if (userRole) loadInterface();
             else {
                 document.getElementById('auth-screen').classList.remove('hidden');
-                populateRankSelects();
+                populateSelects();
             }
         }
 
-        function populateRankSelects() {
+        function populateSelects() {
+            // Ranks
             const opts = RANKS.map(r => `<option value="${r}">${r}</option>`).join('');
             const slSel = document.getElementById('sl-grade');
             if(slSel) slSel.innerHTML = opts;
+
+            // Vehicles (Garage)
+            const vSel = document.getElementById('new-veh-type');
+            if(vSel) {
+                vSel.innerHTML = VEHICLE_DATABASE.map((v, idx) => 
+                    `<option value="${idx}">${v.name} (${v.cost}) - ${v.category}</option>`
+                ).join('');
+            }
         }
 
         // --- STATISTICS ---
@@ -278,7 +313,6 @@
         }
 
         // --- REQUESTS SYSTEM (SL SIDE) ---
-        
         function setupSLRequestListeners() {
             listeners.push(onSnapshot(query(publicPath('users'), where('rtbStatus', '==', 'REQUESTED')), (snap) => {
                 snap.forEach(doc => {
@@ -402,18 +436,24 @@
 
         // --- VEHICLE & SUPPLY ---
         window.createVehicle = async () => {
-            const type = document.getElementById('new-veh-type').value;
-            const name = document.getElementById('new-veh-name').value;
-            const costs = { 'LOGI': 300, 'JEEP': 100, 'TRANSPORT': 200, 'BLINDE': 600 };
-            const cost = costs[type] || 100;
+            const idx = document.getElementById('new-veh-type').value;
+            const vehData = VEHICLE_DATABASE[idx];
+            const nameInput = document.getElementById('new-veh-name').value;
+            
+            if(!vehData) return;
 
-            if(await consumeGlobalSupply(cost)) {
+            if(await consumeGlobalSupply(vehData.cost)) {
                 await addDoc(publicPath('vehicles'), {
-                    name: name || `${type}-${Math.floor(Math.random()*100)}`,
-                    category: type, status: 'OPS', seats: { driver: null, copilot: null, gunner: null }, missionId: null,
-                    cost: cost, createdAt: serverTimestamp(), missionCount: 0
+                    name: nameInput || `${vehData.name}-${Math.floor(Math.random()*100)}`,
+                    category: vehData.category, 
+                    status: 'OPS', 
+                    seats: { driver: null, copilot: null, gunner: null }, 
+                    missionId: null,
+                    cost: vehData.cost, 
+                    createdAt: serverTimestamp(), 
+                    missionCount: 0
                 });
-                addLog(`Véhicule sorti: ${type} (-${cost})`, 'LOGISTICS');
+                addLog(`Véhicule sorti: ${vehData.name} (-${vehData.cost})`, 'LOGISTICS');
                 document.getElementById('garage-modal').classList.add('hidden');
             } else {
                 hudAlert("Erreur", "Supply insuffisant.");
@@ -437,6 +477,7 @@
             setupNotifications();
             setupVehiclesListener();
             setupMissionsListener();
+            populateSelects();
 
             const slDiv = document.getElementById('sl-controls');
             const logDiv = document.getElementById('log-controls');
@@ -488,7 +529,7 @@
             }));
         }
 
-        // --- VEHICLE GRID ---
+        // --- VEHICLE GRID & SEAT LOGIC (UPDATED) ---
         window.setFilter = (f) => { currentFilter = f; renderVehicleGrid(); };
         
         function renderVehicleGrid() {
@@ -546,11 +587,65 @@
             return div;
         }
 
-        // --- STANDARD FUNCTIONS (CLEANED) ---
+        // --- UPDATED SEAT TOGGLE LOGIC WITH SWITCH CHECK ---
+        window.toggleSeat = async (vehId, data, role) => {
+            if(!currentUserId) return;
+            
+            const targetOccupant = data.seats[role];
+
+            // 1. Getting Out (Same seat)
+            if (targetOccupant && targetOccupant.uid === currentUserId) {
+                await updateDoc(publicDoc('vehicles', vehId), { [`seats.${role}`]: null });
+                addLog(`${userPseudo} est descendu de ${data.name}`);
+                return;
+            }
+
+            // 2. Seat Occupied by someone else
+            if (targetOccupant) {
+                return hudAlert("Occupé", `Place occupée par ${targetOccupant.name}`);
+            }
+
+            // 3. Empty Seat -> Check if I am somewhere else
+            let currentVehId = null;
+            let currentSeatRole = null;
+            let currentVehName = null;
+
+            // Iterate local cache to find me
+            for (const v of vehicleDataCache) {
+                for (const [r, occ] of Object.entries(v.data.seats)) {
+                    if (occ && occ.uid === currentUserId) {
+                        currentVehId = v.id;
+                        currentSeatRole = r;
+                        currentVehName = v.data.name;
+                        break;
+                    }
+                }
+                if (currentVehId) break;
+            }
+
+            if (currentVehId) {
+                // I am seated elsewhere, ask to switch
+                hudConfirm("CHANGEMENT", `Quitter <strong>${currentVehName}</strong> pour <strong>${data.name}</strong> ?`, async () => {
+                    const batch = writeBatch(db);
+                    // Empty old seat
+                    batch.update(publicDoc('vehicles', currentVehId), { [`seats.${currentSeatRole}`]: null });
+                    // Fill new seat
+                    batch.update(publicDoc('vehicles', vehId), { [`seats.${role}`]: { uid: currentUserId, name: userPseudo } });
+                    
+                    await batch.commit();
+                    addLog(`${userPseudo} a changé de véhicule.`);
+                });
+            } else {
+                // I am free, sit down directly
+                await updateDoc(publicDoc('vehicles', vehId), { [`seats.${role}`]: { uid: currentUserId, name: userPseudo } });
+                addLog(`${userPseudo} est monté dans ${data.name}`);
+            }
+        };
+
+        // --- STANDARD FUNCTIONS ---
         window.selectLoginMode = (mode) => { if(mode === 'SL') { document.getElementById('btn-login-log').classList.add('hidden'); document.getElementById('login-sl-form').classList.remove('hidden'); } else { document.getElementById('btn-login-sl').classList.add('hidden'); document.getElementById('login-log-form').classList.remove('hidden'); showLogLogin(); } };
         window.resetLoginSelection = () => { document.getElementById('btn-login-sl').classList.remove('hidden'); document.getElementById('btn-login-log').classList.remove('hidden'); document.getElementById('login-sl-form').classList.add('hidden'); document.getElementById('login-log-form').classList.add('hidden'); };
         
-        // LOGIN SL (With Persistence)
         window.loginSL = async () => { 
             const p = document.getElementById('sl-pseudo').value.toUpperCase(); 
             const g = document.getElementById('sl-grade').value; 
@@ -558,7 +653,7 @@
             await setDoc(publicDoc('settings', 'global'), { slSessionId: currentUserId, slName: `${g} ${p}`, serviceStatus: 'ACTIVE' }, {merge:true}); 
             await setDoc(publicDoc('users', currentUserId), { pseudo: p, grade: g, role: 'SL', isOnline: true }); 
             userRole = 'SL'; userPseudo = p; userGrade = g; 
-            localStorage.setItem('logiops_sl_uid', currentUserId); // ONLY SAVE FOR SL
+            localStorage.setItem('logiops_sl_uid', currentUserId); 
             lastNotificationTime = Date.now(); 
             document.getElementById('auth-screen').classList.add('hidden'); 
             loadInterface(); 
@@ -566,11 +661,10 @@
 
         window.showLogLogin = () => { const list = document.getElementById('roster-list-login'); onSnapshot(publicPath('roster'), (snap) => { list.innerHTML = ''; snap.forEach(doc => { const d = doc.data(); const btn = document.createElement('button'); btn.className = "w-full text-left border border-green-900 bg-black/40 p-4 mb-2 rounded flex justify-between items-center touch-manipulation hover:bg-green-900/20"; btn.innerHTML = `<span class="font-bold text-green-400">${d.grade} ${d.pseudo}</span>`; btn.onclick = () => loginLOG(doc.id, d.pseudo, d.grade); list.appendChild(btn); }); }); };
         
-        // LOGIN LOG (No Persistence)
         window.loginLOG = async (rid, p, g) => { 
             await setDoc(publicDoc('users', currentUserId), { pseudo: p, grade: g, role: 'LOG', rosterId: rid, isOnline: true, rtbStatus: 'NONE' }); 
             userRole = 'LOG'; userPseudo = p; userGrade = g; 
-            localStorage.removeItem('logiops_sl_uid'); // Ensure clear
+            localStorage.removeItem('logiops_sl_uid'); 
             lastNotificationTime = Date.now(); 
             document.getElementById('auth-screen').classList.add('hidden'); 
             loadInterface(); 
@@ -580,7 +674,7 @@
             hudConfirm("QUITTER", "Vous passerez Logisticien.", async () => { 
                 await updateDoc(publicDoc('settings', 'global'), { slSessionId: null, slName: null }); 
                 await updateDoc(publicDoc('users', currentUserId), { role: 'LOG' }); 
-                localStorage.removeItem('logiops_sl_uid'); // Clear persistence on downgrade
+                localStorage.removeItem('logiops_sl_uid'); 
                 const rSnap = await getDocs(query(publicPath('roster'), where('pseudo', '==', userPseudo))); 
                 if(rSnap.empty) await addDoc(publicPath('roster'), { grade: userGrade, pseudo: userPseudo }); 
                 userRole = 'LOG'; 
@@ -612,7 +706,6 @@
             });
         };
 
-        window.toggleSeat = async (id, data, role) => { const occ = data.seats[role]; if(occ && occ.uid === currentUserId) { await updateDoc(publicDoc('vehicles', id), { [`seats.${role}`]: null }); } else if(!occ) { await updateDoc(publicDoc('vehicles', id), { [`seats.${role}`]: { uid: currentUserId, name: userPseudo } }); } else { hudAlert("Occupé", "Place déjà prise."); } };
         window.toggleSidebar = () => { const s = document.getElementById('sidebar'); const b = document.getElementById('mobile-backdrop'); if(s.classList.contains('-translate-x-full')) { s.classList.remove('-translate-x-full'); b.classList.remove('hidden'); } else { s.classList.add('-translate-x-full'); b.classList.add('hidden'); } };
         window.closeModal = (id) => document.getElementById(id).classList.add('hidden'); window.toggleModal = (id) => document.getElementById(id).classList.toggle('hidden');
         
@@ -699,16 +792,88 @@
             listeners.push(onSnapshot(publicPath('vehicles'), (snap) => { vContainer.innerHTML = ''; snap.forEach(doc => { if(doc.data().missionId === mId) { vContainer.appendChild(createVehicleCard(doc.id, doc.data(), true)); } }); })); 
         };
 
-        window.requestLeadership = (mId) => { hudConfirm("COMMANDEMENT", "Voulez-vous prendre le commandement de cette mission ?", async () => { await updateDoc(publicDoc('missions', mId), { transferRequest: { targetId: currentUserId, targetName: `${userGrade} ${userPseudo}`, state: 'WAITING_SL' } }); hudAlert("ENVOYÉ", "Demande transmise au Squad Leader."); }); };
-        window.initiateTransfer = async (mId) => { const modal = document.getElementById('transfer-select-modal'); const list = document.getElementById('transfer-list'); modal.classList.remove('hidden'); list.innerHTML = 'Chargement...'; const snap = await getDocs(query(publicPath('users'), where('isOnline', '==', true))); list.innerHTML = ''; snap.forEach(doc => { const d = doc.data(); if (doc.id !== currentUserId) { const btn = document.createElement('button'); btn.className = "w-full text-left p-3 bg-black/60 border border-green-900 hover:bg-green-900/30 mb-1 text-green-400 font-bold"; btn.innerText = `${d.grade} ${d.pseudo}`; btn.onclick = async () => { modal.classList.add('hidden'); await updateDoc(publicDoc('missions', mId), { transferRequest: { targetId: doc.id, targetName: `${d.grade} ${d.pseudo}`, state: 'WAITING_TARGET' } }); hudAlert("OFFRE ENVOYÉE", `Proposition de commandement envoyée à ${d.pseudo}.`); }; list.appendChild(btn); } }); };
-        window.endMission = (mId, status) => { hudConfirm("FIN DE MISSION", "Confirmer la clôture ? Les véhicules repasseront OPS.", async () => { const batch = writeBatch(db); batch.update(publicDoc('missions', mId), { status: status === 'COMPLETED' ? 'ARCHIVED' : 'CANCELLED' }); const vSnap = await getDocs(query(publicPath('vehicles'), where('missionId', '==', mId))); vSnap.forEach(v => batch.update(v.ref, { status: 'OPS', missionId: null })); await batch.commit(); document.getElementById('mission-details-modal').classList.add('hidden'); }); };
-        window.openRosterModal = () => { const m = document.getElementById('roster-modal'); m.classList.remove('hidden'); const list = document.getElementById('sl-roster-list'); onSnapshot(publicPath('roster'), async (snapRoster) => { const usersSnap = await getDocs(publicPath('users')); const usersMap = {}; usersSnap.forEach(u => usersMap[u.data().rosterId] = { id: u.id, ...u.data() }); list.innerHTML = ''; snapRoster.forEach(doc => { const d = doc.data(); const activeUser = usersMap[doc.id]; const isOnline = activeUser && activeUser.isOnline; const div = document.createElement('div'); div.className = "flex justify-between items-center bg-black/40 p-2 rounded mb-1 border border-green-900/30"; let actionBtn = ''; if(isOnline) { actionBtn = `<button onclick="kickUser('${activeUser.id}', '${d.pseudo}')" class="text-xs bg-red-900/50 text-red-400 border border-red-900 px-2 py-1 rounded">EXCLURE</button>`; } else { actionBtn = `<button onclick="deleteRosterEntry('${doc.id}')" class="text-gray-500 hover:text-red-500"><i class="fas fa-trash"></i></button>`; } div.innerHTML = `<div><span class="font-bold ${isOnline ? 'text-green-400' : 'text-gray-500'}">${d.grade} ${d.pseudo}</span>${isOnline ? '<span class="ml-2 text-[9px] bg-green-900 text-green-200 px-1 rounded">EN LIGNE</span>' : ''}</div><div>${actionBtn}</div>`; list.appendChild(div); }); }); };
-        window.kickUser = (uid, name) => { hudConfirm("EXCLURE", `Forcer la déconnexion de ${name} ?`, async () => { await updateDoc(publicDoc('users', uid), { rtbStatus: 'KICKED', isOnline: false }); addLog(`${name} a été exclu par le Commandement.`, 'ADMIN', true); }); };
-        window.deleteRosterEntry = (rid) => { hudConfirm("SUPPRIMER", "Retirer du registre ?", async () => await deleteDoc(publicDoc('roster', rid))); };
-        window.addToRoster = () => { const m = document.getElementById('hud-prompt-modal'); m.classList.remove('hidden'); window.hudPrompt("NOUVEAU PERSONNEL", "Format: Grade Pseudo (ex: Sgt Major)", async (val) => { if(!val) return; const parts = val.split(' '); const grade = parts[0]; const pseudo = parts.slice(1).join(' '); await addDoc(publicPath('roster'), { grade, pseudo, addedAt: serverTimestamp() }); addLog(`Ajout roster : ${val}`, 'ADMIN'); }); };
-        window.createDepot = () => { hudPrompt("NOUVEAU DÉPÔT", "Nom du lieu de stockage :", async (val) => { if(val) { await addDoc(publicPath('depots'), { name: val, amount: 0 }); addLog(`Nouveau dépôt : ${val}`, 'SUPPLY'); } }); };
-        window.updateDepot = async (id, delta) => { const ref = publicDoc('depots', id); const snap = await getDoc(ref); const current = snap.data().amount || 0; if(current + delta < 0) return hudAlert("Erreur", "Stock insuffisant."); await updateDoc(ref, { amount: current + delta }); };
-        window.renderDepotsList = (snap) => { const list = document.getElementById('depots-list'); if(!list) return; list.innerHTML = ''; snap.forEach(doc => { const d = doc.data(); const el = document.createElement('div'); el.className = "bg-black/40 border border-green-900/50 p-3 rounded mb-2 flex justify-between items-center"; el.innerHTML = `<div><div class="font-bold text-green-400 text-sm">${d.name}</div><div class="text-white font-mono text-lg">${d.amount}</div></div><div class="flex gap-2"><button onclick="updateDepot('${doc.id}', 100)" class="border border-green-600 text-green-600 px-3 py-1 text-xs rounded hover:bg-green-900 font-bold">+100</button><button onclick="updateDepot('${doc.id}', -100)" class="border border-red-600 text-red-600 px-3 py-1 text-xs rounded hover:bg-red-900 font-bold">-100</button></div>`; list.appendChild(el); }); };
+        window.requestGlobalRTB = async (mName, mId) => {
+            if(!confirm("Ordonner le RETOUR BASE pour toute la mission ?")) return;
+            await updateDoc(publicDoc('missions', mId), { status: 'RTB_IN_PROGRESS' });
+            addLog(`[ORDRE RTB GLOBAL // ${mName}] RETOUR BASE IMMÉDIAT DEMANDÉ`, 'MISSION', true);
+        };
+
+        window.openRTBCheckModal = async (mId) => {
+            const m = document.getElementById('rtb-check-modal');
+            const list = document.getElementById('rtb-check-list');
+            m.classList.remove('hidden');
+            list.innerHTML = '<div class="animate-pulse">Chargement des véhicules...</div>';
+            
+            const snap = await getDocs(query(publicPath('vehicles'), where('missionId', '==', mId)));
+            list.innerHTML = '';
+            
+            if(snap.empty) {
+                list.innerHTML = '<div class="text-center text-gray-500">Aucun véhicule.</div>';
+            }
+
+            snap.forEach(doc => {
+                const d = doc.data();
+                const div = document.createElement('div');
+                div.className = "mb-4 p-3 border border-green-900/50 bg-black/40 rounded";
+                div.innerHTML = `
+                    <div class="font-bold text-green-400 mb-2">${d.name} (${d.category})</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] text-gray-400">CARBURANT %</label>
+                            <input type="number" min="0" max="100" value="100" class="w-full bg-black border border-green-700 text-white text-center p-1 rtb-fuel" data-id="${doc.id}">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-gray-400">ÉTAT %</label>
+                            <input type="number" min="0" max="100" value="100" class="w-full bg-black border border-green-700 text-white text-center p-1 rtb-health" data-id="${doc.id}">
+                        </div>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+            
+            document.getElementById('btn-confirm-rtb-check').onclick = () => submitRTBCheck(mId);
+        };
+
+        window.submitRTBCheck = async (mId) => {
+            const fuels = document.querySelectorAll('.rtb-fuel');
+            const healths = document.querySelectorAll('.rtb-health');
+            const batch = writeBatch(db);
+            let maintenanceCount = 0;
+
+            for (let i = 0; i < fuels.length; i++) {
+                const vid = fuels[i].dataset.id;
+                const fVal = parseInt(fuels[i].value);
+                const hVal = parseInt(healths[i].value);
+                const vRef = publicDoc('vehicles', vid);
+
+                if (fVal < 100 || hVal < 100) {
+                    batch.update(vRef, { status: 'MAINTENANCE', missionId: null, fuel: fVal, integrity: hVal });
+                    maintenanceCount++;
+                } else {
+                    batch.update(vRef, { status: 'OPS', missionId: null, fuel: 100, integrity: 100 });
+                }
+            }
+
+            batch.update(publicDoc('missions', mId), { status: 'ARCHIVED' });
+            
+            await batch.commit();
+            addLog(`Mission terminée. ${maintenanceCount} véhicules en maintenance.`, 'LOGISTICS');
+            
+            document.getElementById('rtb-check-modal').classList.add('hidden');
+            document.getElementById('mission-details-modal').classList.add('hidden');
+        };
+
+        window.performMaintenance = (vid, name) => {
+            hudConfirm("MAINTENANCE", `Réparer et ravitailler <strong>${name}</strong> ?`, async () => {
+                await updateDoc(publicDoc('vehicles', vid), {
+                    status: 'OPS',
+                    fuel: 100,
+                    integrity: 100
+                });
+                addLog(`${userPseudo} a effectué la maintenance de ${name}.`, 'LOGISTICS');
+            });
+        };
+
     </script>
 
     <!-- Custom CSS -->
