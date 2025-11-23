@@ -63,7 +63,7 @@
             IS_CUSTOM_DB = true;
             console.log("Firebase connecté à :", firebaseConfig.projectId);
         } catch (e) {
-            console.warn("Erreur Initialisation Firebase:", e);
+            console.warn("Erreur Initialisation Firebase (Mode Local):", e);
             USE_FIREBASE = false;
         }
 
@@ -72,12 +72,12 @@
         const getRef = () => {
             if (!db) return null;
             if (IS_CUSTOM_DB) return db.collection('logiops').doc(SESSION_ID);
-            return db.collection('artifacts').doc(typeof __app_id !== 'undefined' ? __app_id : 'default').collection('public').doc('data').collection('logiops').doc('global');
+            return db.collection('artifacts').doc('default').collection('public').doc('data').collection('logiops').doc('global');
         };
 
         const StorageService = {
             save: (data) => {
-                if (USE_FIREBASE && db) {
+                if (USE_FIREBASE && db && firebase.auth().currentUser) {
                     getRef().set(data, { merge: true }).catch(err => console.warn("Erreur Cloud:", err));
                 } else {
                     try {
@@ -87,25 +87,23 @@
                 }
             },
             loadInitial: async (callback) => {
+                let useLocal = true;
                 if (USE_FIREBASE && db) {
                     const auth = firebase.auth();
-                    if (!auth.currentUser) {
-                        try { await auth.signInAnonymously(); } 
-                        catch (e) { 
-                            console.warn("Mode Dégradé Local", e); 
+                    try {
+                        if (!auth.currentUser) await auth.signInAnonymously();
+                        useLocal = false;
+                        return getRef().onSnapshot((doc) => {
+                            if (doc.exists) callback(doc.data());
+                            else callback(null);
+                        }, err => {
+                            console.error("Erreur Lecture Cloud:", err);
                             const local = localStorage.getItem('logiops_v19');
                             if (local) callback(JSON.parse(local));
-                            return () => {};
-                        }
-                    }
-                    return getRef().onSnapshot((doc) => {
-                        if (doc.exists) callback(doc.data());
-                        else callback(null);
-                    }, err => {
-                        const local = localStorage.getItem('logiops_v19');
-                        if (local) callback(JSON.parse(local));
-                    });
-                } else {
+                        });
+                    } catch (e) { console.warn("Auth Cloud échec:", e); }
+                }
+                if (useLocal) {
                     const local = localStorage.getItem('logiops_v19');
                     if (local) callback(JSON.parse(local)); else callback(null);
                     return () => {};
@@ -117,7 +115,7 @@
 
         const useData = () => {
             const [data, setData] = useState({ 
-                units: [], logs: [], squad: [], sitreps: [], destroyedHistory: [],
+                units: [], logs: [], squad: [], sitreps: [], destroyedHistory: [], missions: [],
                 supplySources: [{id: 'main', name: 'BASE PRINCIPALE', amount: 5000}] 
             });
             const [isConnected, setIsConnected] = useState(false);
@@ -129,7 +127,6 @@
                         if(newData) {
                             setData(prev => ({...prev, ...newData}));
                             if (USE_FIREBASE && firebase.auth().currentUser) setIsConnected(true);
-                            else setIsConnected(false);
                         }
                     });
                 };
@@ -148,7 +145,7 @@
             return [data, save, isConnected];
         };
 
-        // --- CONSTANTS ---
+        // --- DATA CONSTANTS ---
         const RANKS = [
             { id: 0, label: 'Recrue', short: 'REC', color: 'text-gray-500' },
             { id: 1, label: 'Soldat', short: 'SDT', color: 'text-green-700' },
@@ -206,7 +203,7 @@
             MessageSquare: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>,
             XCircle: <><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></>,
             Radio: <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9m14.2 0c3.9 3.9 3.9 10.3 0 14.2M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5m8.4 0c2.3 2.3 2.3 6.1 0 8.5M12 12h0" />,
-            Swap: <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
+            Target: <><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>,
         };
 
         const Icon = ({ name, size = 16, className }) => (
@@ -216,6 +213,46 @@
         );
 
         // --- MODALS ---
+        const CreateMissionModal = ({ units, onClose, onCreate }) => {
+            const [title, setTitle] = useState('');
+            const [objective, setObjective] = useState('');
+            const [selectedUnits, setSelectedUnits] = useState([]);
+
+            const toggleUnit = (uuid) => {
+                if(selectedUnits.includes(uuid)) setSelectedUnits(selectedUnits.filter(id => id !== uuid));
+                else setSelectedUnits([...selectedUnits, uuid]);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur z-50 flex items-center justify-center p-4">
+                    <div className="w-full max-w-lg bg-[#090909] border border-purple-600 p-6 shadow-2xl rounded max-h-[90vh] flex flex-col">
+                        <h3 className="text-purple-500 font-black text-lg mb-4 border-b border-purple-900 pb-2">CRÉER OPÉRATION / CONVOI</h3>
+                        <div className="space-y-4 mb-4">
+                            <input type="text" className="w-full bg-black border border-purple-900 p-2 text-white text-sm uppercase" placeholder="NOM DE L'OPÉRATION (EX: CONVOI BRAVO)" value={title} onChange={e=>setTitle(e.target.value)} />
+                            <input type="text" className="w-full bg-black border border-purple-900 p-2 text-white text-sm uppercase" placeholder="OBJECTIF (EX: RAVITAILLEMENT FOB)" value={objective} onChange={e=>setObjective(e.target.value)} />
+                        </div>
+                        <div className="flex-1 overflow-y-auto border border-purple-900/30 p-2 mb-4">
+                            <div className="text-xs text-gray-400 mb-2">SÉLECTIONNER VÉHICULES DISPONIBLES :</div>
+                            <div className="grid grid-cols-1 gap-2">
+                                {units.filter(u => u.status === 'operational').map(u => (
+                                    <div key={u.uuid} onClick={() => toggleUnit(u.uuid)} className={`flex justify-between items-center p-2 border cursor-pointer ${selectedUnits.includes(u.uuid) ? 'border-purple-500 bg-purple-900/20' : 'border-gray-800 bg-black'}`}>
+                                        <span className="text-xs font-bold text-white">{u.name}</span>
+                                        {selectedUnits.includes(u.uuid) && <Icon name="Check" className="text-purple-500"/>}
+                                    </div>
+                                ))}
+                                {units.filter(u => u.status === 'operational').length === 0 && <div className="text-gray-600 text-xs italic">Aucun véhicule dispo.</div>}
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={onClose} className="flex-1 py-3 border border-gray-700 text-gray-500 text-xs font-bold">ANNULER</button>
+                            <button onClick={() => onCreate(title, objective, selectedUnits)} disabled={!title || selectedUnits.length === 0} className="flex-1 py-3 bg-purple-600 text-black font-black text-xs hover:bg-purple-500 disabled:opacity-50">LANCER OPÉRATION</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ... (Other Modals - Sitrep, Maint, RTB, Supply remain mostly same but updated styles)
         const SitrepModal = ({ unit, onClose, onSend }) => {
             const [code, setCode] = useState('green');
             const [location, setLocation] = useState('');
@@ -225,32 +262,11 @@
                     <div className="w-full max-w-sm bg-[#090909] border border-yellow-600 p-4 shadow-2xl rounded">
                         <h3 className="text-yellow-500 font-black text-lg mb-4 uppercase border-b border-yellow-900 pb-2">ENVOYER SITREP</h3>
                         <div className="space-y-4">
-                            <div><label className="text-[10px] text-gray-500 font-bold block mb-1">CODE ALERTE</label><div className="flex gap-2"><button onClick={()=>setCode('green')} className={`flex-1 py-2 border font-bold text-xs ${code==='green'?'bg-green-600 text-black border-green-500':'border-green-900 text-green-700'}`}>VERT (RAS)</button><button onClick={()=>setCode('orange')} className={`flex-1 py-2 border font-bold text-xs ${code==='orange'?'bg-orange-600 text-black border-orange-500':'border-orange-900 text-orange-700'}`}>ORANGE</button><button onClick={()=>setCode('red')} className={`flex-1 py-2 border font-bold text-xs ${code==='red'?'bg-red-600 text-black border-red-500':'border-red-900 text-red-700'}`}>ROUGE</button></div></div>
-                            <div><label className="text-[10px] text-gray-500 font-bold block mb-1">POSITION ACTUELLE</label><input type="text" className="w-full bg-gray-900 border border-gray-700 p-2 text-white text-sm" value={location} onChange={e=>setLocation(e.target.value)} placeholder="Ex: Grille C4, FOB..." /></div>
-                            <div><label className="text-[10px] text-gray-500 font-bold block mb-1">DÉTAILS / MESSAGE</label><textarea className="w-full bg-gray-900 border border-gray-700 p-2 text-white text-sm h-20" value={details} onChange={e=>setDetails(e.target.value)} placeholder="Ex: Contact ennemi, demande munitions..." /></div>
-                            <div className="flex gap-2 pt-2"><button onClick={onClose} className="flex-1 py-2 border border-gray-700 text-gray-500 text-xs">ANNULER</button><button onClick={()=>onSend(code, location, details)} disabled={!location} className="flex-1 py-2 bg-yellow-600 text-black font-bold text-xs hover:bg-yellow-500 disabled:opacity-50">ENVOYER</button></div>
+                            <div><label className="text-[10px] text-gray-500 font-bold block mb-1">CODE ALERTE</label><div className="flex gap-2"><button onClick={()=>setCode('green')} className={`flex-1 py-2 border font-bold text-xs ${code==='green'?'bg-green-600 text-black border-green-500':'border-green-900 text-green-700'}`}>VERT</button><button onClick={()=>setCode('orange')} className={`flex-1 py-2 border font-bold text-xs ${code==='orange'?'bg-orange-600 text-black border-orange-500':'border-orange-900 text-orange-700'}`}>ORANGE</button><button onClick={()=>setCode('red')} className={`flex-1 py-2 border font-bold text-xs ${code==='red'?'bg-red-600 text-black border-red-500':'border-red-900 text-red-700'}`}>ROUGE</button></div></div>
+                            <div><label className="text-[10px] text-gray-500 font-bold block mb-1">POSITION</label><input type="text" className="w-full bg-gray-900 border border-gray-700 p-2 text-white text-sm" value={location} onChange={e=>setLocation(e.target.value)} /></div>
+                            <div><label className="text-[10px] text-gray-500 font-bold block mb-1">MESSAGE</label><textarea className="w-full bg-gray-900 border border-gray-700 p-2 text-white text-sm h-20" value={details} onChange={e=>setDetails(e.target.value)} /></div>
+                            <div className="flex gap-2 pt-2"><button onClick={onClose} className="flex-1 py-2 border border-gray-700 text-gray-500 text-xs">ANNULER</button><button onClick={()=>onSend(code, location, details)} disabled={!location} className="flex-1 py-2 bg-yellow-600 text-black font-bold text-xs hover:bg-yellow-500">ENVOYER</button></div>
                         </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const MaintenanceModal = ({ unit, onClose, onConfirm }) => {
-            const [fuel, setFuel] = useState(unit.fuel || 0);
-            const [health, setHealth] = useState(unit.health || 0);
-            const isFixed = parseInt(fuel) === 100 && parseInt(health) === 100;
-            return (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur z-50 flex items-center justify-center p-4">
-                    <div className="w-full max-w-md bg-[#090909] border border-orange-600 p-6 shadow-2xl rounded relative">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-orange-600"></div>
-                        <h3 className="text-orange-500 font-black text-xl mb-2 uppercase flex items-center gap-2"><Icon name="Wrench"/> ATELIER MÉCANIQUE</h3>
-                        <p className="text-xs text-gray-400 mb-6">VÉHICULE: <span className="text-white font-bold">{unit.name}</span></p>
-                        <div className="space-y-6 mb-8">
-                            <div><label className="flex justify-between text-xs font-bold text-blue-400 mb-2"><span>NIVEAU CARBURANT</span><span>{fuel}%</span></label><input type="range" min="0" max="100" value={fuel} onChange={e=>setFuel(e.target.value)} className="w-full accent-blue-500 h-4 bg-gray-800 appearance-none rounded cursor-pointer"/></div>
-                            <div><label className="flex justify-between text-xs font-bold text-green-400 mb-2"><span>INTÉGRITÉ STRUCTURE</span><span>{health}%</span></label><input type="range" min="0" max="100" value={health} onChange={e=>setHealth(e.target.value)} className="w-full accent-green-500 h-4 bg-gray-800 appearance-none rounded cursor-pointer"/></div>
-                        </div>
-                        <div className="p-3 bg-gray-900 border border-gray-700 mb-6 text-center rounded"><div className={`text-sm font-bold uppercase ${isFixed ? 'text-green-500 animate-pulse' : 'text-red-500'}`}>{isFixed ? "RÉPARATIONS TERMINÉES" : "RÉPARATIONS EN COURS..."}</div></div>
-                        <div className="flex gap-3"><button onClick={onClose} className="flex-1 py-3 border border-gray-700 text-gray-500 text-xs font-bold hover:text-white">PAUSE</button><button onClick={onConfirm} disabled={!isFixed} className="flex-1 py-3 bg-green-600 text-black font-black text-xs hover:bg-green-500 disabled:opacity-20 disabled:bg-gray-800 disabled:text-gray-500">VALIDER SORTIE</button></div>
                     </div>
                 </div>
             );
@@ -275,110 +291,18 @@
             );
         };
 
-        const TransferModal = ({ unit, onClose, onTransfer }) => {
-            return (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur z-50 flex items-center justify-center p-4">
-                    <div className="w-full max-w-sm bg-[#090909] border border-purple-600 p-6 shadow-2xl rounded">
-                        <h3 className="text-purple-500 font-black text-lg mb-4 border-b border-purple-900 pb-2">PASSATION COMMANDEMENT</h3>
-                        <div className="text-xs text-gray-400 mb-4">Choisissez un membre de l'équipage pour prendre le volant :</div>
-                        
-                        <div className="space-y-2 mb-6">
-                            {(!unit.crew || unit.crew.length === 0) ? (
-                                <div className="text-center text-red-500 text-xs italic py-2">Aucun passager à bord.</div>
-                            ) : (
-                                unit.crew.map((p, i) => (
-                                    <button key={i} onClick={() => onTransfer(p)} className="w-full text-left p-3 border border-gray-800 bg-gray-900 hover:border-purple-500 hover:bg-purple-900/20 flex justify-between items-center">
-                                        <span className="text-white font-bold text-xs">{p.name}</span>
-                                        <span className="text-[10px] text-gray-500">{p.rank}</span>
-                                    </button>
-                                ))
-                            )}
-                        </div>
-
-                        <button onClick={onClose} className="w-full py-3 border border-gray-700 text-gray-500 text-xs font-bold hover:text-white">ANNULER</button>
-                    </div>
-                </div>
-            );
-        };
-
-        const SLSitrepAlert = ({ sitrep, onAck }) => (
-            <div className="fixed top-4 right-4 z-[100] w-80 animate-pulse">
-                <div className={`border-l-4 p-4 shadow-2xl bg-black text-white ${sitrep.code==='red'?'border-red-500 bg-red-900/20':sitrep.code==='orange'?'border-orange-500 bg-orange-900/20':'border-green-500 bg-green-900/20'}`}>
-                    <div className="flex justify-between items-start mb-2"><h4 className={`font-black text-sm uppercase ${sitrep.code==='red'?'text-red-500':sitrep.code==='orange'?'text-orange-500':'text-green-500'}`}>NOUVEAU SITREP REÇU</h4><span className="text-[10px] text-gray-400">{sitrep.time}</span></div>
-                    <div className="text-xs font-bold mb-1">UNITÉ: {sitrep.unitName}</div>
-                    <div className="text-xs mb-1">LOC: <span className="text-gray-300">{sitrep.location}</span></div>
-                    <div className="text-xs italic text-gray-400 mb-3">"{sitrep.details}"</div>
-                    <button onClick={onAck} className={`w-full py-2 text-black font-bold text-xs uppercase ${sitrep.code==='red'?'bg-red-600':'bg-gray-200'} hover:opacity-80`}>REÇU / TERMINÉ</button>
-                </div>
-            </div>
-        );
-
-        const SLRTBAlert = ({ unit, onValidate }) => (
-            <div className="fixed top-24 right-4 z-[100] w-80 animate-bounce-in">
-                <div className="border-l-4 border-blue-500 bg-blue-900/20 p-4 shadow-2xl bg-black text-white">
-                    <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-black text-sm uppercase text-blue-500 flex items-center gap-2"><Icon name="Radio"/> DEMANDE RTB</h4>
-                        <span className="text-[10px] text-gray-400">MAINTENANT</span>
-                    </div>
-                    <div className="text-xs font-bold mb-3">UNITÉ: {unit.name}</div>
-                    <button onClick={onValidate} className="w-full py-2 bg-blue-600 text-black font-bold text-xs uppercase hover:bg-blue-500">
-                        AUTORISER RETOUR
-                    </button>
-                </div>
-            </div>
-        );
-
-        const SupplyModal = ({ sources, onClose, onUpdate, onAdd, onDelete }) => {
-            const [newName, setNewName] = useState('');
-            const [newAmount, setNewAmount] = useState(0);
-
-            return (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur z-50 flex items-center justify-center p-4">
-                    <div className="w-full max-w-lg bg-[#090909] border border-green-600 p-6 shadow-2xl rounded max-h-[80vh] flex flex-col">
-                        <div className="flex justify-between items-center mb-6 border-b border-green-900 pb-2">
-                            <h3 className="text-green-500 font-black text-lg uppercase">GESTION LOGISTIQUE</h3>
-                            <button onClick={onClose} className="text-red-500 hover:text-red-400"><Icon name="XCircle" size={24}/></button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto space-y-2 mb-6">
-                            {sources.map(s => (
-                                <div key={s.id} className="flex justify-between items-center bg-gray-900 p-3 border border-gray-800 rounded">
-                                    <span className="font-bold text-green-400 text-sm">{s.name}</span>
-                                    <div className="flex items-center gap-2">
-                                        <input type="number" value={s.amount} onChange={(e)=>onUpdate(s.id, parseInt(e.target.value))} className="w-24 bg-black border border-gray-700 text-white text-right p-1 font-mono text-sm"/>
-                                        <button onClick={()=>onDelete(s.id)} className="text-red-500 hover:text-red-400 p-1"><Icon name="Trash"/></button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="bg-green-900/10 p-3 border border-green-900 rounded mb-4">
-                            <h4 className="text-xs font-bold text-green-600 mb-2">NOUVEAU LIEU DE STOCKAGE</h4>
-                            <div className="flex gap-2">
-                                <input type="text" placeholder="Nom (ex: FOB Alpha)" className="flex-1 bg-black border border-gray-700 p-2 text-xs text-white" value={newName} onChange={e=>setNewName(e.target.value)}/>
-                                <input type="number" placeholder="Qté" className="w-20 bg-black border border-gray-700 p-2 text-xs text-white" value={newAmount} onChange={e=>setNewAmount(e.target.value)}/>
-                                <button onClick={()=>{onAdd(newName, newAmount); setNewName(''); setNewAmount(0);}} className="bg-green-700 text-black font-bold px-3 text-xs rounded hover:bg-green-600">+</button>
-                            </div>
-                        </div>
-
-                        <button onClick={onClose} className="w-full py-3 border border-gray-700 text-gray-400 font-bold text-xs hover:bg-gray-800 hover:text-white">FERMER</button>
-                    </div>
-                </div>
-            );
-        };
-
         // --- UNIT CARD ---
-        const UnitCard = ({ unit, userIdentity, userRankId, isSL, actions, Icons }) => {
+        const UnitCard = ({ unit, userIdentity, userRankId, isSL, actions, Icons, missionData }) => {
             const minRank = unit.minRank || 0;
             const canDrive = userRankId >= minRank;
             const rankLabel = RANKS.find(r => r.id === minRank)?.short || "REC";
             
-            const driver = unit.responsible !== 'BASE' ? unit.responsible : null; 
-            const passengers = unit.crew || []; 
+            const driver = unit.responsible !== 'BASE' ? unit.responsible : null;
+            const passengers = unit.crew || [];
             const totalSlots = unit.slots || 2;
             const occupiedSlots = (driver ? 1 : 0) + passengers.length;
             const hasSpace = occupiedSlots < totalSlots;
-
+            
             const isDriver = driver?.name === userIdentity;
             const isPax = passengers.some(p => p.name === userIdentity);
             const isOnBoard = isDriver || isPax;
@@ -389,21 +313,25 @@
             else if (unit.status === 'destroyed') { statusColor = "red"; statusText = "DÉTRUIT"; }
             else if (unit.status.includes('mission')) { statusColor = "blue"; statusText = "EN MISSION"; }
 
-            // Custom Visual Bar
             const renderCrewBar = () => {
                 const bars = [];
                 for(let i=0; i < totalSlots; i++) {
                     const isOccupied = i < occupiedSlots;
-                    bars.push(
-                        <div key={i} className={`h-2 flex-1 rounded-sm mx-0.5 ${isOccupied ? 'bg-cyan-500 shadow-[0_0_5px_rgba(6,182,212,0.8)]' : 'border border-green-600/50 bg-green-900/20'}`}></div>
-                    );
+                    bars.push(<div key={i} className={`h-2 flex-1 rounded-sm mx-0.5 ${isOccupied ? 'bg-cyan-500 shadow-[0_0_5px_rgba(6,182,212,0.8)]' : 'border border-green-600/50 bg-green-900/20'}`}></div>);
                 }
                 return <div className="flex w-full mt-1">{bars}</div>;
             };
 
             return (
                 <div className={`relative border-l-4 border-${statusColor}-600 bg-gray-900/30 p-3 flex flex-col gap-2 border-t border-r border-b border-gray-800 hover:bg-gray-900/50 transition-all rounded`}>
-                    <div className="flex justify-between items-start">
+                    {/* Mission Banner */}
+                    {missionData && (
+                        <div className="absolute -top-3 left-0 right-0 bg-purple-900/80 border border-purple-500 text-purple-200 text-[9px] font-bold text-center px-2 py-0.5 rounded-t uppercase">
+                            OP: {missionData.title}
+                        </div>
+                    )}
+
+                    <div className="flex justify-between items-start mt-1">
                         <div className="flex gap-2">
                             <div className={`w-8 h-8 flex items-center justify-center border border-${statusColor}-800 bg-${statusColor}-900/20 text-${statusColor}-500 rounded`}>
                                 <Icon name={CATEGORIES[unit.cat]?.icon || 'Truck'}/>
@@ -418,95 +346,64 @@
 
                     {unit.status !== 'destroyed' && (
                         <div className="bg-black/50 p-2 rounded border border-gray-800 space-y-1">
-                            <div className="flex justify-between items-end mb-1">
+                            <div className="flex justify-between items-end">
                                 <span className="text-[9px] text-gray-500 font-bold uppercase">ÉQUIPAGE ({occupiedSlots}/{totalSlots})</span>
-                            </div>
-                            <div className="space-y-1 border-l border-gray-700 pl-2">
-                                <div className="text-[10px] flex justify-between">
-                                    <span className="text-gray-500">CHEF/PIL</span>
-                                    {driver ? <span className="text-cyan-400 font-bold">{driver.name}</span> : <span className="text-gray-600 italic">LIBRE</span>}
-                                </div>
-                                {passengers.map((p, i) => (
-                                    <div key={i} className="text-[10px] flex justify-between">
-                                        <span className="text-gray-500">PAX {i+1}</span>
-                                        <span className="text-gray-300">{p.name}</span>
-                                    </div>
-                                ))}
+                                {driver && <span className="text-[9px] text-cyan-400 font-bold">{driver.name} (PIL)</span>}
                             </div>
                             {renderCrewBar()}
                         </div>
                     )}
 
                     <div className="mt-auto space-y-1">
-                        {unit.status === 'operational' && !isOnBoard && (
+                         {/* FORCE TAKEOVER / DRIVING LOGIC */}
+                        {unit.status === 'operational' && (
                             <div className="grid grid-cols-2 gap-1">
-                                {!driver ? (
-                                    <button onClick={actions.onTakeDriver} disabled={!canDrive} className={`py-1.5 border text-[9px] font-bold uppercase flex items-center justify-center gap-1 ${canDrive ? 'border-green-800 text-green-500 hover:bg-green-900/20' : 'border-red-900/30 text-red-900 cursor-not-allowed'}`}>
-                                        <Icon name="SteeringWheel" size={12}/> {canDrive ? 'CONDUIRE' : 'GRADE NOK'}
+                                {!isDriver && (
+                                    <button onClick={actions.onTakeDriver} disabled={!canDrive} className={`py-1.5 border text-[9px] font-bold uppercase flex items-center justify-center gap-1 ${canDrive ? 'border-green-800 text-green-500 hover:bg-green-900/20' : 'border-red-900/30 text-red-900 cursor-not-allowed'} ${driver ? 'col-span-2 border-orange-600 text-orange-500' : 'col-span-1'}`}>
+                                        <Icon name="SteeringWheel" size={12}/> {driver ? 'CONDUIRE (FORCE)' : (canDrive ? 'CONDUIRE' : 'GRADE NOK')}
                                     </button>
-                                ) : (
-                                    <div className="py-1.5 border border-gray-800 text-gray-600 text-[9px] font-bold uppercase text-center">PILOTE PRIS</div>
                                 )}
-                                {hasSpace && (
-                                    <button onClick={actions.onTakePax} className={`py-1.5 border border-blue-800 text-blue-500 text-[9px] font-bold uppercase hover:bg-blue-900/20 flex items-center justify-center gap-1 ${driver ? 'col-span-2' : 'col-span-1'}`}>
+                                {!driver && !isDriver && hasSpace && (
+                                    <button onClick={actions.onTakePax} className={`py-1.5 border border-blue-800 text-blue-500 text-[9px] font-bold uppercase hover:bg-blue-900/20 flex items-center justify-center gap-1 col-span-1`}>
                                         <Icon name="Users" size={12}/> MONTER
                                     </button>
                                 )}
                             </div>
                         )}
 
-                        {/* ON BOARD DRIVER ACTIONS */}
-                        {isDriver && (
-                            <div className="space-y-1">
-                                {unit.status === 'operational' && (
-                                    <div className="grid grid-cols-2 gap-1">
-                                        <button onClick={actions.onStartMission} className="col-span-2 py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 uppercase">DÉPART MISSION</button>
-                                        <button onClick={actions.onReleaseDriver} className="col-span-1 py-1 border border-red-900 text-red-500 text-[9px] hover:bg-red-900/20 uppercase">DESCENDRE</button>
-                                        {passengers.length > 0 && (
-                                            <button onClick={actions.onTransferRole} className="col-span-1 py-1 border border-purple-900 text-purple-400 text-[9px] hover:bg-purple-900/20 uppercase">TRANSFÉRER RÔLE</button>
-                                        )}
-                                    </div>
-                                )}
-                                
-                                {unit.status === 'mission' && (
-                                    <div className="grid grid-cols-2 gap-1">
-                                        <button onClick={actions.onSitrep} className="py-1 bg-yellow-900/20 border border-yellow-700 text-yellow-500 font-bold text-[9px]">SITREP</button>
-                                        <button onClick={actions.onRequestRTB} className="py-1 bg-blue-900/20 border border-blue-700 text-blue-500 font-bold text-[9px]">RTB</button>
-                                        <button onClick={actions.onReportDestroyed} className="w-full py-1 border border-red-900 text-red-500 text-[9px] mt-1 hover:bg-red-900/20 col-span-2">SIGNALER DESTRUCTION</button>
-                                    </div>
-                                )}
-
-                                {unit.status === 'mission_rtb_transit' && (
-                                    <button onClick={actions.onConfirmArrival} className="w-full py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 uppercase">VALIDER ARRIVÉE</button>
-                                )}
+                        {isDriver && unit.status === 'operational' && (
+                            <div className="grid grid-cols-2 gap-1">
+                                <button onClick={actions.onStartMission} className="col-span-2 py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 uppercase">DÉPART MISSION</button>
+                                <button onClick={actions.onReleaseDriver} className="col-span-2 py-1 border border-red-900 text-red-500 text-[9px] hover:bg-red-900/20 uppercase">DESCENDRE</button>
                             </div>
                         )}
 
-                        {/* ON BOARD PAX ACTIONS */}
-                        {isPax && (
-                            <div className="text-center">
-                                <div className="text-[9px] italic text-gray-500 py-1">PASSAGER À BORD</div>
-                                {unit.status === 'operational' && (
-                                    <button onClick={actions.onLeavePax} className="w-full py-1.5 border border-red-900 text-red-500 text-[9px] hover:bg-red-900/20 uppercase font-bold">DESCENDRE</button>
-                                )}
+                        {unit.status.includes('mission') && isDriver && (
+                            <div className="grid grid-cols-2 gap-1">
+                                <button onClick={actions.onSitrep} className="py-1 bg-yellow-900/20 border border-yellow-700 text-yellow-500 font-bold text-[9px]">SITREP</button>
+                                <button onClick={actions.onRequestRTB} className="py-1 bg-blue-900/20 border border-blue-700 text-blue-500 font-bold text-[9px]">RTB</button>
                             </div>
                         )}
+                        {unit.status.includes('mission') && isDriver && (
+                             <button onClick={actions.onReportDestroyed} className="w-full py-1 border border-red-900 text-red-500 text-[9px] mt-1 hover:bg-red-900/20">SIGNALER DESTRUCTION</button>
+                        )}
 
-                        {/* STATES */}
-                        {unit.status === 'mission_rtb_request' && (
-                            <div className="text-center py-1 border border-blue-900/50 bg-blue-900/10 text-blue-400 text-[9px] animate-pulse font-bold">ATTENTE VALIDATION SL...</div>
+                        {unit.status === 'mission_rtb_transit' && isDriver && (
+                            <button onClick={actions.onConfirmArrival} className="w-full py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 uppercase">VALIDER ARRIVÉE</button>
+                        )}
+
+                        {unit.status === 'damaged' && (
+                             <div className="text-center text-[9px] text-orange-500 font-bold border border-orange-900/30 py-1 bg-orange-900/10">MAINTENANCE REQUISE</div>
                         )}
                         {unit.status === 'damaged' && (
-                            <button onClick={actions.onEnterMaintenance} className="w-full py-2 bg-orange-600 text-black font-black text-[10px] hover:bg-orange-500">ENTRER ATELIER</button>
-                        )}
-                        {unit.status === 'destroyed' && isSL && (
-                             <button onClick={actions.onArchive} className="w-full py-1 border border-gray-700 text-gray-500 text-[9px] hover:text-white">ARCHIVER</button>
+                            <button onClick={actions.onEnterMaintenance} className="w-full py-2 bg-orange-600 text-black font-black text-[10px] hover:bg-orange-500 mt-1">ENTRER ATELIER</button>
                         )}
                     </div>
                 </div>
             );
         };
 
+        // --- APP ---
         const App = () => {
             const [data, save, isConnected] = useData();
             const [userRole, setUserRole] = useState(null);
@@ -517,39 +414,44 @@
             
             const [sitrepModalUnit, setSitrepModalUnit] = useState(null);
             const [maintenanceUnit, setMaintenanceUnit] = useState(null);
-            const [rtbUnit, setRtbUnit] = useState(null);
+            const [rtbModalUnit, setRtbModalUnit] = useState(null);
             const [showSupply, setShowSupply] = useState(false);
+            const [showCreateMission, setShowCreateMission] = useState(false);
             const [incomingSitrep, setIncomingSitrep] = useState(null);
             const [pendingRTB, setPendingRTB] = useState(null);
-            const [rtbModalUnit, setRtbModalUnit] = useState(null);
-            const [transferUnit, setTransferUnit] = useState(null);
             const [notification, setNotification] = useState(null);
 
-            // Notification Listener for SITREPS
+            // Logic for notifications
             useEffect(() => {
-                if (userRole === 'LOGI' && data.sitreps) {
-                    const mySitrep = data.sitreps.find(s => s.acked && !s.notified && s.author === user?.name);
-                    if (mySitrep) {
-                        setNotification({ type: 'success', message: 'SITREP PRIS EN COMPTE PAR SL' });
-                        // Mark notified locally (in a real app, we'd update the DB again, but let's keep it simple)
-                        const updatedSitreps = data.sitreps.map(s => s.id === mySitrep.id ? { ...s, notified: true } : s);
-                        save({ sitreps: updatedSitreps });
-                    }
-                }
                 if (userRole === 'SL' && data.sitreps) {
                     const pending = data.sitreps.find(s => !s.acked);
                     if (pending) setIncomingSitrep(pending);
                 }
+                if (userRole === 'LOGI' && data.sitreps && user) {
+                    const myAckedSitrep = data.sitreps.find(s => s.acked && s.author === user.name && !s.seenByAuthor);
+                    if (myAckedSitrep) {
+                        setNotification({type: 'success', message: `SITREP ${myAckedSitrep.unitName} PRIS EN COMPTE PAR SL`});
+                        const updated = data.sitreps.map(s => s.id === myAckedSitrep.id ? {...s, seenByAuthor: true} : s);
+                        save({sitreps: updated});
+                    }
+                }
                 if (userRole === 'SL' && data.units) {
                     const rtbRequest = data.units.find(u => u.status === 'mission_rtb_request');
-                    if (rtbRequest) setPendingRTB(rtbRequest);
-                    else setPendingRTB(null);
+                    if (rtbRequest) setPendingRTB(rtbRequest); else setPendingRTB(null);
                 }
             }, [data, userRole, user]);
 
             const appActions = {
                 addLog: (msg, type='INFO') => save({ logs: [{ id: Date.now(), time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), type, msg }, ...(data.logs||[])].slice(0,50) }),
                 clearLogs: () => { if(confirm("VIDER LE JOURNAL ?")) save({ logs: [] }); },
+                archiveDestroyed: (unit) => {
+                    const entry = { ...unit, archivedAt: new Date().toLocaleString() };
+                    save({ 
+                        units: data.units.filter(u => u.uuid !== unit.uuid), 
+                        destroyedHistory: [entry, ...(data.destroyedHistory||[])] 
+                    });
+                    appActions.addLog(`ARCHIVAGE ÉPAVE ${unit.name}`, 'LOG');
+                },
                 deployUnit: (model) => {
                     const totalSupply = (data.supplySources||[]).reduce((acc,s)=>acc+s.amount,0);
                     if (totalSupply < model.cost) return alert("Supply insuffisant");
@@ -558,67 +460,61 @@
                     save({ units: [{uuid: Date.now().toString(), ...model, status: 'operational', fuel: 100, health: 100, responsible: 'BASE', crew: [], logs: []}, ...(data.units||[])], supplySources: newSources });
                     appActions.addLog(`ACHAT ${model.name}`, 'GARAGE');
                 },
-                takeDriver: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, responsible: {name:user.name, rank:user.rankShort}} : x) }); appActions.addLog(`${user.name} PREND VOLANT ${u.name}`, 'OPS'); },
+                // Force Takeover Logic
+                takeDriver: (u) => { 
+                    // Eject previous driver to pax if exists (optional, simplified to just overwrite here)
+                    save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, responsible: {name:user.name, rank:user.rankShort}} : x) }); 
+                    appActions.addLog(`${user.name} PREND VOLANT ${u.name} (FORCE)`, 'OPS'); 
+                },
                 releaseDriver: (u) => save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, responsible: 'BASE'} : x) }),
                 takePax: (u) => save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, crew: [...(x.crew || []), { name: user.name, rank: user.rankShort }]} : x) }),
                 leavePax: (u) => save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, crew: (x.crew || []).filter(p => p.name !== user.name)} : x) }),
+                startMission: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission'} : x) }); appActions.addLog(`DÉPART MISSION ${u.name}`, 'OPS'); },
                 
-                // NEW: Transfer Command
-                transferCommand: (pax) => {
-                    if (!transferUnit) return;
-                    // Current driver becomes pax, Pax becomes driver
-                    const oldDriver = transferUnit.responsible;
-                    const newDriver = pax;
-                    const newCrew = transferUnit.crew.filter(p => p.name !== pax.name); // Remove new driver from pax list
-                    if (oldDriver && oldDriver !== 'BASE') newCrew.push(oldDriver); // Add old driver to pax list
-                    
-                    save({ units: (data.units||[]).map(x => x.uuid===transferUnit.uuid ? {...x, responsible: newDriver, crew: newCrew} : x) });
-                    appActions.addLog(`PASSATION COMMANDEMENT ${transferUnit.name}: ${oldDriver.name} -> ${newDriver.name}`, 'OPS');
-                    setTransferUnit(null);
+                // Missions Groupées
+                createMission: (title, obj, vehicleIds) => {
+                    const missionId = `OP_${Date.now()}`;
+                    const newMission = { id: missionId, title, objective: obj, status: 'active' };
+                    // Update vehicles
+                    const updatedUnits = data.units.map(u => vehicleIds.includes(u.uuid) ? { ...u, missionId: missionId } : u);
+                    save({ missions: [...(data.missions||[]), newMission], units: updatedUnits });
+                    appActions.addLog(`DÉBUT OPÉRATION: ${title}`, 'CMD');
+                    setShowCreateMission(false);
                 },
 
-                startMission: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission'} : x) }); appActions.addLog(`DÉPART MISSION ${u.name}`, 'OPS'); },
                 openSitrep: (u) => setSitrepModalUnit(u),
                 sendSitrep: (code, loc, det) => {
                     if(!sitrepModalUnit) return;
-                    // Added 'author' field for feedback
-                    save({ sitreps: [...(data.sitreps||[]), { id: Date.now(), unitName: sitrepModalUnit.name, code, location: loc, details: det, time: new Date().toLocaleTimeString(), acked: false, author: user.name }] });
+                    save({ sitreps: [...(data.sitreps||[]), { id: Date.now(), unitName: sitrepModalUnit.name, code, location: loc, details: det, time: new Date().toLocaleTimeString(), acked: false, author: user.name, seenByAuthor: false }] });
                     setSitrepModalUnit(null);
-                    appActions.addLog(`SITREP ENVOYÉ: ${sitrepModalUnit.name}`, 'RADIO');
+                    appActions.addLog(`SITREP: ${sitrepModalUnit.name} [${code.toUpperCase()}] - ${det}`, 'RADIO');
                 },
                 ackSitrep: () => { if(!incomingSitrep) return; save({ sitreps: (data.sitreps||[]).map(s => s.id===incomingSitrep.id ? {...s, acked: true} : s) }); setIncomingSitrep(null); },
                 requestRTB: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission_rtb_request'} : x) }); appActions.addLog(`DEMANDE RTB ${u.name}`, 'RADIO'); },
-                validateRTB: (u) => setRtbUnit(u),
-                confirmRTB: (f, h) => { if(!rtbUnit) return; const needsMaint = f<100 || h<100; save({ units: (data.units||[]).map(x => x.uuid===rtbUnit.uuid ? {...x, status: needsMaint ? 'damaged' : 'operational', fuel: f, health: h, responsible: needsMaint ? 'BASE' : x.responsible, crew: needsMaint ? [] : x.crew} : x) }); setRtbUnit(null); appActions.addLog(`RETOUR BASE ${rtbUnit.name} -> ${needsMaint?'ATELIER':'DISPO'}`, 'OPS'); },
-                enterMaintenance: (u) => setMaintenanceUnit(u),
-                finishMaintenance: () => { if(!maintenanceUnit) return; save({ units: (data.units||[]).map(x => x.uuid===maintenanceUnit.uuid ? {...x, status: 'operational', fuel: 100, health: 100} : x) }); setMaintenanceUnit(null); appActions.addLog(`SORTIE ATELIER ${maintenanceUnit.name}`, 'MECA'); },
-                reportDestroyed: (u) => { if(!confirm("CONFIRMER ?")) return; save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'destroyed', responsible: 'BASE', crew: []} : x) }); appActions.addLog(`PERTE ${u.name}`, 'ALERTE'); },
-                
-                // NEW: Archive Destroyed
-                archiveDestroyed: (u) => {
-                    const destroyedUnit = { ...u, archiveDate: new Date().toLocaleString() };
-                    save({ 
-                        units: (data.units||[]).filter(x => x.uuid !== u.uuid),
-                        destroyedHistory: [...(data.destroyedHistory||[]), destroyedUnit]
-                    });
-                    appActions.addLog(`ARCHIVAGE ÉPAVE ${u.name}`, 'LOG');
-                },
-
-                updateSupply: (id, val) => save({ supplySources: (data.supplySources||[]).map(s => s.id===id ? {...s, amount: val} : s) }),
-                addSupply: (n, a) => save({ supplySources: [...(data.supplySources||[]), {id: Date.now(), name: n, amount: parseInt(a)}] }),
-                deleteSupply: (id) => save({ supplySources: (data.supplySources||[]).filter(s => s.id!==id) }),
-                addSquad: (name) => { if(!name) return; save({ squad: [...(data.squad||[]), {id: Date.now(), name: name.toUpperCase()}] }); },
-                removeSquad: (id) => save({ squad: (data.squad||[]).filter(m => m.id !== id) }),
                 approveRTB: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission_rtb_transit'} : x) }); setPendingRTB(null); appActions.addLog(`RTB AUTORISÉ ${u.name}`, 'RADIO'); },
                 finalizeRTB: (fuel, health) => {
                     if (!rtbModalUnit) return;
                     const needsRepair = fuel < 100 || health < 100;
                     const updated = data.units.map(u => u.uuid === rtbModalUnit.uuid ? { 
-                        ...u, status: needsRepair ? 'damaged' : 'operational', rtbStatus: 'idle', responsible: needsRepair ? 'BASE' : u.responsible, crew: needsRepair ? [] : u.crew, fuel, health
+                        ...u, status: needsRepair ? 'damaged' : 'operational', responsible: needsRepair ? 'BASE' : u.responsible, crew: needsRepair ? [] : u.crew, fuel, health
                     } : u);
-                    save({ units: updated, logs: [{ id: Date.now(), time: new Date().toLocaleTimeString(), type: 'OPS', msg: `RETOUR BASE ${rtbModalUnit.name} (Statut: ${needsRepair ? 'MAINTENANCE' : 'OK'})` }, ...(data.logs||[])].slice(0,50) });
+                    save({ units: updated });
+                    appActions.addLog(`RETOUR BASE ${rtbModalUnit.name}: ${needsRepair?'ATELIER':'RAS'}`, 'OPS');
                     setRtbModalUnit(null);
-                }
+                },
+                enterMaintenance: (u) => setMaintenanceUnit(u),
+                finishMaintenance: () => { if(!maintenanceUnit) return; save({ units: (data.units||[]).map(x => x.uuid===maintenanceUnit.uuid ? {...x, status: 'operational', fuel: 100, health: 100} : x) }); setMaintenanceUnit(null); appActions.addLog(`SORTIE ATELIER ${maintenanceUnit.name}`, 'MECA'); },
+                reportDestroyed: (u) => { 
+                    const reason = prompt("CAUSE DE LA DESTRUCTION ? (IED, Ennemi, Accident...)");
+                    if(!reason) return;
+                    save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'destroyed', responsible: 'BASE', crew: [], reasonHS: reason} : x) }); 
+                    appActions.addLog(`PERTE ${u.name}: ${reason}`, 'ALERTE'); 
+                },
+                updateSupply: (id, val) => save({ supplySources: (data.supplySources||[]).map(s => s.id===id ? {...s, amount: val} : s) }),
+                addSupply: (n, a) => save({ supplySources: [...(data.supplySources||[]), {id: Date.now(), name: n, amount: parseInt(a)}] }),
+                deleteSupply: (id) => save({ supplySources: (data.supplySources||[]).filter(s => s.id!==id) }),
+                addSquad: (name) => { if(!name) return; save({ squad: [...(data.squad||[]), {id: Date.now(), name: name.toUpperCase()}] }); },
+                removeSquad: (id) => save({ squad: (data.squad||[]).filter(m => m.id !== id) }),
             };
 
             const filteredUnits = (data.units||[]).filter(u => filter === 'ALL' || u.status === filter || (filter === 'mission' && u.status.includes('mission')));
@@ -654,6 +550,31 @@
                         <button onClick={()=>setShowSupply(true)} className="text-right"><div className="text-[8px] text-green-600 font-bold uppercase">LOGISTIQUE GLOBALE</div><div className="text-xl font-mono text-white font-bold cursor-pointer hover:text-green-400">{totalSupply.toLocaleString()}</div></button>
                     </header>
 
+                    {/* NOTIFICATION TOAST */}
+                    {notification && (
+                        <div className="fixed top-16 right-4 z-50 bg-green-600 text-white px-4 py-2 rounded shadow-lg animate-bounce-in flex items-center gap-2">
+                            <Icon name="Check"/> {notification.message}
+                            <button onClick={()=>setNotification(null)} className="ml-2">x</button>
+                        </div>
+                    )}
+
+                    {/* SL ALERTS */}
+                    {incomingSitrep && (
+                        <div className="fixed top-20 right-4 z-50 w-80 bg-black border-l-4 border-yellow-500 p-4 shadow-2xl animate-pulse">
+                            <div className="font-black text-yellow-500 mb-1">SITREP REÇU</div>
+                            <div className="text-xs text-white mb-1">UNITÉ: {incomingSitrep.unitName}</div>
+                            <div className="text-xs text-gray-400 italic mb-2">"{incomingSitrep.details}"</div>
+                            <button onClick={appActions.ackSitrep} className="w-full bg-yellow-600 text-black font-bold text-xs py-1">REÇU</button>
+                        </div>
+                    )}
+                    {pendingRTB && (
+                        <div className="fixed top-44 right-4 z-50 w-80 bg-black border-l-4 border-blue-500 p-4 shadow-2xl animate-pulse">
+                            <div className="font-black text-blue-500 mb-1">DEMANDE RTB</div>
+                            <div className="text-xs text-white mb-2">UNITÉ: {pendingRTB.name}</div>
+                            <button onClick={()=>appActions.approveRTB(pendingRTB)} className="w-full bg-blue-600 text-black font-bold text-xs py-1">AUTORISER</button>
+                        </div>
+                    )}
+
                     <div className="flex-1 flex overflow-hidden relative">
                         <nav className={`absolute md:relative inset-y-0 left-0 z-10 bg-black border-r border-green-900 w-64 transform ${menuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-200 flex flex-col p-4 gap-2`}>
                             <button onClick={()=>{setTab('dashboard');setMenuOpen(false)}} className={`flex items-center gap-3 p-3 rounded text-sm font-bold ${tab==='dashboard'?'bg-green-900/20 text-green-400':'text-gray-500 hover:text-white'}`}><Icon name="Layout"/> OPÉRATIONS</button>
@@ -666,38 +587,53 @@
                         <main className="flex-1 overflow-y-auto bg-grid-pattern p-4">
                             {tab === 'dashboard' && (
                                 <>
-                                    <div className="flex gap-2 overflow-x-auto pb-2 mb-4 no-scrollbar">
-                                        {[['ALL','TOUS'],['operational','DISPO'],['mission','MISSION'],['damaged','ATELIER'],['destroyed','DÉTRUIT']].map(([k,l]) => (
-                                            <button key={k} onClick={()=>setFilter(k)} className={`px-4 py-2 border text-xs font-bold rounded whitespace-nowrap ${filter===k ? 'bg-green-900/40 border-green-500 text-white' : 'border-gray-800 text-gray-600 bg-black'}`}>{l}</button>
-                                        ))}
+                                    <div className="flex justify-between items-center mb-4">
+                                        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                                            {[['ALL','TOUS'],['operational','DISPO'],['mission','MISSION'],['damaged','ATELIER'],['destroyed','DÉTRUIT']].map(([k,l]) => (
+                                                <button key={k} onClick={()=>setFilter(k)} className={`px-4 py-2 border text-xs font-bold rounded whitespace-nowrap ${filter===k ? 'bg-green-900/40 border-green-500 text-white' : 'border-gray-800 text-gray-600 bg-black'}`}>{l}</button>
+                                            ))}
+                                        </div>
+                                        {userRole === 'SL' && <button onClick={()=>setShowCreateMission(true)} className="bg-purple-900/20 border border-purple-500 text-purple-400 px-3 py-2 text-xs font-bold hover:bg-purple-900/40 flex items-center gap-2"><Icon name="Plus"/> CRÉER MISSION</button>}
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                        {(data.units||[]).length === 0 && <div className="col-span-full text-center text-gray-600 py-10 italic">Aucun véhicule déployé.</div>}
-                                        {filteredUnits.map(u => (
-                                            <UnitCard 
-                                                key={u.uuid} 
-                                                unit={u} 
-                                                userIdentity={user.name} 
-                                                userRankId={user.rankId} 
-                                                isSL={userRole==='SL'} 
-                                                Icons={Icons}
-                                                actions={{
-                                                    onTakeDriver: () => appActions.takeDriver(u),
-                                                    onReleaseDriver: () => appActions.releaseDriver(u),
-                                                    onTakePax: () => appActions.takePax(u),
-                                                    onLeavePax: () => appActions.leavePax(u),
-                                                    onStartMission: () => appActions.startMission(u),
-                                                    onSitrep: () => appActions.openSitrep(u),
-                                                    onRequestRTB: () => appActions.requestRTB(u),
-                                                    onValidateRTB: () => appActions.validateRTB(u),
-                                                    onConfirmArrival: () => setRtbModalUnit(u),
-                                                    onReportDestroyed: () => appActions.reportDestroyed(u),
-                                                    onEnterMaintenance: () => appActions.enterMaintenance(u),
-                                                    onArchive: () => appActions.archiveDestroyed(u),
-                                                    onTransferRole: () => setTransferUnit(u)
-                                                }}
-                                            />
-                                        ))}
+
+                                    {/* GROUP BY CATEGORY LOGIC */}
+                                    <div className="space-y-6">
+                                        {Object.keys(CATEGORIES).map(cat => {
+                                            const unitsInCat = filteredUnits.filter(u => u.cat === cat);
+                                            if (unitsInCat.length === 0) return null;
+                                            const catInfo = CATEGORIES[cat];
+                                            return (
+                                                <div key={cat} className="border border-gray-800 bg-gray-900/20">
+                                                    <div className={`p-2 border-b border-gray-800 flex items-center gap-2 ${catInfo.color}`}>
+                                                        <Icon name={catInfo.icon}/> <span className="font-black text-sm">{catInfo.label}</span>
+                                                        <span className="text-xs bg-gray-800 px-2 rounded ml-auto">{unitsInCat.length}</span>
+                                                    </div>
+                                                    <div className="p-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                                        {unitsInCat.map(u => (
+                                                            <UnitCard 
+                                                                key={u.uuid} unit={u} userIdentity={user.name} userRankId={user.rankId} isSL={userRole==='SL'} Icons={Icons}
+                                                                missionData={data.missions?.find(m => m.id === u.missionId)}
+                                                                actions={{
+                                                                    onTakeDriver: () => appActions.takeDriver(u),
+                                                                    onReleaseDriver: () => appActions.releaseDriver(u),
+                                                                    onTakePax: () => appActions.takePax(u),
+                                                                    onLeavePax: () => appActions.leavePax(u),
+                                                                    onStartMission: () => appActions.startMission(u),
+                                                                    onSitrep: () => appActions.openSitrep(u),
+                                                                    onRequestRTB: () => appActions.requestRTB(u),
+                                                                    onValidateRTB: () => appActions.validateRTB(u),
+                                                                    onConfirmArrival: () => setRtbModalUnit(u),
+                                                                    onReportDestroyed: () => appActions.reportDestroyed(u),
+                                                                    onEnterMaintenance: () => appActions.enterMaintenance(u),
+                                                                    onArchive: () => appActions.archiveDestroyed(u)
+                                                                }}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                        {filteredUnits.length === 0 && <div className="text-center text-gray-600 py-10 italic">Aucune unité.</div>}
                                     </div>
                                 </>
                             )}
@@ -705,7 +641,7 @@
                             {tab === 'garage' && userRole === 'SL' && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                     {INITIAL_CATALOG.map(m => (
-                                        <div key={m.id} className="bg-black border border-gray-800 p-4 flex flex-col gap-2">
+                                        <div key={m.id} className="bg-black border border-gray-800 p-4 flex flex-col gap-2 hover:border-green-600 transition-colors">
                                             <div className="flex justify-between"><span className="text-[10px] bg-gray-900 text-gray-400 px-2 py-0.5 rounded">{m.cat}</span><span className="text-green-500 font-bold text-xs">{m.cost} PTS</span></div>
                                             <h3 className="font-bold text-white">{m.name}</h3>
                                             <div className="text-[10px] text-gray-500">{m.type} • {m.slots} PLACES</div>
@@ -737,27 +673,33 @@
                             )}
 
                             {tab === 'logs' && (
-                                <div className="max-w-3xl mx-auto space-y-4">
+                                <div className="max-w-4xl mx-auto space-y-6">
                                     <div className="bg-black border border-green-900 p-4 h-[50vh] overflow-y-auto font-mono text-xs">
                                         <div className="flex justify-between border-b border-green-900 pb-2 mb-2">
                                             <h3 className="text-green-500 font-bold">JOURNAL DE MARCHE (JMO)</h3>
-                                            {userRole === 'SL' && <button onClick={appActions.clearLogs} className="text-red-500 hover:text-white"><Icon name="Trash"/></button>}
+                                            {userRole === 'SL' && <button onClick={appActions.clearLogs} className="text-red-500 hover:text-white" title="Vider JMO"><Icon name="Trash"/></button>}
                                         </div>
                                         {(data.logs||[]).map(l => (
                                             <div key={l.id} className="flex gap-2 mb-1 text-gray-400 border-b border-gray-900 pb-1">
-                                                <span className="text-green-700 w-16">{l.time}</span>
-                                                <span className="font-bold w-16 text-green-600">[{l.type}]</span>
-                                                <span>{l.msg}</span>
+                                                <span className="text-green-700 w-16 flex-shrink-0">{l.time}</span>
+                                                <span className="font-bold w-20 flex-shrink-0 text-green-600">[{l.type}]</span>
+                                                <span className="break-words">{l.msg}</span>
                                             </div>
                                         ))}
                                     </div>
-                                    {/* DESTROYED HISTORY */}
+                                    
                                     <div className="bg-black border border-red-900/50 p-4 h-[30vh] overflow-y-auto">
-                                        <h3 className="text-red-500 font-bold border-b border-red-900 pb-2 mb-2">HISTORIQUE PERTES</h3>
+                                        <h3 className="text-red-500 font-bold border-b border-red-900 pb-2 mb-2">HISTORIQUE DES PERTES</h3>
                                         {(data.destroyedHistory||[]).map((u, i) => (
-                                            <div key={i} className="flex justify-between text-xs py-1 border-b border-red-900/30 text-gray-500">
-                                                <span>{u.name}</span>
-                                                <span className="text-red-800">{u.archiveDate}</span>
+                                            <div key={i} className="flex justify-between items-center text-xs py-2 border-b border-red-900/20 text-gray-400">
+                                                <div>
+                                                    <span className="text-white font-bold mr-2">{u.name}</span>
+                                                    <span className="text-gray-600 text-[10px]">({u.cat})</span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-red-400 font-bold uppercase">{u.reasonHS || "INCONNUE"}</div>
+                                                    <div className="text-[9px] text-gray-600">{u.archivedAt}</div>
+                                                </div>
                                             </div>
                                         ))}
                                         {(data.destroyedHistory||[]).length === 0 && <div className="text-center text-gray-700 italic py-4">Aucune perte archivée.</div>}
@@ -768,14 +710,11 @@
                     </div>
 
                     {sitrepModalUnit && <SitrepModal unit={sitrepModalUnit} onClose={()=>setSitrepModalUnit(null)} onSend={appActions.sendSitrep} />}
-                    {incomingSitrep && <SLSitrepAlert sitrep={incomingSitrep} onAck={appActions.ackSitrep} />}
-                    {pendingRTB && <SLRTBAlert unit={pendingRTB} onValidate={()=>appActions.approveRTB(pendingRTB)} />}
                     {rtbUnit && <RTBCheckModal onClose={()=>setRtbUnit(null)} onConfirm={appActions.confirmRTB} />}
                     {maintenanceUnit && <MaintenanceModal unit={maintenanceUnit} onClose={()=>setMaintenanceUnit(null)} onConfirm={appActions.finishMaintenance} />}
                     {showSupply && <SupplyModal sources={data.supplySources||[]} onClose={()=>setShowSupply(false)} onUpdate={appActions.updateSupply} onAdd={appActions.addSupply} onDelete={appActions.deleteSupply} />}
                     {rtbModalUnit && <RTBCheckModal onClose={()=>setRtbModalUnit(null)} onConfirm={appActions.finalizeRTB} />}
-                    {notification && <NotificationToast message={notification.message} type={notification.type} onClose={()=>setNotification(null)} />}
-                    {transferUnit && <TransferModal unit={transferUnit} onClose={()=>setTransferUnit(null)} onTransfer={appActions.transferCommand} />}
+                    {showCreateMission && <CreateMissionModal units={data.units} onClose={()=>setShowCreateMission(false)} onCreate={appActions.createMission} />}
                 </div>
             );
         };
