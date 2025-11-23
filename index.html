@@ -48,6 +48,10 @@
         let userPseudo = null;
         let userGrade = null;
         let currentUserId = null;
+        
+        // Listeners cleanups
+        let unsubMissionDetails = null;
+        let unsubMissionVehicles = null;
 
         // --- UTILS ---
         const formatTime = (date) => {
@@ -164,7 +168,6 @@
                     }
                 }
 
-                // Use setDoc with merge to be safe if doc doesn't exist yet
                 await setDoc(publicDoc('settings', 'global'), {
                     slSessionId: currentUserId,
                     slName: `${grade} ${pseudo}`,
@@ -268,7 +271,6 @@
                 if(slControls) slControls.classList.remove('hidden');
                 if(logControls) logControls.classList.add('hidden');
             } else {
-                // setupLOGInterface(); // Not needed if empty
                 if(slControls) slControls.classList.add('hidden');
                 if(logControls) logControls.classList.remove('hidden');
             }
@@ -537,37 +539,21 @@
 
         // --- NEW MISSION LOGIC ---
 
-        // 1. Open the Modal
+        // 1. Open the Modal (Creation)
         window.openMissionModal = async () => {
             if(!currentUserId) return;
-            
             toggleModal('mission-modal');
-            const rosterSelect = document.getElementById('mission-leader-select');
             const vehiclesList = document.getElementById('mission-vehicle-list');
-
-            // 1. Populate Roster Dropdown
-            rosterSelect.innerHTML = '<option value="">-- CHOISIR UN CHEF --</option>';
-            const rosterSnap = await getDocs(publicPath('roster'));
-            rosterSnap.forEach(doc => {
-                const d = doc.data();
-                const option = document.createElement('option');
-                option.value = `${doc.id}:${d.grade} ${d.pseudo}`; // Store ID and Name
-                option.text = `${d.grade} ${d.pseudo}`;
-                rosterSelect.appendChild(option);
-            });
-
-            // 2. Populate Available Vehicles
+            
+            // Populate Available Vehicles (OPS and no mission)
             vehiclesList.innerHTML = '<div class="text-center animate-pulse text-xs">RECHERCHE DE VÉHICULES...</div>';
             
-            // Note: Complex "OR" queries are hard in NoSQL without index, so we fetch all and filter in JS for "OPS" OR "OPS with no mission"
-            // For simplicity/performance in this demo, we fetch all and show those currently 'OPS' or 'OPS' but missionId null
             const vehSnap = await getDocs(publicPath('vehicles'));
             vehiclesList.innerHTML = '';
             
             let count = 0;
             vehSnap.forEach(doc => {
                 const d = doc.data();
-                // Filter: Must be available (status OPS) AND not already in a mission
                 if (d.status === 'OPS' && !d.missionId) {
                     count++;
                     const div = document.createElement('label');
@@ -580,14 +566,12 @@
                         </div>
                         <i class="fas fa-check text-green-500 opacity-0 transition-opacity"></i>
                     `;
-                    // Visual feedback on check
                     const checkbox = div.querySelector('input');
                     const icon = div.querySelector('i');
                     checkbox.addEventListener('change', () => {
                         div.classList.toggle('border-green-500', checkbox.checked);
                         icon.classList.toggle('opacity-100', checkbox.checked);
                     });
-
                     vehiclesList.appendChild(div);
                 }
             });
@@ -597,32 +581,23 @@
             }
         };
 
-        // 2. Submit the Mission
+        // 2. Submit the Mission (Leader optional)
         window.confirmMission = async () => {
             const name = document.getElementById('mission-name').value;
-            const leaderVal = document.getElementById('mission-leader-select').value; // "id:Name"
+            // Removed leader select in creation per requirement
 
             if(!name) return alert("Nom de mission requis");
             
-            // Leader parsing
-            let leaderId = currentUserId; // Default to me
-            let leaderName = "MOI";
-            if (leaderVal) {
-                const parts = leaderVal.split(':');
-                leaderId = parts[0]; // Roster ID (Note: ideally we link to auth UID, but this works for display)
-                leaderName = parts[1];
-            }
-
             // Get selected vehicles
             const checkboxes = document.querySelectorAll('.mission-veh-checkbox:checked');
             const selectedVehicles = Array.from(checkboxes).map(cb => cb.value);
 
-            // Create Mission
+            // Create Mission (No leader initially unless volunteered)
             const missionRef = await addDoc(publicPath('missions'), {
                 name: name,
                 status: 'ACTIVE',
-                leaderId: leaderId, 
-                leaderName: leaderName,
+                leaderId: null, 
+                leaderName: null, // Starts empty
                 createdAt: serverTimestamp(),
                 vehicleCount: selectedVehicles.length
             });
@@ -640,8 +615,92 @@
                 await batch.commit();
             }
 
-            addLog(`Nouvelle mission: ${name} (Chef: ${leaderName}, Véhicules: ${selectedVehicles.length})`, 'MISSION');
+            addLog(`Nouvelle mission: ${name} (Véhicules: ${selectedVehicles.length})`, 'MISSION');
             toggleModal('mission-modal');
+        };
+
+        // 3. Mission Details View (The "Immersive" Modal)
+        window.openMissionDetails = (missionId) => {
+            // Unsubscribe previous listeners if existing
+            if(unsubMissionDetails) unsubMissionDetails();
+            if(unsubMissionVehicles) unsubMissionVehicles();
+
+            const modal = document.getElementById('mission-details-modal');
+            const titleEl = document.getElementById('detail-mission-name');
+            const leaderEl = document.getElementById('detail-mission-leader');
+            const vehiclesEl = document.getElementById('detail-mission-vehicles');
+
+            modal.classList.remove('hidden');
+            vehiclesEl.innerHTML = '<div class="text-center animate-pulse mt-4">CHARGEMENT DES DONNÉES...</div>';
+
+            // Listener 1: The Mission Metadata
+            unsubMissionDetails = onSnapshot(publicDoc('missions', missionId), (doc) => {
+                if(!doc.exists()) {
+                    closeMissionDetails();
+                    return;
+                }
+                const data = doc.data();
+                titleEl.innerText = data.name;
+                
+                // Leader Logic
+                if (data.leaderName) {
+                    leaderEl.innerHTML = `
+                        <div class="text-xs text-gray-500 mb-1">CHEF DE MISSION</div>
+                        <div class="text-xl font-bold text-green-400 border border-green-500/50 p-2 rounded bg-green-900/20 text-center">
+                            <i class="fas fa-crown mr-2 text-yellow-500"></i>${data.leaderName}
+                        </div>
+                    `;
+                } else {
+                    leaderEl.innerHTML = `
+                        <div class="text-xs text-gray-500 mb-1">COMMANDEMENT</div>
+                        <button onclick="volunteerForMission('${doc.id}')" class="w-full py-3 border border-yellow-500 text-yellow-500 bg-yellow-900/20 hover:bg-yellow-500 hover:text-black font-bold rounded animate-pulse transition-colors">
+                            <i class="fas fa-hand-point-up mr-2"></i>SE PROPOSER COMME CHEF
+                        </button>
+                    `;
+                }
+            });
+
+            // Listener 2: The Vehicles assigned to this mission
+            // We fetch all vehicles and filter in JS to avoid "index required" errors on filtered queries
+            unsubMissionVehicles = onSnapshot(publicPath('vehicles'), (snap) => {
+                vehiclesEl.innerHTML = '';
+                let count = 0;
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    if(data.missionId === missionId) {
+                        count++;
+                        // REUSE the createVehicleCard logic for consistency!
+                        // It already handles seat clicking perfectly.
+                        const card = createVehicleCard(doc.id, data);
+                        // Adjust styling slightly if needed, or leave as is
+                        vehiclesEl.appendChild(card);
+                    }
+                });
+                if(count === 0) {
+                    vehiclesEl.innerHTML = '<div class="text-center text-gray-500 py-10">AUCUN VÉHICULE ASSIGNÉ</div>';
+                }
+            });
+        };
+
+        window.closeMissionDetails = () => {
+            const modal = document.getElementById('mission-details-modal');
+            modal.classList.add('hidden');
+            if(unsubMissionDetails) unsubMissionDetails();
+            if(unsubMissionVehicles) unsubMissionVehicles();
+        };
+
+        window.volunteerForMission = async (missionId) => {
+            if(!currentUserId) return;
+            if(!confirm("Voulez-vous prendre le commandement de cette mission ?")) return;
+            
+            // Identity string
+            const myName = `${userGrade} ${userPseudo}`;
+            
+            await updateDoc(publicDoc('missions', missionId), {
+                leaderId: currentUserId,
+                leaderName: myName
+            });
+            addLog(`${myName} a pris le commandement de la mission.`, 'MISSION');
         };
 
         function setupMissionsListener() {
@@ -658,25 +717,29 @@
                     if(data.status === 'ARCHIVED') return;
                     
                     const el = document.createElement('div');
-                    el.className = "border border-green-500/50 p-3 mb-2 bg-green-900/10 rounded";
+                    el.className = "border border-green-500/50 p-3 mb-2 bg-green-900/10 rounded cursor-pointer hover:bg-green-900/30 transition-colors";
                     // Only show leader if explicitly set
-                    const leaderDisplay = data.leaderName ? `<div class="text-[10px] text-green-600 mb-1">CHEF: ${data.leaderName}</div>` : '';
+                    const leaderDisplay = data.leaderName 
+                        ? `<div class="text-[10px] text-green-400 font-bold"><i class="fas fa-crown text-yellow-500 mr-1"></i>${data.leaderName}</div>` 
+                        : `<div class="text-[10px] text-gray-500 italic">CHEF: AUCUN</div>`;
+                    
                     const vehDisplay = data.vehicleCount ? `<span class="text-[9px] bg-gray-800 px-1 rounded text-gray-300 ml-2"><i class="fas fa-car"></i> ${data.vehicleCount}</span>` : '';
 
+                    el.onclick = () => openMissionDetails(data.id);
+
                     el.innerHTML = `
-                        <div class="flex justify-between items-start mb-1">
+                        <div class="flex justify-between items-start mb-1 pointer-events-none"> <!-- pointer-events-none to let parent click handle it -->
                             <div>
                                 <h3 class="font-bold text-green-400 truncate pr-2 leading-tight">${data.name}</h3>
                                 ${leaderDisplay}
                             </div>
                             <div class="flex items-center">
-                                <span class="text-[9px] bg-green-900 text-green-200 px-1 rounded flex-shrink-0 animate-pulse">ACTIF</span>
+                                <span class="text-[9px] bg-green-900 text-green-200 px-1 rounded flex-shrink-0">ACTIF</span>
                                 ${vehDisplay}
                             </div>
                         </div>
-                        <div class="flex gap-2 mt-2">
-                            <button onclick="sendCitrep('${data.name}')" class="flex-1 text-xs bg-blue-900/30 px-2 py-2 border border-blue-500 rounded text-blue-200 active:bg-blue-500 active:text-white transition-colors">CITREP</button>
-                            ${userRole === 'SL' ? `<button onclick="archiveMission('${data.id}')" class="flex-1 text-xs bg-red-900/30 px-2 py-2 border border-red-500 rounded text-red-200 active:bg-red-500 active:text-white transition-colors">FIN</button>` : ''}
+                        <div class="mt-2 text-[10px] text-green-600 flex justify-end pointer-events-none">
+                             <span>CLIQUER POUR DÉTAILS <i class="fas fa-chevron-right ml-1"></i></span>
                         </div>
                     `;
                     container.appendChild(el);
@@ -685,8 +748,6 @@
         }
 
         window.archiveMission = async (id) => {
-            // Find vehicles attached to this mission and release them? 
-            // Usually we keep them there until RTB, but for simplicity, the SL handles vehicles separately.
             await updateDoc(publicDoc('missions', id), { status: 'ARCHIVED' });
             addLog("Mission terminée et archivée", "MISSION");
         };
@@ -1096,11 +1157,11 @@
         </div>
     </div>
 
-    <!-- MODAL: MISSION CREATE -->
+    <!-- MODAL: MISSION CREATE (SL Only) -->
     <div id="mission-modal" class="modal-bg fixed inset-0 z-50 hidden flex items-center justify-center p-4">
         <div class="hud-panel w-full max-w-md p-6 relative rounded shadow-2xl h-[90vh] flex flex-col">
             <button onclick="toggleModal('mission-modal')" class="absolute top-3 right-3 text-green-500 p-2 active:text-white"><i class="fas fa-times text-xl"></i></button>
-            <h3 class="text-xl font-bold text-green-500 mb-4 border-b border-green-900 pb-2 flex items-center gap-2"><i class="fas fa-map-marked-alt"></i> PLANIFICATION MISSION</h3>
+            <h3 class="text-xl font-bold text-green-500 mb-4 border-b border-green-900 pb-2 flex items-center gap-2"><i class="fas fa-map-marked-alt"></i> NOUVELLE MISSION</h3>
             
             <div class="flex-1 flex flex-col space-y-4 overflow-hidden">
                 <div>
@@ -1108,17 +1169,7 @@
                     <input id="mission-name" type="text" class="w-full bg-black border border-green-700 p-3 text-white uppercase rounded" placeholder="EX: OPERATION OVERLORD">
                 </div>
 
-                <div>
-                    <label class="text-xs text-gray-400 block mb-1">CHEF DE MISSION (LOG)</label>
-                    <div class="relative">
-                         <select id="mission-leader-select" class="w-full bg-black border border-green-700 p-3 text-white appearance-none rounded">
-                             <option value="">-- SÉLECTIONNER --</option>
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-green-500">
-                            <i class="fas fa-chevron-down text-xs"></i>
-                        </div>
-                    </div>
-                </div>
+                <!-- Leader selection removed for creation -->
 
                 <div class="flex-1 flex flex-col min-h-0">
                     <label class="text-xs text-gray-400 block mb-1">AFFECTATION VÉHICULES (DISPONIBLES)</label>
@@ -1129,6 +1180,33 @@
             </div>
             
             <button onclick="confirmMission()" class="btn-tac w-full py-4 mt-4 font-bold rounded shadow-lg">LANCER LA MISSION</button>
+        </div>
+    </div>
+
+    <!-- MODAL: MISSION DETAILS (Public) -->
+    <div id="mission-details-modal" class="modal-bg fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div class="hud-panel w-full max-w-4xl p-6 relative rounded shadow-2xl h-[95vh] flex flex-col">
+            <button onclick="closeMissionDetails()" class="absolute top-3 right-3 text-green-500 p-2 active:text-white z-10"><i class="fas fa-times text-xl"></i></button>
+            
+            <!-- Mission Header -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-green-900 pb-4 mb-4 gap-4">
+                <div>
+                    <div class="text-[10px] text-gray-500 uppercase tracking-widest">Dossier de Mission</div>
+                    <h3 id="detail-mission-name" class="text-2xl md:text-3xl font-bold text-green-500 uppercase">--</h3>
+                </div>
+                <div id="detail-mission-leader" class="w-full md:w-auto">
+                    <!-- Leader Info or "Take Command" button goes here -->
+                </div>
+            </div>
+
+            <!-- Content Area -->
+            <div class="flex-1 overflow-y-auto -webkit-overflow-scrolling-touch bg-black/20 p-2 rounded border border-green-900/30">
+                <div id="detail-mission-vehicles" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Vehicle Cards of this mission go here -->
+                </div>
+            </div>
+            
+             <!-- Footer actions (RTB, etc) could go here later -->
         </div>
     </div>
 
