@@ -19,7 +19,7 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, collection, doc, setDoc, getDoc, updateDoc, 
             onSnapshot, deleteDoc, serverTimestamp, query, orderBy, addDoc, where, getDocs, writeBatch 
@@ -54,9 +54,15 @@
         let currentUserId = null;
         let lastNotificationTime = Date.now();
         let slSessionActive = false;
+        
+        // Filtering
         let currentFilter = 'ALL'; 
         let vehicleDataCache = [];
+
+        // Requests Queue
         let pendingRequests = [];
+
+        // Cleanups
         let listeners = [];
 
         // --- DATA CONSTANTS ---
@@ -187,11 +193,8 @@
                             localStorage.removeItem('logiops_sl_uid');
                             location.reload();
                         }
-                        // Live Role Update
-                        if(d.role && d.role !== userRole) {
+                        if(d.role && d.role !== userRole && userRole !== null) {
                             userRole = d.role;
-                            userPseudo = d.pseudo; // Ensure sync
-                            userGrade = d.grade;
                             loadInterface();
                         }
                     }
@@ -291,19 +294,16 @@
         }
 
         function setupPresenceListener() {
-            // New Logic: Count users where isOnline=true (connected) vs Roster size (Total)
-            listeners.push(onSnapshot(publicPath('roster'), (rosterSnap) => {
-                const total = rosterSnap.size;
-                // Nested listener for online users
-                onSnapshot(query(publicPath('users'), where('isOnline', '==', true)), (usersSnap) => {
-                    let connected = 0;
-                    usersSnap.forEach(u => {
-                         // Optional: filter only LOGs or everyone? Assuming everyone connected
-                         // Excluding approved RTB
-                         if(u.data().rtbStatus !== 'APPROVED') connected++;
-                    });
-                    safeSetText('stat-log-count', `${connected}/${total}`);
+            listeners.push(onSnapshot(publicPath('users'), (snap) => {
+                let connected = 0;
+                let total = 0; 
+                snap.forEach(d => {
+                    if (d.data().role === 'LOG') { 
+                        total++; 
+                        if (d.data().isOnline && d.data().rtbStatus !== 'APPROVED' && d.data().rtbStatus !== 'KICKED') connected++;
+                    }
                 });
+                safeSetText('stat-log-count', `${connected}/${total}`);
             }));
         }
 
@@ -371,6 +371,121 @@
                     }
                 });
             }));
+        }
+
+        // --- UI LOADING FUNCTION ---
+        function loadInterface() {
+            document.getElementById('main-interface').classList.remove('hidden');
+            
+            document.getElementById('profile-card').innerHTML = `
+                <div class="text-xs text-gray-500 mb-1">IDENTITÉ</div>
+                <div class="font-bold text-lg text-white">${userGrade} ${userPseudo}</div>
+                <div class="text-xs bg-gray-800 px-2 py-1 rounded inline-block mt-1 text-green-400 border border-green-900">${userRole}</div>
+            `;
+
+            setupNotifications();
+            setupVehiclesListener();
+            setupMissionsListener();
+            populateSelects();
+
+            const slDiv = document.getElementById('sl-controls');
+            const logDiv = document.getElementById('log-controls');
+            const btnLeavePost = document.getElementById('btn-leave-post');
+            const btnEndService = document.getElementById('btn-end-service');
+            const btnCreateVeh = document.getElementById('btn-create-vehicle');
+
+            if (userRole === 'SL') {
+                slDiv.classList.remove('hidden');
+                logDiv.classList.add('hidden');
+                btnLeavePost.classList.remove('hidden');
+                btnEndService.classList.remove('hidden');
+                if(btnCreateVeh) btnCreateVeh.classList.remove('hidden');
+                setupSLRequestListeners(); 
+            } else {
+                slDiv.classList.add('hidden');
+                logDiv.classList.remove('hidden');
+                btnLeavePost.classList.add('hidden');
+                btnEndService.classList.add('hidden');
+                if(btnCreateVeh) btnCreateVeh.classList.add('hidden');
+            }
+        }
+
+        function populateSelects() {
+             // Only Ranks are dropdown, Garage is Grid
+        }
+
+        function setupVehiclesListener() {
+            const grid = document.getElementById('vehicle-grid');
+            listeners.push(onSnapshot(publicPath('vehicles'), (snap) => {
+                let stats = { total: 0, ops: 0, mission: 0, repair: 0, destroyed: 0 };
+                vehicleDataCache = [];
+                
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    const item = { id: doc.id, data: d };
+                    vehicleDataCache.push(item);
+                    
+                    stats.total++;
+                    if(d.status === 'OPS') stats.ops++;
+                    if(d.status === 'MISSION') stats.mission++;
+                    if(d.status === 'MAINTENANCE' || d.status === 'REPAIR') stats.repair++;
+                    if(d.status === 'DESTROYED') stats.destroyed++;
+                });
+
+                safeSetText('count-total', stats.total);
+                safeSetText('count-ops', stats.ops);
+                safeSetText('count-mission', stats.mission);
+                safeSetText('count-repair', stats.repair);
+                safeSetText('count-destroyed', stats.destroyed);
+
+                renderVehicleGrid();
+            }));
+        }
+
+        // --- VEHICLE GRID ---
+        window.setFilter = (f) => { currentFilter = f; renderVehicleGrid(); };
+        
+        function renderVehicleGrid() {
+            const grid = document.getElementById('vehicle-grid');
+            if(!grid) return;
+            grid.innerHTML = '';
+            const list = currentFilter === 'ALL' ? vehicleDataCache.filter(v => v.data.status !== 'DESTROYED') : vehicleDataCache.filter(v => v.data.status === currentFilter);
+            list.forEach(v => grid.appendChild(createVehicleCard(v.id, v.data)));
+        }
+
+        function createVehicleCard(id, data, isMissionView = false) {
+            const div = document.createElement('div');
+            const statusColors = { 'OPS': 'border-green-500', 'MISSION': 'border-blue-500', 'MAINTENANCE': 'border-orange-500 bg-orange-900/20', 'REPAIR': 'border-orange-500', 'DESTROYED': 'border-red-600 opacity-60' };
+            div.className = `bg-gray-900/90 border-2 ${statusColors[data.status] || 'border-gray-500'} p-3 rounded relative flex flex-col gap-2 cursor-pointer hover:bg-gray-800 transition`;
+            div.onclick = (e) => { 
+                if(e.target.tagName === 'BUTTON' || e.target.closest('button')) return; 
+                window.openVehicleDetail(id); 
+            };
+
+            div.innerHTML = `<div class="flex justify-between items-start border-b border-gray-700 pb-2"><div><div class="text-xs text-gray-400">${data.category}</div><div class="font-bold text-white truncate w-24">${data.name}</div></div><div class="text-xs font-bold px-1 bg-black rounded">${data.status}</div></div>`;
+            
+            if (data.status === 'MAINTENANCE') {
+                div.innerHTML += `<div class="my-2 text-xs text-orange-300 text-center"><div>ESSENCE: ${data.fuel}%</div><div>ÉTAT: ${data.integrity}%</div></div><button onclick="performMaintenance('${id}', '${data.name}')" class="mt-auto w-full py-2 bg-orange-500 text-black font-bold rounded animate-pulse">EFFECTUER MAINTENANCE</button>`;
+                return div;
+            }
+
+            const seatsDiv = document.createElement('div'); seatsDiv.className = "grid grid-cols-3 gap-1";
+            ['driver', 'copilot', 'gunner'].forEach(role => {
+                const occ = data.seats[role]; const btn = document.createElement('button'); const isMe = occ && occ.uid === currentUserId;
+                btn.className = `h-12 border rounded text-[9px] flex flex-col items-center justify-center ${isMe ? 'bg-green-500 text-black font-bold' : (occ ? 'bg-green-900/50 text-green-300' : 'bg-gray-800 text-gray-500')}`;
+                btn.innerHTML = `<span>${role.substr(0,3).toUpperCase()}</span><span>${occ ? occ.name : 'LIBRE'}</span>`;
+                if(data.status !== 'DESTROYED') btn.onclick = () => window.toggleSeat(id, data, role);
+                seatsDiv.appendChild(btn);
+            });
+            div.appendChild(seatsDiv);
+
+            if(isMissionView) {
+                 const uActs = document.createElement('div');
+                 uActs.className = "grid grid-cols-2 gap-1 mt-auto pt-2 text-[10px]";
+                 uActs.innerHTML = `<button onclick="unitSitrep('${data.name}')" class="border border-blue-500 text-blue-300">SITREP</button><button onclick="unitRtb('${data.name}')" class="border border-orange-500 text-orange-300">RTB</button>`;
+                 div.appendChild(uActs);
+            }
+            return div;
         }
 
         // --- EXPORTED FUNCTIONS ---
@@ -457,45 +572,8 @@
         window.logoutSelf = async () => { hudConfirm("DÉCONNEXION", "Quitter ?", async () => { await updateDoc(publicDoc('users', currentUserId), { isOnline: false }); localStorage.removeItem('logiops_sl_uid'); location.reload(); }, null); };
         window.endServiceGlobal = () => { hudConfirm("FIN SERVICE GLOBAL", "Déconnexion de TOUS ?", async () => { await updateDoc(publicDoc('settings', 'global'), { serviceStatus: 'ENDED' }); addLog("FIN DE SERVICE", "CMD", true); }, null); };
         
-        window.unitSitrep = (n) => hudPrompt(`SITREP ${n}`, "Message :", (msg) => addLog(`[SITREP ${n}] ${msg}`, 'RADIO', true)); window.unitRtb = (n) => addLog(`ORDRE RTB POUR ${n}`, 'CMD', true); window.sendSitrep = (m) => hudPrompt(`SITREP MISSION`, "Message global :", (msg) => addLog(`[SITREP GLOBAL] ${msg}`, 'MISSION', true)); 
-        window.requestGlobalRTB = async (mName, mId) => { if(!confirm("Ordonner le RETOUR BASE pour toute la mission ?")) return; await updateDoc(publicDoc('missions', mId), { status: 'RTB_REQUESTED' }); addLog(`[ORDRE RTB GLOBAL // ${mName}] RETOUR BASE IMMÉDIAT DEMANDÉ`, 'MISSION', true); };
-        window.openRequestsModal = () => { const m = document.getElementById('requests-modal'); const list = document.getElementById('requests-list'); m.classList.remove('hidden'); list.innerHTML = ''; if(pendingRequests.length === 0) { list.innerHTML = '<div class="text-center text-gray-500">Aucune demande.</div>'; return; } pendingRequests.forEach((req, index) => { const div = document.createElement('div'); div.className = "border border-yellow-500/50 bg-yellow-900/10 p-3 rounded mb-2"; div.innerHTML = `<div class="flex justify-between items-start mb-2"><div class="font-bold text-yellow-500">${req.title}</div><div class="text-xs text-gray-400">${req.type}</div></div><div class="text-sm text-white mb-3">${req.desc}</div><div class="grid grid-cols-2 gap-2"><button onclick="resolveRequest(${index}, true)" class="bg-green-900/50 border border-green-500 text-green-400 text-xs py-2 rounded font-bold">ACCEPTER</button><button onclick="resolveRequest(${index}, false)" class="bg-red-900/50 border border-red-500 text-red-400 text-xs py-2 rounded font-bold">REFUSER</button></div>`; list.appendChild(div); }); };
-        window.resolveRequest = async (index, accepted) => { const req = pendingRequests[index]; if (req.type === 'RTB') { const newStatus = accepted ? 'APPROVED' : 'DENIED'; await updateDoc(publicDoc('users', req.data.uid), { rtbStatus: newStatus, isOnline: accepted ? false : true }); if(accepted) addLog(`${req.data.name} RTB Validé.`, 'ADMIN'); } else if (req.type === 'LEAD') { if(accepted) { await updateDoc(publicDoc('missions', req.data.mId), { leaderId: req.data.targetId, leaderName: req.data.targetName, transferRequest: null }); addLog(`SL a validé ${req.data.targetName} Chef.`, 'CMD'); } else { await updateDoc(publicDoc('missions', req.data.mId), { transferRequest: null }); } } pendingRequests.splice(index, 1); updateRequestsUI(); const m = document.getElementById('requests-modal'); if(!m.classList.contains('hidden')) openRequestsModal(); };
-        
-        window.openMissionModal = async () => { document.getElementById('mission-modal').classList.remove('hidden'); const list = document.getElementById('mission-vehicle-list'); const warnDiv = document.getElementById('maintenance-warning'); list.innerHTML = '...'; warnDiv.innerHTML = ''; const snap = await getDocs(publicPath('vehicles')); list.innerHTML = ''; let opsCount = 0; let maintCount = 0; let maintNames = []; snap.forEach(doc => { const d = doc.data(); if (d.status === 'MAINTENANCE') { maintCount++; maintNames.push(d.name); } if(d.status === 'OPS' && !d.missionId) { opsCount++; const l = document.createElement('label'); l.className = "flex items-center gap-3 p-3 bg-black/40 border border-green-900/50 rounded cursor-pointer"; l.innerHTML = `<input type="checkbox" class="accent-green-500 w-5 h-5 m-chk" value="${doc.id}"><div class="text-sm font-bold text-green-400">${d.name} <span class="text-xs text-gray-500">(${d.category})</span></div>`; list.appendChild(l); } }); if (maintCount > 0) { warnDiv.innerHTML = `<div class="p-2 bg-orange-900/30 border border-orange-500 text-orange-300 text-xs rounded mb-2"><i class="fas fa-wrench"></i> <strong>ATTENTION :</strong> ${maintCount} véhicules en maintenance<br><span class="italic text-[9px]">${maintNames.join(', ')}</span></div>`; } if(opsCount===0) list.innerHTML = '<div class="text-center text-gray-500 py-4">Aucun véhicule OPS.</div>'; };
-        window.confirmMission = async () => { const name = document.getElementById('mission-name').value; if(!name) return; const chks = document.querySelectorAll('.m-chk:checked'); const vIds = Array.from(chks).map(c => c.value); const mRef = await addDoc(publicPath('missions'), { name, status: 'ACTIVE', leaderId: null, leaderName: null, createdAt: serverTimestamp(), vehicleCount: vIds.length }); const batch = writeBatch(db); vIds.forEach(id => batch.update(publicDoc('vehicles', id), { status: 'MISSION', missionId: mRef.id })); await batch.commit(); addLog(`Mission lancée : ${name}`, 'MISSION'); document.getElementById('mission-modal').classList.add('hidden'); };
-        window.openRTBCheckModal = async (mId) => { const m = document.getElementById('rtb-check-modal'); const list = document.getElementById('rtb-check-list'); m.classList.remove('hidden'); const snap = await getDocs(query(publicPath('vehicles'), where('missionId', '==', mId))); list.innerHTML = ''; snap.forEach(doc => { const d = doc.data(); const div = document.createElement('div'); div.className = "mb-4 p-3 border border-green-900/50 bg-black/40 rounded"; div.innerHTML = `<div class="font-bold text-green-400 mb-2">${d.name} (${d.category})</div><div class="grid grid-cols-2 gap-2"><div><label class="text-[10px] text-gray-400">CARBURANT %</label><input type="number" min="0" max="100" value="100" class="w-full bg-black border border-green-700 text-white text-center p-1 rtb-fuel" data-id="${doc.id}"></div><div><label class="text-[10px] text-gray-400">ÉTAT %</label><input type="number" min="0" max="100" value="100" class="w-full bg-black border border-green-700 text-white text-center p-1 rtb-health" data-id="${doc.id}"></div></div>`; list.appendChild(div); }); document.getElementById('btn-confirm-rtb-check').onclick = () => submitRTBCheck(mId); };
-        window.submitRTBCheck = async (mId) => { const fuels = document.querySelectorAll('.rtb-fuel'); const healths = document.querySelectorAll('.rtb-health'); const batch = writeBatch(db); let mCount = 0; for (let i = 0; i < fuels.length; i++) { const vid = fuels[i].dataset.id; const fVal = parseInt(fuels[i].value); const hVal = parseInt(healths[i].value); const vRef = publicDoc('vehicles', vid); if (fVal < 100 || hVal < 100) { batch.update(vRef, { status: 'MAINTENANCE', missionId: null, fuel: fVal, integrity: hVal }); mCount++; } else { batch.update(vRef, { status: 'OPS', missionId: null, fuel: 100, integrity: 100 }); } } batch.update(publicDoc('missions', mId), { status: 'ARCHIVED' }); await batch.commit(); addLog(`Mission terminée. ${mCount} maintenance.`, 'LOGISTICS'); document.getElementById('rtb-check-modal').classList.add('hidden'); document.getElementById('mission-details-modal').classList.add('hidden'); };
-        window.performMaintenance = (vid, name) => { hudConfirm("MAINTENANCE", `Réparer ${name} ?`, async () => { await updateDoc(publicDoc('vehicles', vid), { status: 'OPS', fuel: 100, integrity: 100 }); addLog(`Maintenance effectuée sur ${name}.`, 'LOGISTICS'); }, null); };
-        window.openRosterModal = () => { const m = document.getElementById('roster-modal'); m.classList.remove('hidden'); const list = document.getElementById('sl-roster-list'); onSnapshot(publicPath('roster'), async (snapRoster) => { const usersSnap = await getDocs(publicPath('users')); const usersMap = {}; usersSnap.forEach(u => usersMap[u.data().rosterId] = { id: u.id, ...u.data() }); list.innerHTML = ''; snapRoster.forEach(doc => { const d = doc.data(); const activeUser = usersMap[doc.id]; const isOnline = activeUser && activeUser.isOnline; const div = document.createElement('div'); div.className = "flex justify-between items-center bg-black/40 p-2 rounded mb-1 border border-green-900/30"; let actionBtn = ''; if(isOnline) { actionBtn = `<button onclick="kickUser('${activeUser.id}', '${d.pseudo}')" class="text-xs bg-red-900/50 text-red-400 border border-red-900 px-2 py-1 rounded">EXCLURE</button>`; } else { actionBtn = `<button onclick="deleteRosterEntry('${doc.id}')" class="text-gray-500 hover:text-red-500"><i class="fas fa-trash"></i></button>`; } div.innerHTML = `<div><span class="font-bold ${isOnline ? 'text-green-400' : 'text-gray-500'}">${d.grade} ${d.pseudo}</span>${isOnline ? '<span class="ml-2 text-[9px] bg-green-900 text-green-200 px-1 rounded">EN LIGNE</span>' : ''}</div><div>${actionBtn}</div>`; list.appendChild(div); }); }); };
-        window.kickUser = (uid, name) => { hudConfirm("EXCLURE", `Ejecter ${name} ?`, async () => { await updateDoc(publicDoc('users', uid), { rtbStatus: 'KICKED', isOnline: false }); addLog(`${name} a été exclu par le Commandement.`, 'ADMIN', true); }, null); };
-        window.deleteRosterEntry = (rid) => { hudConfirm("SUPPRIMER", "Retirer du registre ?", async () => await deleteDoc(publicDoc('roster', rid))); };
-        window.addToRoster = () => { const m = document.getElementById('hud-prompt-modal'); m.classList.remove('hidden'); window.hudPrompt("NOUVEAU PERSONNEL", "Format: Grade Pseudo (ex: Sgt Major)", async (val) => { if(!val) return; const parts = val.split(' '); const grade = parts[0]; const pseudo = parts.slice(1).join(' '); await addDoc(publicPath('roster'), { grade, pseudo, addedAt: serverTimestamp() }); addLog(`Ajout roster : ${val}`, 'ADMIN'); }); };
-        window.createDepot = () => { hudPrompt("NOUVEAU DÉPÔT", "Nom du lieu de stockage :", async (val) => { if(val) { await addDoc(publicPath('depots'), { name: val, amount: 0 }); addLog(`Nouveau dépôt : ${val}`, 'SUPPLY'); } }); };
-        window.updateDepot = async (id, delta) => { const ref = publicDoc('depots', id); const snap = await getDoc(ref); const current = snap.data().amount || 0; if(current + delta < 0) return hudAlert("Erreur", "Stock insuffisant."); await updateDoc(ref, { amount: current + delta }); };
-        window.renderDepotsList = (snap) => { const list = document.getElementById('depots-list'); if(!list) return; list.innerHTML = ''; snap.forEach(doc => { const d = doc.data(); const el = document.createElement('div'); el.className = "bg-black/40 border border-green-900/50 p-3 rounded mb-2 flex justify-between items-center"; el.innerHTML = `<div><div class="font-bold text-green-400 text-sm">${d.name}</div><div class="text-white font-mono text-lg">${d.amount}</div></div><div class="flex gap-2"><button onclick="updateDepot('${doc.id}', 100)" class="border border-green-600 text-green-600 px-3 py-1 text-xs rounded hover:bg-green-900 font-bold">+100</button><button onclick="updateDepot('${doc.id}', -100)" class="border border-red-600 text-red-600 px-3 py-1 text-xs rounded hover:bg-red-900 font-bold">-100</button></div>`; list.appendChild(el); }); };
-        window.openGarageModal = () => { const m = document.getElementById('garage-modal'); m.classList.remove('hidden'); const container = document.getElementById('garage-content'); container.innerHTML = ''; const categories = {}; VEHICLE_DATABASE.forEach((v, index) => { if(!categories[v.category]) categories[v.category] = []; categories[v.category].push({ ...v, index }); }); for (const [cat, vehicles] of Object.entries(categories)) { const col = document.createElement('div'); col.className = "flex flex-col gap-2 min-w-[200px] bg-green-900/10 p-2 rounded border border-green-900/30"; col.innerHTML = `<h4 class="text-xs font-bold text-green-400 uppercase border-b border-green-800 pb-1 mb-1">${cat}</h4>`; vehicles.forEach(v => { const btn = document.createElement('button'); btn.className = "text-left text-[10px] p-2 bg-black/60 border border-gray-700 hover:border-green-500 hover:text-green-300 transition rounded flex justify-between"; btn.innerHTML = `<span>${v.name}</span><span class="text-gray-500">${v.cost}</span>`; btn.onclick = () => window.createVehicle(v.index); col.appendChild(btn); }); container.appendChild(col); } };
-        window.createVehicle = async (index) => { if(userRole !== 'SL') return hudAlert("Accès Refusé", "Seul le Squad Leader peut sortir des véhicules."); const vehData = VEHICLE_DATABASE[index]; const nameInput = document.getElementById('new-veh-name').value; if(!vehData) return; if(await consumeGlobalSupply(vehData.cost)) { const snap = await getDocs(publicPath('vehicles')); const existingNumbers = []; const prefix = vehData.code || "VEH"; snap.forEach(doc => { const d = doc.data(); if (d.name && d.name.startsWith(prefix)) { const parts = d.name.split(' - '); if(parts[1]) existingNumbers.push(parseInt(parts[1])); } }); let num = 1; while (existingNumbers.includes(num)) { num++; } const numStr = num.toString().padStart(2, '0'); const finalName = `${prefix} - ${numStr}`; await addDoc(publicPath('vehicles'), { name: finalName, category: vehData.category, status: 'OPS', seats: { driver: null, copilot: null, gunner: null }, missionId: null, cost: vehData.cost, createdAt: serverTimestamp(), missionCount: 0 }); addLog(`Véhicule sorti: ${finalName} (-${vehData.cost})`, 'LOGISTICS'); document.getElementById('garage-modal').classList.add('hidden'); } else { hudAlert("Erreur", "Supply insuffisant."); } };
-        async function consumeGlobalSupply(amount) { const snap = await getDocs(publicPath('depots')); let targetDoc = null; snap.forEach(d => { if(d.data().amount >= amount && !targetDoc) targetDoc = d; }); if(!targetDoc) return false; await updateDoc(targetDoc.ref, { amount: targetDoc.data().amount - amount }); return true; }
-        async function refundGlobalSupply(amount) { const snap = await getDocs(publicPath('depots')); if(snap.empty) return; const targetDoc = snap.docs[0]; await updateDoc(targetDoc.ref, { amount: targetDoc.data().amount + amount }); }
-        async function addLog(message, type = 'INFO', isPriority = false) { if (!currentUserId) return; await addDoc(publicPath('logs'), { message, type, timestamp: serverTimestamp() }); await addDoc(publicPath('notifications'), { message, type, timestamp: serverTimestamp(), read: false, isPriority, senderName: `${userGrade} ${userPseudo}` }); }
-        window.setFilter = (f) => { currentFilter = f; renderVehicleGrid(); };
-        function renderVehicleGrid() { const grid = document.getElementById('vehicle-grid'); if(!grid) return; grid.innerHTML = ''; const list = currentFilter === 'ALL' ? vehicleDataCache.filter(v => v.data.status !== 'DESTROYED') : vehicleDataCache.filter(v => v.data.status === currentFilter); list.forEach(v => grid.appendChild(createVehicleCard(v.id, v.data))); }
-        function createVehicleCard(id, data, isMissionView = false) { const div = document.createElement('div'); const statusColors = { 'OPS': 'border-green-500', 'MISSION': 'border-blue-500', 'MAINTENANCE': 'border-orange-500 bg-orange-900/20', 'REPAIR': 'border-orange-500', 'DESTROYED': 'border-red-600 opacity-60' }; div.className = `bg-gray-900/90 border-2 ${statusColors[data.status] || 'border-gray-500'} p-3 rounded relative flex flex-col gap-2 cursor-pointer hover:bg-gray-800 transition`; div.onclick = (e) => { if(e.target.tagName === 'BUTTON' || e.target.closest('button')) return; window.openVehicleDetail(id); }; div.innerHTML = `<div class="flex justify-between items-start border-b border-gray-700 pb-2"><div><div class="text-xs text-gray-400">${data.category}</div><div class="font-bold text-white truncate w-24">${data.name}</div></div><div class="text-xs font-bold px-1 bg-black rounded">${data.status}</div></div>`; if (data.status === 'MAINTENANCE') { div.innerHTML += `<div class="my-2 text-xs text-orange-300 text-center"><div>ESSENCE: ${data.fuel}%</div><div>ÉTAT: ${data.integrity}%</div></div><button onclick="performMaintenance('${id}', '${data.name}')" class="mt-auto w-full py-2 bg-orange-500 text-black font-bold rounded animate-pulse">EFFECTUER MAINTENANCE</button>`; return div; } const seatsDiv = document.createElement('div'); seatsDiv.className = "grid grid-cols-3 gap-1"; ['driver', 'copilot', 'gunner'].forEach(role => { const occ = data.seats[role]; const btn = document.createElement('button'); const isMe = occ && occ.uid === currentUserId; btn.className = `h-12 border rounded text-[9px] flex flex-col items-center justify-center ${isMe ? 'bg-green-500 text-black font-bold' : (occ ? 'bg-green-900/50 text-green-300' : 'bg-gray-800 text-gray-500')}`; btn.innerHTML = `<span>${role.substr(0,3).toUpperCase()}</span><span>${occ ? occ.name : 'LIBRE'}</span>`; if(data.status !== 'DESTROYED') btn.onclick = () => window.toggleSeat(id, data, role); seatsDiv.appendChild(btn); }); div.appendChild(seatsDiv); if(isMissionView) { const uActs = document.createElement('div'); uActs.className = "grid grid-cols-2 gap-1 mt-auto pt-2 text-[10px]"; uActs.innerHTML = `<button onclick="unitSitrep('${data.name}')" class="border border-blue-500 text-blue-300">SITREP</button><button onclick="unitRtb('${data.name}')" class="border border-orange-500 text-orange-300">RTB</button>`; div.appendChild(uActs); } return div; }
-        window.openVehicleDetail = (vid) => { document.getElementById('vehicle-detail-modal').classList.remove('hidden'); onSnapshot(publicDoc('vehicles', vid), (doc) => { if(!doc.exists()) return document.getElementById('vehicle-detail-modal').classList.add('hidden'); const d = doc.data(); document.getElementById('vd-name').innerText = d.name; document.getElementById('vd-type').innerText = d.category; document.getElementById('vd-status').innerText = d.status; document.getElementById('vd-cost').innerText = d.cost; const acts = document.getElementById('vd-actions'); acts.innerHTML = ''; if(d.status === 'DESTROYED') { const b = document.createElement('button'); b.className="btn-tac w-full border-red-500 text-red-500 py-3 font-bold rounded"; b.innerText="ARCHIVER ÉPAVE"; b.onclick = () => { hudConfirm("ARCHIVER", "Supprimer ?", async () => { await deleteDoc(publicDoc('vehicles', vid)); document.getElementById('vehicle-detail-modal').classList.add('hidden'); }, null); }; acts.appendChild(b); } else if(d.status === 'OPS' && !d.missionId) { if(userRole === 'SL') { const b = document.createElement('button'); b.className="btn-tac w-full border-green-500 text-green-500 py-3 font-bold rounded"; b.innerText=`RETOUR GARAGE (+${d.cost})`; b.onclick = () => { hudConfirm("GARAGE", "Rentrer véhicule ?", async () => { await refundGlobalSupply(d.cost); await deleteDoc(publicDoc('vehicles', vid)); document.getElementById('vehicle-detail-modal').classList.add('hidden'); }, null); }; acts.appendChild(b); } else acts.innerHTML = '<div class="text-center text-gray-500">SL REQUIS</div>'; } }); };
-        window.toggleSeat = async (vehId, data, role) => { if(!currentUserId) return; const targetOccupant = data.seats[role]; if (targetOccupant && targetOccupant.uid === currentUserId) { await updateDoc(publicDoc('vehicles', vehId), { [`seats.${role}`]: null }); addLog(`${userPseudo} est descendu de ${data.name}`); return; } if (targetOccupant) return hudAlert("Occupé", `Place occupée par ${targetOccupant.name}`); let currentVehId = null, currentSeatRole = null, currentVehName = null; for (const v of vehicleDataCache) { for (const [r, occ] of Object.entries(v.data.seats)) { if (occ && occ.uid === currentUserId) { currentVehId = v.id; currentSeatRole = r; currentVehName = v.data.name; break; } } if (currentVehId) break; } if (currentVehId) { hudConfirm("CHANGEMENT", `Quitter <strong>${currentVehName}</strong> pour <strong>${data.name}</strong> ?`, async () => { const batch = writeBatch(db); batch.update(publicDoc('vehicles', currentVehId), { [`seats.${currentSeatRole}`]: null }); batch.update(publicDoc('vehicles', vehId), { [`seats.${role}`]: { uid: currentUserId, name: userPseudo } }); await batch.commit(); addLog(`${userPseudo} a changé de véhicule.`); }); } else { await updateDoc(publicDoc('vehicles', vehId), { [`seats.${role}`]: { uid: currentUserId, name: userPseudo } }); addLog(`${userPseudo} est monté dans ${data.name}`); } };
-        window.toggleSidebar = () => { const s = document.getElementById('sidebar'); const b = document.getElementById('mobile-backdrop'); if(s.classList.contains('-translate-x-full')) { s.classList.remove('-translate-x-full'); b.classList.remove('hidden'); } else { s.classList.add('-translate-x-full'); b.classList.add('hidden'); } };
-        window.closeModal = (id) => document.getElementById(id).classList.add('hidden'); window.toggleModal = (id) => document.getElementById(id).classList.toggle('hidden');
-        window.requestLogRTB = async () => { hudConfirm("FIN DE SERVICE", "Demander RTB ?", async () => { await updateDoc(publicDoc('users', currentUserId), { rtbStatus: 'REQUESTED' }); addLog(`${userPseudo} demande un RTB.`, 'ADMIN', true); hudAlert("EN ATTENTE", "Demande envoyée."); }, null); };
-        window.logoutSelf = async () => { hudConfirm("DÉCONNEXION", "Quitter ?", async () => { await updateDoc(publicDoc('users', currentUserId), { isOnline: false }); localStorage.removeItem('logiops_sl_uid'); location.reload(); }, null); };
-        window.endServiceGlobal = () => { hudConfirm("FIN SERVICE GLOBAL", "Déconnexion de TOUS ?", async () => { await updateDoc(publicDoc('settings', 'global'), { serviceStatus: 'ENDED' }); addLog("FIN DE SERVICE", "CMD", true); }, null); };
-        window.resetOperation = () => { if(userRole !== 'SL') return; hudConfirm("RESET OPÉRATION", "Voulez-vous vraiment tout effacer ?", () => { const m = document.getElementById('hud-confirm-modal'); document.getElementById('hud-confirm-title').innerText = "ATTENTION"; document.getElementById('hud-confirm-msg').innerHTML = "<span class='text-red-500 font-bold'>CETTE ACTION EST IRRÉVERSIBLE.</span>"; const btnYes = document.getElementById('btn-confirm-yes'); btnYes.className = "btn-tac border-red-500 text-red-500 py-3 font-bold rounded hover:bg-red-900"; btnYes.innerText = "CONFIRMER DESTRUCTION"; btnYes.onclick = async () => { m.classList.add('hidden'); const batch = writeBatch(db); const vSnap = await getDocs(publicPath('vehicles')); vSnap.forEach(d => batch.delete(d.ref)); const mSnap = await getDocs(publicPath('missions')); mSnap.forEach(d => batch.delete(d.ref)); const lSnap = await getDocs(publicPath('logs')); lSnap.forEach(d => batch.delete(d.ref)); const nSnap = await getDocs(publicPath('notifications')); nSnap.forEach(d => batch.delete(d.ref)); const rSnap = await getDocs(publicPath('roster')); rSnap.forEach(d => batch.delete(d.ref)); await batch.commit(); addLog("RESET COMPLET", "ADMIN", true); alert("Opération Réinitialisée."); location.reload(); }; m.classList.remove('hidden'); }, null); };
-        
-        window.unitSitrep = (n) => hudPrompt(`SITREP ${n}`, "Message :", (msg) => addLog(`[SITREP ${n}] ${msg}`, 'RADIO', true)); 
-        window.unitRtb = (n) => addLog(`ORDRE RTB POUR ${n}`, 'CMD', true); 
-        window.sendSitrep = (m) => hudPrompt(`SITREP MISSION`, "Message global :", (msg) => addLog(`[SITREP GLOBAL] ${msg}`, 'MISSION', true)); 
-        window.requestRTB = (m) => addLog(`ORDRE RTB GLOBAL MISSION ${m}`, 'MISSION', true);
-        window.requestGlobalRTB = async (mName, mId) => { if(!confirm("Ordonner le RETOUR BASE pour toute la mission ?")) return; await updateDoc(publicDoc('missions', mId), { status: 'RTB_REQUESTED' }); addLog(`[ORDRE RTB GLOBAL // ${mName}] RETOUR BASE IMMÉDIAT DEMANDÉ`, 'MISSION', true); };
+        window.unitSitrep = (n) => hudPrompt(`SITREP ${n}`, "Message :", (msg) => addLog(`[SITREP ${n}] ${msg}`, 'RADIO', true)); window.unitRtb = (n) => addLog(`ORDRE RTB POUR ${n}`, 'CMD', true); window.sendSitrep = (m) => hudPrompt(`SITREP MISSION`, "Message global :", (msg) => addLog(`[SITREP GLOBAL] ${msg}`, 'MISSION', true)); window.requestRTB = (m) => addLog(`ORDRE RTB GLOBAL MISSION ${m}`, 'MISSION', true);
+        window.requestGlobalRTB = async (mName, mId) => { if(!confirm("Ordonner le RETOUR BASE pour toute la mission ?")) return; await updateDoc(publicDoc('missions', mId), { status: 'RTB_IN_PROGRESS' }); addLog(`[ORDRE RTB GLOBAL // ${mName}] RETOUR BASE IMMÉDIAT DEMANDÉ`, 'MISSION', true); };
         window.openRequestsModal = () => { const m = document.getElementById('requests-modal'); const list = document.getElementById('requests-list'); m.classList.remove('hidden'); list.innerHTML = ''; if(pendingRequests.length === 0) { list.innerHTML = '<div class="text-center text-gray-500">Aucune demande.</div>'; return; } pendingRequests.forEach((req, index) => { const div = document.createElement('div'); div.className = "border border-yellow-500/50 bg-yellow-900/10 p-3 rounded mb-2"; div.innerHTML = `<div class="flex justify-between items-start mb-2"><div class="font-bold text-yellow-500">${req.title}</div><div class="text-xs text-gray-400">${req.type}</div></div><div class="text-sm text-white mb-3">${req.desc}</div><div class="grid grid-cols-2 gap-2"><button onclick="resolveRequest(${index}, true)" class="bg-green-900/50 border border-green-500 text-green-400 text-xs py-2 rounded font-bold">ACCEPTER</button><button onclick="resolveRequest(${index}, false)" class="bg-red-900/50 border border-red-500 text-red-400 text-xs py-2 rounded font-bold">REFUSER</button></div>`; list.appendChild(div); }); };
         window.resolveRequest = async (index, accepted) => { const req = pendingRequests[index]; if (req.type === 'RTB') { const newStatus = accepted ? 'APPROVED' : 'DENIED'; await updateDoc(publicDoc('users', req.data.uid), { rtbStatus: newStatus, isOnline: accepted ? false : true }); if(accepted) addLog(`${req.data.name} RTB Validé.`, 'ADMIN'); } else if (req.type === 'LEAD') { if(accepted) { await updateDoc(publicDoc('missions', req.data.mId), { leaderId: req.data.targetId, leaderName: req.data.targetName, transferRequest: null }); addLog(`SL a validé ${req.data.targetName} Chef.`, 'CMD'); } else { await updateDoc(publicDoc('missions', req.data.mId), { transferRequest: null }); } } pendingRequests.splice(index, 1); updateRequestsUI(); const m = document.getElementById('requests-modal'); if(!m.classList.contains('hidden')) openRequestsModal(); };
         window.openMissionModal = async () => { document.getElementById('mission-modal').classList.remove('hidden'); const list = document.getElementById('mission-vehicle-list'); const warnDiv = document.getElementById('maintenance-warning'); list.innerHTML = '...'; warnDiv.innerHTML = ''; const snap = await getDocs(publicPath('vehicles')); list.innerHTML = ''; let opsCount = 0; let maintCount = 0; let maintNames = []; snap.forEach(doc => { const d = doc.data(); if (d.status === 'MAINTENANCE') { maintCount++; maintNames.push(d.name); } if(d.status === 'OPS' && !d.missionId) { opsCount++; const l = document.createElement('label'); l.className = "flex items-center gap-3 p-3 bg-black/40 border border-green-900/50 rounded cursor-pointer"; l.innerHTML = `<input type="checkbox" class="accent-green-500 w-5 h-5 m-chk" value="${doc.id}"><div class="text-sm font-bold text-green-400">${d.name} <span class="text-xs text-gray-500">(${d.category})</span></div>`; list.appendChild(l); } }); if (maintCount > 0) { warnDiv.innerHTML = `<div class="p-2 bg-orange-900/30 border border-orange-500 text-orange-300 text-xs rounded mb-2"><i class="fas fa-wrench"></i> <strong>ATTENTION :</strong> ${maintCount} véhicules en maintenance<br><span class="italic text-[9px]">${maintNames.join(', ')}</span></div>`; } if(opsCount===0) list.innerHTML = '<div class="text-center text-gray-500 py-4">Aucun véhicule OPS.</div>'; };
@@ -531,6 +609,8 @@
     <div id="auth-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-black p-4">
         <div class="hud-panel w-full max-w-md p-6 rounded relative">
             <h1 class="text-4xl text-green-500 text-center mb-6 font-bold">LOGIOPS V2</h1>
+            
+            <!-- SELECTION BUTTONS -->
             <div class="flex flex-col gap-4 mb-4">
                 <button id="btn-login-sl" onclick="selectLoginMode('SL')" class="py-4 border border-green-600 text-green-400 rounded font-bold hover:bg-green-900/30 transition-all flex items-center justify-center gap-3">
                     <i class="fas fa-chess-king text-2xl"></i> SQUAD LEADER
