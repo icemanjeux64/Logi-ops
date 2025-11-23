@@ -54,6 +54,7 @@
         let unsubMissionDetails = null;
         let unsubMissionVehicles = null;
         let unsubGlobalSettings = null;
+        let unsubDepots = null;
 
         // --- UTILS ---
         const formatTime = (date) => {
@@ -110,26 +111,23 @@
             unsubGlobalSettings = onSnapshot(publicDoc('settings', 'global'), (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    safeSetText('supply-count', data.supply || 0);
-                    
+                    // Supply is now handled by depots listener, but we check service status here
                     const headerSlEl = document.getElementById('header-sl-name');
                     if (headerSlEl && data.slName) {
                         headerSlEl.innerText = `CMD: ${data.slName}`;
                     }
 
-                    // GLOBAL SERVICE END CHECK
-                    // If service is inactive AND I am currently logged in (role is set), kick me out
                     if (data.serviceStatus === 'ENDED' && userRole) {
                         forceLogout("FIN DE SERVICE ORDONNÉE PAR LE COMMANDEMENT");
                     }
-
                 } else {
-                    // Create if not exists (fail-safe)
-                    setDoc(publicDoc('settings', 'global'), { supply: 1000, slSessionId: null, slName: 'AUCUN', serviceStatus: 'ACTIVE' }).catch(console.error);
+                    setDoc(publicDoc('settings', 'global'), { slSessionId: null, slName: 'AUCUN', serviceStatus: 'ACTIVE' }).catch(console.error);
                 }
             });
 
-            // Only load UI if we have a role locally defined (logged in via app flow)
+            setupDepotsListener(); // Listen for Supply
+            setupPresenceListener(); // Listen for connected users
+
             if (userRole) {
                 loadInterface();
             } else {
@@ -137,31 +135,52 @@
             }
         }
 
+        function setupDepotsListener() {
+            if (unsubDepots) unsubDepots();
+            unsubDepots = onSnapshot(publicPath('depots'), (snapshot) => {
+                let total = 0;
+                snapshot.forEach(doc => {
+                    total += (parseInt(doc.data().amount) || 0);
+                });
+                safeSetText('supply-count', total);
+                
+                // If Supply Modal is open, refresh list
+                const list = document.getElementById('depots-list');
+                if (list && !list.closest('.hidden')) {
+                    renderDepotsList(snapshot);
+                }
+            });
+        }
+
+        function setupPresenceListener() {
+            // 1. Get Total Roster
+            onSnapshot(publicPath('roster'), (snapRoster) => {
+                const total = snapRoster.size;
+                // 2. Get Connected Users
+                onSnapshot(query(publicPath('users'), where('isOnline', '==', true)), (snapUsers) => {
+                    // Simple count. In a real app we'd filter by lastActive timestamp too.
+                    const connected = snapUsers.size;
+                    safeSetText('stat-log-count', `${connected}/${total}`);
+                });
+            });
+        }
+
         async function addLog(message, type = 'INFO', isPriority = false) {
             if (!currentUserId) return;
             try {
                 await addDoc(publicPath('logs'), {
-                    message: message,
-                    type: type,
-                    timestamp: serverTimestamp()
+                    message: message, type: type, timestamp: serverTimestamp()
                 });
                 await addDoc(publicPath('notifications'), {
-                    message: message,
-                    type: type,
-                    timestamp: serverTimestamp(),
-                    read: false,
-                    isPriority: isPriority,
-                    senderName: `${userGrade} ${userPseudo}`
+                    message: message, type: type, timestamp: serverTimestamp(), read: false, isPriority: isPriority, senderName: `${userGrade} ${userPseudo}`
                 });
             } catch (e) { console.error(e); }
         }
 
         // --- ACTIONS ---
         
-        // 1. Login SL
         window.loginSL = async () => {
             if (!currentUserId) return alert("Connexion au réseau en cours...");
-            
             const pseudo = document.getElementById('sl-pseudo').value.toUpperCase();
             const grade = document.getElementById('sl-grade').value;
             if (!pseudo) return alert("Pseudo requis");
@@ -174,29 +193,21 @@
                     if(!confirm(`⚠️ ALERTE\n\nLe SL ${globalData.slName} est déjà en poste.\n\nÉcraser sa session ?`)) return;
                 }
 
-                // Start Service
                 await setDoc(publicDoc('settings', 'global'), {
-                    slSessionId: currentUserId,
-                    slName: `${grade} ${pseudo}`,
-                    serviceStatus: 'ACTIVE', // START SERVICE
-                    lastLogin: serverTimestamp()
+                    slSessionId: currentUserId, slName: `${grade} ${pseudo}`, serviceStatus: 'ACTIVE', lastLogin: serverTimestamp()
                 }, { merge: true });
 
                 await setDoc(publicDoc('users', currentUserId), {
                     pseudo: pseudo, grade: grade, role: 'SL', isOnline: true, lastActive: serverTimestamp()
                 });
 
-                userRole = 'SL'; userPseudo = pseudo; userGrade = grade;
-                lastNotificationTime = Date.now();
-
+                userRole = 'SL'; userPseudo = pseudo; userGrade = grade; lastNotificationTime = Date.now();
                 addLog(`DÉBUT DE SERVICE SL: ${grade} ${pseudo}`, 'CMD', true);
                 document.getElementById('auth-screen').classList.add('hidden');
                 loadInterface();
-
             } catch (error) { console.error(error); alert("Erreur login SL"); }
         };
 
-        // 2. Login LOG
         window.showLogLogin = async () => {
             document.getElementById('login-sl-form').classList.add('hidden');
             document.getElementById('login-log-form').classList.remove('hidden');
@@ -205,10 +216,7 @@
 
             onSnapshot(publicPath('roster'), (snapshot) => {
                 rosterDiv.innerHTML = '';
-                if(snapshot.empty) {
-                    rosterDiv.innerHTML = '<div class="text-red-500 text-center py-4">Aucun effectif.</div>';
-                    return;
-                }
+                if(snapshot.empty) { rosterDiv.innerHTML = '<div class="text-red-500 text-center py-4">Aucun effectif.</div>'; return; }
                 snapshot.forEach(doc => {
                     const data = doc.data();
                     const btn = document.createElement('button');
@@ -222,52 +230,39 @@
 
         window.loginLOG = async (rosterId, pseudo, grade) => {
             if (!currentUserId) return alert("Connexion...");
-            
-            // Check if service is active first
             const globalSnap = await getDoc(publicDoc('settings', 'global'));
-            if (globalSnap.exists() && globalSnap.data().serviceStatus === 'ENDED') {
-                return alert("AUCUN SERVICE EN COURS. ATTENDEZ LE SQUAD LEADER.");
-            }
+            if (globalSnap.exists() && globalSnap.data().serviceStatus === 'ENDED') return alert("AUCUN SERVICE EN COURS.");
 
             try {
                 await setDoc(publicDoc('users', currentUserId), {
                     pseudo: pseudo, grade: grade, role: 'LOG', rosterId: rosterId, isOnline: true, currentVehicle: null, lastActive: serverTimestamp()
                 });
-                userRole = 'LOG'; userPseudo = pseudo; userGrade = grade;
-                lastNotificationTime = Date.now();
-
+                userRole = 'LOG'; userPseudo = pseudo; userGrade = grade; lastNotificationTime = Date.now();
                 addLog(`CONNEXION: ${grade} ${pseudo}`, 'CONNECT');
                 document.getElementById('auth-screen').classList.add('hidden');
                 loadInterface();
             } catch (error) { console.error(error); alert("Erreur login LOG"); }
         };
 
-        // 3. Disconnect & End Service
         window.logoutSelf = async () => {
             if(confirm("Confirmer la déconnexion ?")) {
+                // Set offline
+                await updateDoc(publicDoc('users', currentUserId), { isOnline: false });
                 addLog(`${userGrade} ${userPseudo} S'EST DÉCONNECTÉ`, 'CONNECT');
-                location.reload(); // Simple reload to reset state
+                location.reload();
             }
         };
 
         window.endServiceGlobal = async () => {
-            if(!confirm("⚠️ ATTENTION ⚠️\n\nVous allez terminer le service pour TOUS les utilisateurs connectés.\n\nContinuer ?")) return;
-
-            await updateDoc(publicDoc('settings', 'global'), {
-                serviceStatus: 'ENDED'
-            });
+            if(!confirm("⚠️ ATTENTION ⚠️\n\nTerminer le service pour TOUS ?")) return;
+            await updateDoc(publicDoc('settings', 'global'), { serviceStatus: 'ENDED' });
             addLog("FIN DE SERVICE GÉNÉRALE", "CMD", true);
-            // Triggers auto-logout via listener for everyone
         };
 
-        function forceLogout(reason) {
-            alert(reason);
-            location.reload();
-        }
+        function forceLogout(reason) { alert(reason); location.reload(); }
 
         function loadInterface() {
-            const ui = document.getElementById('main-interface');
-            ui.classList.remove('hidden');
+            document.getElementById('main-interface').classList.remove('hidden');
             safeSetText('user-identity', `${userGrade} ${userPseudo}`);
             safeSetText('user-badge', userRole);
 
@@ -285,7 +280,7 @@
                 slControls.classList.remove('hidden');
                 logControls.classList.add('hidden');
                 garageBtn.classList.remove('hidden');
-                endServiceBtn.classList.remove('hidden'); // SL Only
+                endServiceBtn.classList.remove('hidden');
             } else {
                 slControls.classList.add('hidden');
                 logControls.classList.remove('hidden');
@@ -297,14 +292,12 @@
         // --- NOTIFICATIONS & ALERTS ---
         function setupNotifications() {
             const feed = document.getElementById('notif-feed');
-            const q = publicPath('notifications');
-            onSnapshot(q, (snapshot) => {
+            onSnapshot(publicPath('notifications'), (snapshot) => {
                 if (userRole === 'SL') {
                     snapshot.docChanges().forEach((change) => {
                         if (change.type === "added") {
                             const data = change.doc.data();
-                            const msgTime = getMillis(data.timestamp);
-                            if (data.isPriority && msgTime > lastNotificationTime) {
+                            if (data.isPriority && getMillis(data.timestamp) > lastNotificationTime) {
                                 showAlertModal(data.type, data.message, data.senderName);
                             }
                         }
@@ -334,7 +327,86 @@
         };
         window.closeAlertModal = () => document.getElementById('alert-modal').classList.add('hidden');
 
-        // --- VEHICLE MANAGEMENT ---
+        // --- SUPPLY MANAGEMENT (DEPOTS) ---
+        window.openSupplyModal = async () => {
+            toggleModal('supply-modal');
+            const list = document.getElementById('depots-list');
+            list.innerHTML = '<div class="text-center animate-pulse">CHARGEMENT...</div>';
+            const snap = await getDocs(publicPath('depots'));
+            if(snap.empty) {
+                // Init default depot if none
+                await addDoc(publicPath('depots'), { name: "BASE PRINCIPALE", amount: 1000 });
+            }
+            // Listener is already active, it will update the list
+        };
+
+        function renderDepotsList(snapshot) {
+            const list = document.getElementById('depots-list');
+            if(!list) return;
+            list.innerHTML = '';
+            
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const div = document.createElement('div');
+                div.className = "flex flex-col bg-black/40 border border-green-900/50 p-3 rounded mb-2";
+                div.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-green-400">${data.name}</span>
+                        <span class="font-mono text-white text-lg">${data.amount}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="number" id="val-${doc.id}" class="w-20 bg-gray-900 border border-green-800 p-1 text-xs text-white text-center rounded" placeholder="Qté">
+                        <button onclick="updateDepot('${doc.id}', 1)" class="flex-1 bg-green-900/30 hover:bg-green-500 hover:text-black text-green-500 text-xs py-1 rounded border border-green-700">+ AJOUTER</button>
+                        <button onclick="updateDepot('${doc.id}', -1)" class="flex-1 bg-red-900/30 hover:bg-red-500 hover:text-black text-red-500 text-xs py-1 rounded border border-red-900">- RETIRER</button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        window.createDepot = async () => {
+            const name = prompt("Nom du nouveau lieu de stockage :");
+            if(!name) return;
+            const amount = prompt("Quantité initiale :", "0");
+            await addDoc(publicPath('depots'), { name: name, amount: parseInt(amount) || 0 });
+            addLog(`Nouveau dépôt créé : ${name}`, 'SUPPLY');
+        };
+
+        window.updateDepot = async (id, multiplier) => {
+            const input = document.getElementById(`val-${id}`);
+            const val = parseInt(input.value);
+            if(!val || val <= 0) return;
+            
+            const change = val * multiplier;
+            const ref = publicDoc('depots', id);
+            const docSnap = await getDoc(ref);
+            const current = docSnap.data().amount || 0;
+            
+            if (current + change < 0) return alert("Stock insuffisant !");
+            
+            await updateDoc(ref, { amount: current + change });
+            input.value = '';
+            addLog(`Mouvement stock (${docSnap.data().name}) : ${change > 0 ? '+' : ''}${change}`, 'SUPPLY');
+        };
+
+        // Helper to consume supply from "Main" or first available
+        async function consumeGlobalSupply(amount) {
+            const snap = await getDocs(publicPath('depots'));
+            // Try to find "BASE PRINCIPALE" or just take the first one with enough stock
+            let targetDoc = null;
+            
+            // Strategy: Find first depot with enough items
+            snap.forEach(d => {
+                if(d.data().amount >= amount && !targetDoc) targetDoc = d;
+            });
+
+            if(!targetDoc) return false;
+
+            await updateDoc(targetDoc.ref, { amount: targetDoc.data().amount - amount });
+            return true;
+        }
+
+        // --- VEHICLE & MISSION ---
         function setupVehiclesListener() {
             const container = document.getElementById('vehicle-grid');
             onSnapshot(publicPath('vehicles'), (snapshot) => {
@@ -343,13 +415,12 @@
                 let stats = { total: 0, ops: 0, mission: 0, repair: 0, destroyed: 0 };
                 snapshot.forEach(doc => {
                     const data = doc.data();
-                    const id = doc.id;
                     stats.total++;
                     if(data.status === 'OPS') stats.ops++;
                     if(data.status === 'MISSION') stats.mission++;
                     if(data.status === 'REPAIR') stats.repair++;
                     if(data.status === 'DESTROYED') stats.destroyed++;
-                    container.appendChild(createVehicleCard(id, data));
+                    container.appendChild(createVehicleCard(doc.id, data));
                 });
                 updateDashboardStats(stats);
             });
@@ -363,7 +434,7 @@
             safeSetText('stat-destroyed', stats.destroyed);
         }
 
-        function createVehicleCard(id, data) {
+        function createVehicleCard(id, data, missionContext = false, isLeader = false) {
             const statusColors = {
                 'OPS': 'border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.2)]',
                 'MISSION': 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.2)]',
@@ -384,39 +455,28 @@
                 </div>
             `;
 
+            // Seats
             const seatsContainer = document.createElement('div');
             seatsContainer.className = "grid grid-cols-3 gap-2 my-2";
-            
             ['driver', 'copilot', 'gunner'].forEach(role => {
                 const occupant = data.seats[role];
-                const seatBtn = document.createElement('button');
-                
-                let icon = role === 'driver' ? 'fa-steering-wheel' : (role === 'copilot' ? 'fa-map' : 'fa-crosshairs');
-                
-                // If I am in the seat, highlight it
                 const isMe = occupant && occupant.uid === currentUserId;
+                const seatBtn = document.createElement('button');
+                let icon = role === 'driver' ? 'fa-steering-wheel' : (role === 'copilot' ? 'fa-map' : 'fa-crosshairs');
                 
                 seatBtn.className = `p-2 text-xs border rounded flex flex-col items-center justify-center h-16 active:scale-95 transition-transform touch-manipulation
                     ${isMe ? 'bg-green-500 border-white text-black font-bold shadow-lg' : (occupant ? 'bg-green-900/60 border-green-500 text-green-300' : 'bg-gray-800 border-gray-700 text-gray-500 hover:border-green-500')}`;
-                
-                seatBtn.innerHTML = `
-                    <i class="fas ${icon} mb-1 text-base"></i>
-                    <span class="truncate w-full text-center text-[9px] font-bold">${occupant ? occupant.name : 'LIBRE'}</span>
-                `;
-
-                if (data.status !== 'DESTROYED') {
-                    seatBtn.onclick = (e) => { e.stopPropagation(); handleSeatClick(id, data, role); };
-                }
-                
+                seatBtn.innerHTML = `<i class="fas ${icon} mb-1 text-base"></i><span class="truncate w-full text-center text-[9px] font-bold">${occupant ? occupant.name : 'LIBRE'}</span>`;
+                if (data.status !== 'DESTROYED') seatBtn.onclick = (e) => { e.stopPropagation(); handleSeatClick(id, data, role); };
                 seatsContainer.appendChild(seatBtn);
             });
             div.appendChild(seatsContainer);
 
-            if (userRole === 'SL') {
+            // SL ACTIONS
+            if (userRole === 'SL' && !missionContext) {
                 const actions = document.createElement('div');
                 actions.className = "mt-auto pt-2 border-t border-gray-700 grid grid-cols-2 gap-2 text-xs";
                 const btnClass = "p-3 border rounded font-bold active:bg-opacity-50 touch-manipulation";
-
                 if (data.status !== 'DESTROYED') {
                     actions.innerHTML = `
                         <button onclick="setVehicleStatus('${id}', 'REPAIR')" class="${btnClass} border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black">RÉPARER</button>
@@ -424,87 +484,75 @@
                         <button onclick="setVehicleStatus('${id}', 'OPS')" class="${btnClass} border-green-500 text-green-500 hover:bg-green-500 hover:text-black col-span-2">RÉTABLIR OPS</button>
                     `;
                 } else {
-                    actions.innerHTML = `
-                         <button onclick="deleteVehicle('${id}')" class="${btnClass} border-red-900 text-red-900 hover:bg-red-900 hover:text-white col-span-2">ARCHIVER ÉPAVE</button>
-                    `;
+                    actions.innerHTML = `<button onclick="deleteVehicle('${id}')" class="${btnClass} border-red-900 text-red-900 hover:bg-red-900 hover:text-white col-span-2">ARCHIVER ÉPAVE</button>`;
                 }
                 div.appendChild(actions);
             }
+
+            // MISSION LEADER ACTIONS (Contextual)
+            if (missionContext && isLeader) {
+                const missionActions = document.createElement('div');
+                missionActions.className = "mt-auto pt-2 border-t border-blue-900 grid grid-cols-2 gap-2 text-xs";
+                missionActions.innerHTML = `
+                    <button onclick="sendCitrep('${data.name}')" class="p-2 bg-blue-900/30 border border-blue-500 text-blue-300 rounded hover:bg-blue-500 hover:text-white"><i class="fas fa-microphone"></i> CITREP</button>
+                    <button onclick="requestVehRTB('${data.name}')" class="p-2 bg-orange-900/30 border border-orange-500 text-orange-300 rounded hover:bg-orange-500 hover:text-white"><i class="fas fa-home"></i> RTB</button>
+                `;
+                div.appendChild(missionActions);
+            }
+
             return div;
         }
 
         window.handleSeatClick = async (vehId, vehData, seatRole) => {
             if(!currentUserId) return;
             const currentSeat = vehData.seats[seatRole];
-            
-            // GET OUT
             if (currentSeat && currentSeat.uid === currentUserId) {
-                const newSeats = { ...vehData.seats, [seatRole]: null };
-                await updateDoc(publicDoc('vehicles', vehId), { seats: newSeats });
+                await updateDoc(publicDoc('vehicles', vehId), { seats: { ...vehData.seats, [seatRole]: null } });
                 addLog(`${userPseudo} est descendu de ${vehData.name} (${seatRole})`);
                 return;
             }
-            
-            // ALREADY OCCUPIED
-            if (currentSeat) {
-                alert(`Place occupée par ${currentSeat.name}`);
-                return;
-            }
-            
-            // GET IN
-            const newSeats = { ...vehData.seats, [seatRole]: { uid: currentUserId, name: userPseudo } };
-            await updateDoc(publicDoc('vehicles', vehId), { seats: newSeats });
+            if (currentSeat) return alert(`Place occupée par ${currentSeat.name}`);
+            await updateDoc(publicDoc('vehicles', vehId), { seats: { ...vehData.seats, [seatRole]: { uid: currentUserId, name: userPseudo } } });
             addLog(`${userPseudo} est monté dans ${vehData.name} (${seatRole})`);
         };
 
         window.setVehicleStatus = async (id, status) => {
             if(!currentUserId) return;
-            
-            // AUTO-EJECT LOGIC ON DESTROY
             let updateData = { status: status };
-            
             if (status === 'DESTROYED') {
-                if(confirm("Confirmer la DESTRUCTION du véhicule ? Cela éjectera tous les passagers.")) {
-                    updateData.seats = { driver: null, copilot: null, gunner: null }; // Clear seats
-                    addLog(`VÉHICULE ${id} DÉTRUIT - ÉVACUATION IMMÉDIATE`, 'ALERTE', true);
-                } else {
-                    return;
-                }
-            } else {
-                addLog(`Véhicule passé en ${status}`, 'VEHICULE');
-            }
-
+                if(!confirm("Confirmer DESTRUCTION ?")) return;
+                updateData.seats = { driver: null, copilot: null, gunner: null };
+                addLog(`VÉHICULE ${id} DÉTRUIT`, 'ALERTE', true);
+            } else { addLog(`Véhicule passé en ${status}`, 'VEHICULE'); }
             await updateDoc(publicDoc('vehicles', id), updateData);
         };
 
         window.deleteVehicle = async (id) => {
             if(!currentUserId) return;
-            if(confirm('Archiver ce véhicule détruit (le retirer du tableau) ?')) {
+            if(confirm('Archiver ce véhicule ?')) {
                 await deleteDoc(publicDoc('vehicles', id));
-                addLog("Véhicule détruit archivé.", "ADMIN");
+                addLog("Véhicule archivé.", "ADMIN");
             }
         };
 
-        // --- SL LOGIC & REST ---
         window.createVehicle = async () => {
-            if(!currentUserId) return;
             if(userRole !== 'SL') return alert("Interdit");
             const typeEl = document.getElementById('new-veh-type');
             const nameEl = document.getElementById('new-veh-name');
             const cost = { 'LOGI': 300, 'JEEP': 100, 'TRANSPORT': 200, 'BLINDE': 600 }[typeEl.value];
-            const globalSnap = await getDoc(publicDoc('settings', 'global'));
-            const currentSupply = globalSnap.data()?.supply || 0;
 
-            if (currentSupply < cost) return alert("Supply insuffisant");
-
-            await setDoc(publicDoc('settings', 'global'), { supply: currentSupply - cost }, {merge: true});
-            await addDoc(publicPath('vehicles'), {
-                name: nameEl.value || `${typeEl.value}-${Math.floor(Math.random()*100)}`,
-                category: typeEl.value, cost: cost, status: 'OPS', missionId: null,
-                seats: { driver: null, copilot: null, gunner: null }, createdAt: serverTimestamp()
-            });
-            addLog(`Véhicule sorti: ${typeEl.value}`, 'LOGISTICS');
-            toggleModal('garage-modal');
+            // Updated Supply Logic: consume from depots
+            if (await consumeGlobalSupply(cost)) {
+                await addDoc(publicPath('vehicles'), {
+                    name: nameEl.value || `${typeEl.value}-${Math.floor(Math.random()*100)}`,
+                    category: typeEl.value, cost: cost, status: 'OPS', missionId: null,
+                    seats: { driver: null, copilot: null, gunner: null }, createdAt: serverTimestamp()
+                });
+                addLog(`Véhicule sorti: ${typeEl.value} (-${cost})`, 'LOGISTICS');
+                toggleModal('garage-modal');
+            } else {
+                alert("Supply insuffisant dans les entrepôts !");
+            }
         };
 
         window.addToRoster = async () => {
@@ -526,18 +574,12 @@
                     div.innerHTML = `<span class="text-green-300 font-bold">${d.grade} ${d.pseudo}</span><button class="text-red-500 p-2" onclick="removeFromRoster('${doc.id}')"><i class="fas fa-trash"></i></button>`;
                     list.appendChild(div);
                 });
-                safeSetText('stat-log-count', snap.size);
             });
         }
         window.removeFromRoster = async(id) => { if(confirm('Retirer ?')) await deleteDoc(publicDoc('roster', id)); };
-        window.addSupply = async (amount) => {
-            const s = await getDoc(publicDoc('settings', 'global'));
-            await setDoc(publicDoc('settings', 'global'), { supply: (s.data()?.supply||0) + amount }, {merge: true});
-            addLog(`Ravitaillement: +${amount}`, 'SUPPLY');
-        };
         window.clearLogs = async () => { if(confirm("Effacer le journal ?")) addLog("JOURNAL EFFACÉ", "ADMIN"); };
 
-        // --- MISSION LOGIC ---
+        // --- MISSION ---
         window.openMissionModal = async () => {
             toggleModal('mission-modal');
             const vehiclesList = document.getElementById('mission-vehicle-list');
@@ -566,14 +608,10 @@
             const missionRef = await addDoc(publicPath('missions'), {
                 name: name, status: 'ACTIVE', leaderId: null, leaderName: null, createdAt: serverTimestamp(), vehicleCount: selectedVehicles.length
             });
-            if (selectedVehicles.length > 0) {
-                const batch = writeBatch(db);
-                selectedVehicles.forEach(vehId => {
-                    batch.update(publicDoc('vehicles', vehId), { status: 'MISSION', missionId: missionRef.id });
-                });
-                await batch.commit();
-            }
-            addLog(`Mission: ${name} (Véhicules: ${selectedVehicles.length})`, 'MISSION');
+            const batch = writeBatch(db);
+            selectedVehicles.forEach(vehId => batch.update(publicDoc('vehicles', vehId), { status: 'MISSION', missionId: missionRef.id }));
+            await batch.commit();
+            addLog(`Mission: ${name} (${selectedVehicles.length} veh)`, 'MISSION');
             toggleModal('mission-modal');
         };
 
@@ -585,15 +623,14 @@
             const leaderEl = document.getElementById('detail-mission-leader');
             const vehiclesEl = document.getElementById('detail-mission-vehicles');
             const actionsEl = document.getElementById('sl-mission-actions');
+            const leaderActionsEl = document.getElementById('leader-mission-actions');
+            
             modal.classList.remove('hidden');
             vehiclesEl.innerHTML = '<div class="text-center animate-pulse mt-4">CHARGEMENT...</div>';
 
+            // SL Actions
             if (userRole === 'SL') {
-                actionsEl.innerHTML = `
-                    <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-green-900/50">
-                        <button onclick="closeMission('${missionId}', 'COMPLETED')" class="btn-tac bg-green-900/40 hover:bg-green-500 py-3 rounded font-bold">ACCOMPLIE</button>
-                        <button onclick="closeMission('${missionId}', 'CANCELLED')" class="btn-tac border-red-500 text-red-500 hover:bg-red-900/50 py-3 rounded font-bold">ANNULER</button>
-                    </div>`;
+                actionsEl.innerHTML = `<div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-green-900/50"><button onclick="closeMission('${missionId}', 'COMPLETED')" class="btn-tac bg-green-900/40 hover:bg-green-500 py-3 rounded font-bold">ACCOMPLIE</button><button onclick="closeMission('${missionId}', 'CANCELLED')" class="btn-tac border-red-500 text-red-500 hover:bg-red-900/50 py-3 rounded font-bold">ANNULER</button></div>`;
                 actionsEl.classList.remove('hidden');
             } else { actionsEl.classList.add('hidden'); }
 
@@ -601,16 +638,35 @@
                 if(!doc.exists()) return closeMissionDetails();
                 const data = doc.data();
                 titleEl.innerText = data.name;
+                const isLeader = data.leaderId === currentUserId;
+
+                // LEADER GLOBAL ACTIONS
+                if (isLeader) {
+                    leaderActionsEl.innerHTML = `
+                        <div class="grid grid-cols-2 gap-2 mb-4 border-b border-green-900/50 pb-4">
+                            <button onclick="sendGlobalCitrep('${data.name}')" class="btn-tac border-blue-500 text-blue-300 py-2 text-sm"><i class="fas fa-globe mr-2"></i>CITREP GLOBAL</button>
+                            <button onclick="requestGlobalRTB('${data.name}')" class="btn-tac border-orange-500 text-orange-300 py-2 text-sm"><i class="fas fa-undo mr-2"></i>RTB GLOBAL</button>
+                        </div>
+                    `;
+                    leaderActionsEl.classList.remove('hidden');
+                } else {
+                    leaderActionsEl.classList.add('hidden');
+                }
+
                 leaderEl.innerHTML = data.leaderName 
                     ? `<div class="text-xs text-gray-500 mb-1">CHEF</div><div class="text-xl font-bold text-green-400 border border-green-500/50 p-2 rounded bg-green-900/20 text-center"><i class="fas fa-crown mr-2 text-yellow-500"></i>${data.leaderName}</div>` 
                     : `<div class="text-xs text-gray-500 mb-1">COMMANDEMENT</div><button onclick="volunteerForMission('${doc.id}')" class="w-full py-3 border border-yellow-500 text-yellow-500 bg-yellow-900/20 animate-pulse font-bold rounded">SE PROPOSER</button>`;
-            });
-
-            unsubMissionVehicles = onSnapshot(publicPath('vehicles'), (snap) => {
-                vehiclesEl.innerHTML = '';
-                snap.forEach(doc => {
-                    const data = doc.data();
-                    if(data.missionId === missionId) vehiclesEl.appendChild(createVehicleCard(doc.id, data));
+                
+                // Refresh vehicles with mission context
+                if(unsubMissionVehicles) unsubMissionVehicles(); // avoid double sub
+                unsubMissionVehicles = onSnapshot(publicPath('vehicles'), (snap) => {
+                    vehiclesEl.innerHTML = '';
+                    snap.forEach(vDoc => {
+                        if(vDoc.data().missionId === missionId) {
+                            // Pass Context: true, IsLeader: isLeader
+                            vehiclesEl.appendChild(createVehicleCard(vDoc.id, vDoc.data(), true, isLeader));
+                        }
+                    });
                 });
             });
         };
@@ -630,7 +686,7 @@
 
         window.closeMission = async (missionId, reason) => {
             if (userRole !== 'SL') return;
-            if (!confirm("Confirmer ? (Les véhicules repasseront OPS)")) return;
+            if (!confirm("Confirmer ?")) return;
             const vehQuery = query(publicPath('vehicles'), where('missionId', '==', missionId));
             const vehSnap = await getDocs(vehQuery);
             const batch = writeBatch(db);
@@ -660,8 +716,22 @@
             });
         }
 
-        window.sendCitrep = async (m) => { const t = prompt("Message:"); if(t) addLog(`[CITREP ${m}] ${t}`, 'RADIO', true); };
+        // LEADER / GLOBAL ACTIONS
+        window.sendGlobalCitrep = async (mName) => {
+            const t = prompt("Message CITREP GLOBAL pour l'ensemble de la mission :");
+            if(t) addLog(`[CITREP GLOBAL // ${mName}] ${t}`, 'MISSION', true);
+        };
+        window.requestGlobalRTB = async (mName) => {
+            if(confirm("Ordonner le retour base (RTB) pour TOUTE la mission ?")) {
+                addLog(`[ORDRE RTB GLOBAL // ${mName}] RETOUR BASE IMMÉDIAT DEMANDÉ`, 'MISSION', true);
+            }
+        };
+        
+        // UNIT ACTIONS
+        window.sendCitrep = async (unitName) => { const t = prompt(`CITREP pour ${unitName} :`); if(t) addLog(`[CITREP ${unitName}] ${t}`, 'RADIO', true); };
+        window.requestVehRTB = (unitName) => addLog(`ORDRE RTB POUR ${unitName}`, 'RADIO', true);
         window.requestRTB = () => addLog(`DEMANDE DE RTB POUR ${userPseudo}`, 'RADIO', true);
+
         window.toggleModal = (id) => document.getElementById(id).classList.toggle('hidden');
         window.toggleSidebar = () => {
             const s = document.getElementById('sidebar'), b = document.getElementById('sidebar-backdrop');
@@ -801,7 +871,7 @@
             <div class="mt-auto border-t border-green-900/50 bg-black/40">
                 <div id="sl-controls" class="p-4 hidden space-y-2">
                     <button onclick="openMissionModal()" class="btn-tac w-full py-3 text-sm font-bold rounded flex items-center justify-center gap-2"><i class="fas fa-plus-circle"></i> CRÉER MISSION</button>
-                    <button onclick="toggleModal('roster-modal')" class="btn-tac w-full py-3 text-sm font-bold rounded flex items-center justify-center gap-2"><i class="fas fa-users"></i> GÉRER ROSTER</button>
+                    <button onclick="toggleModal('roster-modal')" class="btn-tac w-full py-3 text-sm font-bold rounded flex items-center justify-center gap-2"><i class="fas fa-users"></i> GÉRER LES LOGISTICIENS</button>
                 </div>
                  <div id="log-controls" class="p-4 hidden">
                     <button onclick="requestRTB()" class="btn-tac w-full py-3 text-sm border-orange-500 text-orange-500 active:bg-orange-500 active:text-black font-bold rounded flex items-center justify-center gap-2"><i class="fas fa-home"></i> DEMANDER RTB</button>
@@ -831,11 +901,21 @@
                 <!-- KPI SCROLLABLE CONTAINER -->
                 <div class="flex-1 overflow-x-auto no-scrollbar mx-2 mask-gradient">
                     <div class="flex gap-4 md:gap-8 text-sm font-mono min-w-max px-2 items-center h-full py-1">
-                        <div class="flex flex-col items-center">
-                            <span class="text-[9px] text-gray-500 uppercase">Supply</span>
-                            <span id="supply-count" class="text-xl font-bold text-white text-glow">0</span>
+                        
+                        <!-- SUPPLY CLICKABLE -->
+                        <div onclick="openSupplyModal()" class="flex flex-col items-center cursor-pointer hover:bg-green-900/20 rounded px-2 transition-colors group">
+                            <span class="text-[9px] text-gray-500 uppercase group-hover:text-green-400">Supply</span>
+                            <span id="supply-count" class="text-xl font-bold text-white text-glow group-hover:text-green-300">0</span>
                         </div>
                         <div class="w-px bg-green-900/50 h-6"></div>
+
+                        <!-- EFFECTIFS (NEW) -->
+                        <div class="flex flex-col items-center">
+                            <span class="text-[9px] text-gray-500 uppercase">Effectifs</span>
+                            <span class="text-lg font-bold text-green-400"><span id="stat-log-count">0/0</span></span>
+                        </div>
+                        <div class="w-px bg-green-900/50 h-6"></div>
+
                         <div class="flex flex-col items-center">
                             <span class="text-[9px] text-gray-500 uppercase">Total</span>
                             <span class="text-lg font-bold text-green-400"><span id="stat-total-veh">0</span></span>
@@ -897,34 +977,47 @@
             <h3 class="text-xl font-bold text-green-500 mb-4 border-b border-green-900 pb-2 flex items-center gap-2"><i class="fas fa-warehouse"></i> GARAGE CENTRAL</h3>
             
             <div class="space-y-4">
-                <div>
-                    <label class="text-xs text-gray-400 block mb-1">TYPE DE VÉHICULE</label>
-                    <div class="relative">
-                         <select id="new-veh-type" class="w-full bg-black border border-green-700 p-3 text-white appearance-none rounded">
-                            <option value="LOGI">CAMION LOGISTIQUE (300s)</option>
-                            <option value="JEEP">JEEP LEGÈRE (100s)</option>
-                            <option value="TRANSPORT">CAMION TRANSPORT (200s)</option>
-                            <option value="BLINDE">BLINDÉ LÉGER (600s)</option>
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-green-500">
-                            <i class="fas fa-chevron-down text-xs"></i>
+                <!-- Create Vehicle Form -->
+                <div class="bg-green-900/10 p-3 rounded border border-green-900/30">
+                    <div class="text-xs text-green-400 mb-2 font-bold uppercase">Nouveau Véhicule</div>
+                    <div class="space-y-2">
+                        <div class="relative">
+                             <select id="new-veh-type" class="w-full bg-black border border-green-700 p-3 text-white appearance-none rounded">
+                                <option value="LOGI">CAMION LOGISTIQUE (300s)</option>
+                                <option value="JEEP">JEEP LEGÈRE (100s)</option>
+                                <option value="TRANSPORT">CAMION TRANSPORT (200s)</option>
+                                <option value="BLINDE">BLINDÉ LÉGER (600s)</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-green-500"><i class="fas fa-chevron-down text-xs"></i></div>
                         </div>
-                    </div>
-                </div>
-                <div>
-                    <label class="text-xs text-gray-400 block mb-1">NOM DE CODE</label>
-                    <input id="new-veh-name" type="text" class="w-full bg-black border border-green-700 p-3 text-white uppercase rounded" placeholder="EX: ALPHA-1">
-                </div>
-
-                <div class="pt-4 border-t border-green-900/50 mt-4 bg-green-900/10 p-3 rounded">
-                    <p class="text-[10px] text-gray-500 mb-2 font-bold uppercase">Ravitaillement Rapide</p>
-                    <div class="grid grid-cols-2 gap-3">
-                        <button onclick="addSupply(500)" class="border border-green-800 p-2 text-xs active:bg-green-900 rounded font-bold">+500 SUPPLY</button>
-                        <button onclick="addSupply(1000)" class="border border-green-800 p-2 text-xs active:bg-green-900 rounded font-bold">+1000 SUPPLY</button>
+                        <input id="new-veh-name" type="text" class="w-full bg-black border border-green-700 p-3 text-white uppercase rounded" placeholder="NOM DE CODE (EX: ALPHA-1)">
+                        <button onclick="createVehicle()" class="btn-tac w-full py-3 mt-2 font-bold rounded shadow-lg">SORTIR DU GARAGE</button>
                     </div>
                 </div>
 
-                <button onclick="createVehicle()" class="btn-tac w-full py-4 mt-2 font-bold rounded shadow-lg">SORTIR DU GARAGE</button>
+                <div class="pt-4 border-t border-green-900/50 mt-4">
+                    <button onclick="openSupplyModal()" class="w-full py-3 border border-green-600 text-green-400 hover:bg-green-600 hover:text-black rounded font-bold flex justify-center items-center gap-2">
+                        <i class="fas fa-boxes"></i> GESTION LOGISTIQUE & STOCKS
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: SUPPLY MANAGEMENT (NEW) -->
+    <div id="supply-modal" class="modal-bg fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div class="hud-panel w-full max-w-md p-6 relative rounded shadow-2xl h-[80vh] flex flex-col">
+            <button onclick="toggleModal('supply-modal')" class="absolute top-3 right-3 text-green-500 p-2 active:text-white"><i class="fas fa-times text-xl"></i></button>
+            <h3 class="text-xl font-bold text-green-500 mb-4 border-b border-green-900 pb-2 flex items-center gap-2"><i class="fas fa-boxes"></i> LOGISTIQUE & STOCKS</h3>
+            
+            <div class="flex-1 flex flex-col min-h-0">
+                <div id="depots-list" class="flex-1 overflow-y-auto space-y-2 pr-1 -webkit-overflow-scrolling-touch">
+                    <!-- Dynamic List -->
+                </div>
+                
+                <div class="pt-4 border-t border-green-900/50 mt-2">
+                    <button onclick="createDepot()" class="btn-tac w-full py-3 font-bold rounded"><i class="fas fa-plus-circle mr-2"></i> AJOUTER UN LIEU DE STOCKAGE</button>
+                </div>
             </div>
         </div>
     </div>
@@ -933,11 +1026,11 @@
     <div id="roster-modal" class="modal-bg fixed inset-0 z-50 hidden flex items-center justify-center p-4">
         <div class="hud-panel w-full max-w-md p-6 relative rounded shadow-2xl h-[80vh] flex flex-col">
             <button onclick="toggleModal('roster-modal')" class="absolute top-3 right-3 text-green-500 p-2 active:text-white"><i class="fas fa-times text-xl"></i></button>
-            <h3 class="text-xl font-bold text-green-500 mb-4 border-b border-green-900 pb-2 flex items-center gap-2"><i class="fas fa-users-cog"></i> GESTION PERSONNEL</h3>
+            <h3 class="text-xl font-bold text-green-500 mb-4 border-b border-green-900 pb-2 flex items-center gap-2"><i class="fas fa-users-cog"></i> GESTION LOGISTICIENS</h3>
             
             <div class="flex-1 flex flex-col min-h-0">
                 <div class="flex justify-between text-xs text-gray-400 mb-2 items-center">
-                    <span>ENREGISTRÉS: <span id="stat-log-count" class="text-white font-bold">0</span></span>
+                    <span>ENREGISTRÉS: <span id="stat-log-count-modal" class="text-white font-bold">0</span></span>
                     <button onclick="addToRoster()" class="text-green-900 bg-green-500 hover:bg-green-400 px-3 py-2 rounded font-bold shadow-lg shadow-green-500/20 active:translate-y-0.5 transition-all"><i class="fas fa-plus mr-1"></i> AJOUTER</button>
                 </div>
                 <div id="sl-roster-list" class="flex-1 bg-black/50 border border-green-900 p-2 overflow-y-auto space-y-1 rounded -webkit-overflow-scrolling-touch">
@@ -982,8 +1075,11 @@
                     <div class="text-[10px] text-gray-500 uppercase tracking-widest">Dossier de Mission</div>
                     <h3 id="detail-mission-name" class="text-2xl md:text-3xl font-bold text-green-500 uppercase">--</h3>
                 </div>
-                <div id="detail-mission-leader" class="w-full md:w-auto">
-                    <!-- Leader Info or "Take Command" button goes here -->
+                
+                <!-- Leader Info / Global Actions Area -->
+                <div class="w-full md:w-auto flex flex-col md:items-end gap-2">
+                    <div id="detail-mission-leader"></div>
+                    <div id="leader-mission-actions" class="hidden w-full md:w-auto"></div>
                 </div>
             </div>
 
