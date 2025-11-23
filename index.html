@@ -19,7 +19,7 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, collection, doc, setDoc, getDoc, updateDoc, 
             onSnapshot, deleteDoc, serverTimestamp, query, orderBy, addDoc, where, getDocs, writeBatch 
@@ -48,11 +48,12 @@
         let userPseudo = null;
         let userGrade = null;
         let currentUserId = null;
-        let lastNotificationTime = 0; // To track new alerts
+        let lastNotificationTime = 0; 
         
         // Listeners cleanups
         let unsubMissionDetails = null;
         let unsubMissionVehicles = null;
+        let unsubGlobalSettings = null;
 
         // --- UTILS ---
         const formatTime = (date) => {
@@ -97,8 +98,6 @@
                 currentUserId = user.uid;
                 console.log("System Connected. UID:", currentUserId);
                 checkAppState();
-            } else {
-                console.log("Waiting for auth...");
             }
         });
 
@@ -106,7 +105,9 @@
 
         function checkAppState() {
             // Listen to Global Settings
-            onSnapshot(publicDoc('settings', 'global'), (docSnap) => {
+            if (unsubGlobalSettings) unsubGlobalSettings();
+            
+            unsubGlobalSettings = onSnapshot(publicDoc('settings', 'global'), (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     safeSetText('supply-count', data.supply || 0);
@@ -115,116 +116,104 @@
                     if (headerSlEl && data.slName) {
                         headerSlEl.innerText = `CMD: ${data.slName}`;
                     }
+
+                    // GLOBAL SERVICE END CHECK
+                    // If service is inactive AND I am currently logged in (role is set), kick me out
+                    if (data.serviceStatus === 'ENDED' && userRole) {
+                        forceLogout("FIN DE SERVICE ORDONNÉE PAR LE COMMANDEMENT");
+                    }
+
                 } else {
                     // Create if not exists (fail-safe)
-                    setDoc(publicDoc('settings', 'global'), { supply: 1000, slSessionId: null, slName: 'AUCUN' }).catch(console.error);
+                    setDoc(publicDoc('settings', 'global'), { supply: 1000, slSessionId: null, slName: 'AUCUN', serviceStatus: 'ACTIVE' }).catch(console.error);
                 }
             });
 
+            // Only load UI if we have a role locally defined (logged in via app flow)
             if (userRole) {
                 loadInterface();
             } else {
-                const authScreen = document.getElementById('auth-screen');
-                if(authScreen) authScreen.classList.remove('hidden');
+                document.getElementById('auth-screen').classList.remove('hidden');
             }
         }
 
-        // Modified addLog to handle Priority
         async function addLog(message, type = 'INFO', isPriority = false) {
             if (!currentUserId) return;
             try {
-                // We keep logs for historical data if needed, but UI is unified
                 await addDoc(publicPath('logs'), {
                     message: message,
                     type: type,
                     timestamp: serverTimestamp()
                 });
-                
-                // Notifications feed
                 await addDoc(publicPath('notifications'), {
                     message: message,
                     type: type,
                     timestamp: serverTimestamp(),
                     read: false,
                     isPriority: isPriority,
-                    senderName: `${userGrade} ${userPseudo}` // Useful for alert context
+                    senderName: `${userGrade} ${userPseudo}`
                 });
-            } catch (e) {
-                console.error("Log error:", e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         // --- ACTIONS ---
+        
+        // 1. Login SL
         window.loginSL = async () => {
-            if (!currentUserId) return alert("Connexion au réseau en cours... Veuillez patienter.");
+            if (!currentUserId) return alert("Connexion au réseau en cours...");
             
             const pseudo = document.getElementById('sl-pseudo').value.toUpperCase();
             const grade = document.getElementById('sl-grade').value;
-
             if (!pseudo) return alert("Pseudo requis");
 
             try {
                 const globalSnap = await getDoc(publicDoc('settings', 'global'));
                 const globalData = globalSnap.data();
 
-                if (globalData && globalData.slSessionId && globalData.slSessionId !== currentUserId) {
-                    if(!confirm(`⚠️ ALERTE SÉCURITÉ ⚠️\n\nLe Squad Leader ${globalData.slName} est déjà en poste.\n\nÊtes-vous certain de vouloir prendre le commandement et écraser sa session ?`)) {
-                        return;
-                    }
+                if (globalData && globalData.slSessionId && globalData.slSessionId !== currentUserId && globalData.serviceStatus === 'ACTIVE') {
+                    if(!confirm(`⚠️ ALERTE\n\nLe SL ${globalData.slName} est déjà en poste.\n\nÉcraser sa session ?`)) return;
                 }
 
+                // Start Service
                 await setDoc(publicDoc('settings', 'global'), {
                     slSessionId: currentUserId,
                     slName: `${grade} ${pseudo}`,
+                    serviceStatus: 'ACTIVE', // START SERVICE
                     lastLogin: serverTimestamp()
                 }, { merge: true });
 
                 await setDoc(publicDoc('users', currentUserId), {
-                    pseudo: pseudo,
-                    grade: grade,
-                    role: 'SL',
-                    isOnline: true,
-                    lastActive: serverTimestamp()
+                    pseudo: pseudo, grade: grade, role: 'SL', isOnline: true, lastActive: serverTimestamp()
                 });
 
-                userRole = 'SL';
-                userPseudo = pseudo;
-                userGrade = grade;
-
-                // Mark current time to avoid showing alerts from before login
+                userRole = 'SL'; userPseudo = pseudo; userGrade = grade;
                 lastNotificationTime = Date.now();
 
-                addLog(`PRISE DE SERVICE SL: ${grade} ${pseudo}`, 'CMD');
+                addLog(`DÉBUT DE SERVICE SL: ${grade} ${pseudo}`, 'CMD', true);
                 document.getElementById('auth-screen').classList.add('hidden');
                 loadInterface();
 
-            } catch (error) {
-                console.error("Login SL Error:", error);
-                alert("Erreur lors de la prise de service. Vérifiez la console.");
-            }
+            } catch (error) { console.error(error); alert("Erreur login SL"); }
         };
 
+        // 2. Login LOG
         window.showLogLogin = async () => {
             document.getElementById('login-sl-form').classList.add('hidden');
             document.getElementById('login-log-form').classList.remove('hidden');
-
             const rosterDiv = document.getElementById('roster-list-login');
-            rosterDiv.innerHTML = '<div class="text-center animate-pulse py-4">CHARGEMENT DU ROSTER...</div>';
+            rosterDiv.innerHTML = '<div class="text-center animate-pulse py-4">CHARGEMENT...</div>';
 
             onSnapshot(publicPath('roster'), (snapshot) => {
                 rosterDiv.innerHTML = '';
                 if(snapshot.empty) {
-                    rosterDiv.innerHTML = '<div class="text-red-500 text-center py-4">Aucun logisticien enregistré.</div>';
+                    rosterDiv.innerHTML = '<div class="text-red-500 text-center py-4">Aucun effectif.</div>';
                     return;
                 }
                 snapshot.forEach(doc => {
                     const data = doc.data();
                     const btn = document.createElement('button');
                     btn.className = "w-full text-left border border-green-900 bg-gray-900/50 active:bg-green-900/30 p-4 mb-2 rounded flex justify-between items-center group transition-all touch-manipulation";
-                    btn.innerHTML = `
-                        <span class="font-bold text-green-400 text-lg">${data.grade} ${data.pseudo}</span>
-                        <i class="fas fa-sign-in-alt text-green-600"></i>
-                    `;
+                    btn.innerHTML = `<span class="font-bold text-green-400 text-lg">${data.grade} ${data.pseudo}</span><i class="fas fa-sign-in-alt text-green-600"></i>`;
                     btn.onclick = () => loginLOG(doc.id, data.pseudo, data.grade);
                     rosterDiv.appendChild(btn);
                 });
@@ -232,37 +221,53 @@
         };
 
         window.loginLOG = async (rosterId, pseudo, grade) => {
-            if (!currentUserId) return alert("Connexion au réseau en cours...");
+            if (!currentUserId) return alert("Connexion...");
+            
+            // Check if service is active first
+            const globalSnap = await getDoc(publicDoc('settings', 'global'));
+            if (globalSnap.exists() && globalSnap.data().serviceStatus === 'ENDED') {
+                return alert("AUCUN SERVICE EN COURS. ATTENDEZ LE SQUAD LEADER.");
+            }
 
             try {
                 await setDoc(publicDoc('users', currentUserId), {
-                    pseudo: pseudo,
-                    grade: grade,
-                    role: 'LOG',
-                    rosterId: rosterId,
-                    isOnline: true,
-                    currentVehicle: null,
-                    lastActive: serverTimestamp()
+                    pseudo: pseudo, grade: grade, role: 'LOG', rosterId: rosterId, isOnline: true, currentVehicle: null, lastActive: serverTimestamp()
                 });
-
-                userRole = 'LOG';
-                userPseudo = pseudo;
-                userGrade = grade;
+                userRole = 'LOG'; userPseudo = pseudo; userGrade = grade;
                 lastNotificationTime = Date.now();
 
-                addLog(`CONNEXION LOGISTICIEN: ${grade} ${pseudo}`, 'CONNECT');
+                addLog(`CONNEXION: ${grade} ${pseudo}`, 'CONNECT');
                 document.getElementById('auth-screen').classList.add('hidden');
                 loadInterface();
-            } catch (error) {
-                console.error("Login LOG Error:", error);
-                alert("Erreur de connexion.");
+            } catch (error) { console.error(error); alert("Erreur login LOG"); }
+        };
+
+        // 3. Disconnect & End Service
+        window.logoutSelf = async () => {
+            if(confirm("Confirmer la déconnexion ?")) {
+                addLog(`${userGrade} ${userPseudo} S'EST DÉCONNECTÉ`, 'CONNECT');
+                location.reload(); // Simple reload to reset state
             }
         };
 
+        window.endServiceGlobal = async () => {
+            if(!confirm("⚠️ ATTENTION ⚠️\n\nVous allez terminer le service pour TOUS les utilisateurs connectés.\n\nContinuer ?")) return;
+
+            await updateDoc(publicDoc('settings', 'global'), {
+                serviceStatus: 'ENDED'
+            });
+            addLog("FIN DE SERVICE GÉNÉRALE", "CMD", true);
+            // Triggers auto-logout via listener for everyone
+        };
+
+        function forceLogout(reason) {
+            alert(reason);
+            location.reload();
+        }
+
         function loadInterface() {
             const ui = document.getElementById('main-interface');
-            if(ui) ui.classList.remove('hidden');
-            
+            ui.classList.remove('hidden');
             safeSetText('user-identity', `${userGrade} ${userPseudo}`);
             safeSetText('user-badge', userRole);
 
@@ -273,54 +278,46 @@
             const slControls = document.getElementById('sl-controls');
             const logControls = document.getElementById('log-controls');
             const garageBtn = document.getElementById('garage-btn');
+            const endServiceBtn = document.getElementById('btn-end-service');
 
             if (userRole === 'SL') {
                 setupSLInterface();
-                if(slControls) slControls.classList.remove('hidden');
-                if(logControls) logControls.classList.add('hidden');
-                if(garageBtn) garageBtn.classList.remove('hidden'); // Show Garage for SL
+                slControls.classList.remove('hidden');
+                logControls.classList.add('hidden');
+                garageBtn.classList.remove('hidden');
+                endServiceBtn.classList.remove('hidden'); // SL Only
             } else {
-                if(slControls) slControls.classList.add('hidden');
-                if(logControls) logControls.classList.remove('hidden');
-                if(garageBtn) garageBtn.classList.add('hidden'); // Hide Garage for LOG
+                slControls.classList.add('hidden');
+                logControls.classList.remove('hidden');
+                garageBtn.classList.add('hidden');
+                endServiceBtn.classList.add('hidden');
             }
         }
 
-        // --- NOTIFICATIONS, LIVE FEED & ALERTS ---
+        // --- NOTIFICATIONS & ALERTS ---
         function setupNotifications() {
             const feed = document.getElementById('notif-feed');
             const q = publicPath('notifications');
-            
-            // We use onSnapshot with docChanges to detect NEW additions for alerts
             onSnapshot(q, (snapshot) => {
-                // 1. Alert Logic (Only for SL)
                 if (userRole === 'SL') {
                     snapshot.docChanges().forEach((change) => {
                         if (change.type === "added") {
                             const data = change.doc.data();
-                            // Check if priority AND if the timestamp is recent (after login) to avoid re-alerting old stuff
                             const msgTime = getMillis(data.timestamp);
-                            
                             if (data.isPriority && msgTime > lastNotificationTime) {
-                                // Trigger Alert Modal
                                 showAlertModal(data.type, data.message, data.senderName);
                             }
                         }
                     });
                 }
-
-                // 2. Feed Logic (Render List)
                 if(!feed) return;
                 feed.innerHTML = '';
                 let docs = snapshot.docs.map(doc => doc.data());
                 docs.sort((a, b) => getMillis(b.timestamp) - getMillis(a.timestamp));
-
                 docs.slice(0, 50).forEach(data => {
                     const div = document.createElement('div');
-                    // Styling priority messages differently
                     const priorityClass = data.isPriority ? "border-l-4 border-l-red-500 bg-red-900/10" : "border-green-900/50";
                     const textClass = data.isPriority ? "text-red-300" : "text-green-300";
-                    
                     div.className = `text-xs border-b p-2 font-mono break-words ${priorityClass} ${textClass}`;
                     div.innerHTML = `<span class="opacity-50">[${formatTime(data.timestamp)}]</span> <span class="font-bold">${data.type}:</span> ${data.message}`;
                     feed.appendChild(div);
@@ -333,14 +330,9 @@
             document.getElementById('alert-title').innerText = `ALERTE : ${title}`;
             document.getElementById('alert-message').innerText = message;
             document.getElementById('alert-sender').innerText = sender || "INCONNU";
-            
             modal.classList.remove('hidden');
-            // Play sound effect here if needed
         };
-
-        window.closeAlertModal = () => {
-            document.getElementById('alert-modal').classList.add('hidden');
-        };
+        window.closeAlertModal = () => document.getElementById('alert-modal').classList.add('hidden');
 
         // --- VEHICLE MANAGEMENT ---
         function setupVehiclesListener() {
@@ -349,17 +341,14 @@
                 if(!container) return;
                 container.innerHTML = '';
                 let stats = { total: 0, ops: 0, mission: 0, repair: 0, destroyed: 0 };
-
                 snapshot.forEach(doc => {
                     const data = doc.data();
                     const id = doc.id;
-                    
                     stats.total++;
                     if(data.status === 'OPS') stats.ops++;
                     if(data.status === 'MISSION') stats.mission++;
                     if(data.status === 'REPAIR') stats.repair++;
                     if(data.status === 'DESTROYED') stats.destroyed++;
-
                     container.appendChild(createVehicleCard(id, data));
                 });
                 updateDashboardStats(stats);
@@ -404,8 +393,11 @@
                 
                 let icon = role === 'driver' ? 'fa-steering-wheel' : (role === 'copilot' ? 'fa-map' : 'fa-crosshairs');
                 
+                // If I am in the seat, highlight it
+                const isMe = occupant && occupant.uid === currentUserId;
+                
                 seatBtn.className = `p-2 text-xs border rounded flex flex-col items-center justify-center h-16 active:scale-95 transition-transform touch-manipulation
-                    ${occupant ? 'bg-green-900/60 border-green-500 text-green-300' : 'bg-gray-800 border-gray-700 text-gray-500 hover:border-green-500'}`;
+                    ${isMe ? 'bg-green-500 border-white text-black font-bold shadow-lg' : (occupant ? 'bg-green-900/60 border-green-500 text-green-300' : 'bg-gray-800 border-gray-700 text-gray-500 hover:border-green-500')}`;
                 
                 seatBtn.innerHTML = `
                     <i class="fas ${icon} mb-1 text-base"></i>
@@ -420,7 +412,6 @@
             });
             div.appendChild(seatsContainer);
 
-            // SL ACTIONS - Only visible to SL
             if (userRole === 'SL') {
                 const actions = document.createElement('div');
                 actions.className = "mt-auto pt-2 border-t border-gray-700 grid grid-cols-2 gap-2 text-xs";
@@ -434,28 +425,33 @@
                     `;
                 } else {
                     actions.innerHTML = `
-                         <button onclick="deleteVehicle('${id}')" class="${btnClass} border-red-900 text-red-900 hover:bg-red-900 hover:text-white col-span-2">SUPPRIMER L'ÉPAVE</button>
+                         <button onclick="deleteVehicle('${id}')" class="${btnClass} border-red-900 text-red-900 hover:bg-red-900 hover:text-white col-span-2">ARCHIVER ÉPAVE</button>
                     `;
                 }
                 div.appendChild(actions);
             }
-
             return div;
         }
 
         window.handleSeatClick = async (vehId, vehData, seatRole) => {
             if(!currentUserId) return;
             const currentSeat = vehData.seats[seatRole];
+            
+            // GET OUT
             if (currentSeat && currentSeat.uid === currentUserId) {
                 const newSeats = { ...vehData.seats, [seatRole]: null };
                 await updateDoc(publicDoc('vehicles', vehId), { seats: newSeats });
                 addLog(`${userPseudo} est descendu de ${vehData.name} (${seatRole})`);
                 return;
             }
+            
+            // ALREADY OCCUPIED
             if (currentSeat) {
                 alert(`Place occupée par ${currentSeat.name}`);
                 return;
             }
+            
+            // GET IN
             const newSeats = { ...vehData.seats, [seatRole]: { uid: currentUserId, name: userPseudo } };
             await updateDoc(publicDoc('vehicles', vehId), { seats: newSeats });
             addLog(`${userPseudo} est monté dans ${vehData.name} (${seatRole})`);
@@ -463,386 +459,214 @@
 
         window.setVehicleStatus = async (id, status) => {
             if(!currentUserId) return;
-            await updateDoc(publicDoc('vehicles', id), { status: status });
-            addLog(`Véhicule passé en ${status}`, 'VEHICULE');
+            
+            // AUTO-EJECT LOGIC ON DESTROY
+            let updateData = { status: status };
+            
+            if (status === 'DESTROYED') {
+                if(confirm("Confirmer la DESTRUCTION du véhicule ? Cela éjectera tous les passagers.")) {
+                    updateData.seats = { driver: null, copilot: null, gunner: null }; // Clear seats
+                    addLog(`VÉHICULE ${id} DÉTRUIT - ÉVACUATION IMMÉDIATE`, 'ALERTE', true);
+                } else {
+                    return;
+                }
+            } else {
+                addLog(`Véhicule passé en ${status}`, 'VEHICULE');
+            }
+
+            await updateDoc(publicDoc('vehicles', id), updateData);
         };
 
         window.deleteVehicle = async (id) => {
             if(!currentUserId) return;
-            if(confirm('Supprimer définitivement ce véhicule ?')) {
+            if(confirm('Archiver ce véhicule détruit (le retirer du tableau) ?')) {
                 await deleteDoc(publicDoc('vehicles', id));
+                addLog("Véhicule détruit archivé.", "ADMIN");
             }
         };
 
-        // --- SL LOGIC ---
+        // --- SL LOGIC & REST ---
         window.createVehicle = async () => {
             if(!currentUserId) return;
-            if(userRole !== 'SL') return alert("Seul le Squad Leader peut sortir des véhicules.");
-
+            if(userRole !== 'SL') return alert("Interdit");
             const typeEl = document.getElementById('new-veh-type');
             const nameEl = document.getElementById('new-veh-name');
-            if(!typeEl || !nameEl) return;
-
-            const type = typeEl.value;
-            const name = nameEl.value;
-            const costs = { 'LOGI': 300, 'JEEP': 100, 'TRANSPORT': 200, 'BLINDE': 600 };
-            const cost = costs[type];
-
+            const cost = { 'LOGI': 300, 'JEEP': 100, 'TRANSPORT': 200, 'BLINDE': 600 }[typeEl.value];
             const globalSnap = await getDoc(publicDoc('settings', 'global'));
             const currentSupply = globalSnap.data()?.supply || 0;
 
-            if (currentSupply < cost) {
-                alert("Supply insuffisant !");
-                return;
-            }
+            if (currentSupply < cost) return alert("Supply insuffisant");
 
             await setDoc(publicDoc('settings', 'global'), { supply: currentSupply - cost }, {merge: true});
             await addDoc(publicPath('vehicles'), {
-                name: name || `${type}-${Math.floor(Math.random()*100)}`,
-                category: type,
-                cost: cost,
-                status: 'OPS',
-                missionId: null,
-                seats: { driver: null, copilot: null, gunner: null },
-                createdAt: serverTimestamp()
+                name: nameEl.value || `${typeEl.value}-${Math.floor(Math.random()*100)}`,
+                category: typeEl.value, cost: cost, status: 'OPS', missionId: null,
+                seats: { driver: null, copilot: null, gunner: null }, createdAt: serverTimestamp()
             });
-
-            addLog(`Véhicule sorti du garage: ${type} (-${cost} supply)`, 'LOGISTICS');
+            addLog(`Véhicule sorti: ${typeEl.value}`, 'LOGISTICS');
             toggleModal('garage-modal');
         };
 
         window.addToRoster = async () => {
-            if(!currentUserId) return;
-            const pseudo = prompt("Pseudo du logisticien:");
-            if(!pseudo) return;
-            const grade = prompt("Grade (ex: Sdt, Cpl):", "Sdt");
-
-            await addDoc(publicPath('roster'), {
-                pseudo: pseudo,
-                grade: grade,
-                addedAt: serverTimestamp()
-            });
-            addLog(`Ajout au roster: ${grade} ${pseudo}`, 'ADMIN');
+            const pseudo = prompt("Pseudo:"); if(!pseudo) return;
+            const grade = prompt("Grade:", "Sdt");
+            await addDoc(publicPath('roster'), { pseudo, grade, addedAt: serverTimestamp() });
+            addLog(`Ajout roster: ${grade} ${pseudo}`, 'ADMIN');
         };
 
         function setupSLInterface() {
             const list = document.getElementById('sl-roster-list');
             if(!list) return;
-
             onSnapshot(publicPath('roster'), (snap) => {
                 list.innerHTML = '';
                 snap.forEach(doc => {
                     const d = doc.data();
                     const div = document.createElement('div');
                     div.className = "flex justify-between items-center text-sm p-3 border-b border-green-900/30";
-                    div.innerHTML = `
-                        <span class="text-green-300 font-bold">${d.grade} ${d.pseudo}</span> 
-                        <button class="text-red-500 p-2" onclick="removeFromRoster('${doc.id}')"><i class="fas fa-trash"></i></button>
-                    `;
+                    div.innerHTML = `<span class="text-green-300 font-bold">${d.grade} ${d.pseudo}</span><button class="text-red-500 p-2" onclick="removeFromRoster('${doc.id}')"><i class="fas fa-trash"></i></button>`;
                     list.appendChild(div);
                 });
                 safeSetText('stat-log-count', snap.size);
             });
         }
-
-        window.removeFromRoster = async(id) => {
-            if(confirm('Retirer du roster ?')) await deleteDoc(publicDoc('roster', id));
-        };
-
+        window.removeFromRoster = async(id) => { if(confirm('Retirer ?')) await deleteDoc(publicDoc('roster', id)); };
         window.addSupply = async (amount) => {
-            if(!currentUserId) return;
-            const globalSnap = await getDoc(publicDoc('settings', 'global'));
-            const current = globalSnap.data()?.supply || 0;
-            await setDoc(publicDoc('settings', 'global'), { supply: current + amount }, {merge: true});
-            addLog(`Ravitaillement reçu: +${amount}`, 'SUPPLY');
+            const s = await getDoc(publicDoc('settings', 'global'));
+            await setDoc(publicDoc('settings', 'global'), { supply: (s.data()?.supply||0) + amount }, {merge: true});
+            addLog(`Ravitaillement: +${amount}`, 'SUPPLY');
         };
-
-        window.clearLogs = async () => {
-            if(confirm("Effacer tout le journal ?")) {
-                addLog("JOURNAL EFFACÉ PAR LE SL", "ADMIN");
-            }
-        };
+        window.clearLogs = async () => { if(confirm("Effacer le journal ?")) addLog("JOURNAL EFFACÉ", "ADMIN"); };
 
         // --- MISSION LOGIC ---
-
         window.openMissionModal = async () => {
-            if(!currentUserId) return;
             toggleModal('mission-modal');
             const vehiclesList = document.getElementById('mission-vehicle-list');
-            
-            vehiclesList.innerHTML = '<div class="text-center animate-pulse text-xs">RECHERCHE DE VÉHICULES...</div>';
-            
+            vehiclesList.innerHTML = '<div class="text-center animate-pulse text-xs">RECHERCHE...</div>';
             const vehSnap = await getDocs(publicPath('vehicles'));
             vehiclesList.innerHTML = '';
-            
             let count = 0;
             vehSnap.forEach(doc => {
                 const d = doc.data();
                 if (d.status === 'OPS' && !d.missionId) {
                     count++;
                     const div = document.createElement('label');
-                    div.className = "flex items-center gap-3 p-3 border border-green-900/50 bg-black/40 rounded cursor-pointer hover:bg-green-900/20 active:bg-green-900/40 transition-colors";
-                    div.innerHTML = `
-                        <input type="checkbox" class="accent-green-500 w-5 h-5 mission-veh-checkbox" value="${doc.id}">
-                        <div class="flex-1">
-                            <div class="text-xs text-gray-400 font-bold">${d.category}</div>
-                            <div class="text-green-300 font-bold">${d.name}</div>
-                        </div>
-                        <i class="fas fa-check text-green-500 opacity-0 transition-opacity"></i>
-                    `;
-                    const checkbox = div.querySelector('input');
-                    const icon = div.querySelector('i');
-                    checkbox.addEventListener('change', () => {
-                        div.classList.toggle('border-green-500', checkbox.checked);
-                        icon.classList.toggle('opacity-100', checkbox.checked);
-                    });
+                    div.className = "flex items-center gap-3 p-3 border border-green-900/50 bg-black/40 rounded cursor-pointer";
+                    div.innerHTML = `<input type="checkbox" class="accent-green-500 w-5 h-5 mission-veh-checkbox" value="${doc.id}"><div class="flex-1"><div class="text-xs text-gray-400">${d.category}</div><div class="text-green-300 font-bold">${d.name}</div></div>`;
                     vehiclesList.appendChild(div);
                 }
             });
-
-            if (count === 0) {
-                vehiclesList.innerHTML = '<div class="text-center text-gray-500 text-xs py-4">AUCUN VÉHICULE DISPONIBLE AU GARAGE (OPS)</div>';
-            }
+            if (count === 0) vehiclesList.innerHTML = '<div class="text-center text-gray-500 text-xs py-4">AUCUN VÉHICULE OPS DISPO</div>';
         };
 
         window.confirmMission = async () => {
             const name = document.getElementById('mission-name').value;
-
-            if(!name) return alert("Nom de mission requis");
-            
+            if(!name) return alert("Nom requis");
             const checkboxes = document.querySelectorAll('.mission-veh-checkbox:checked');
             const selectedVehicles = Array.from(checkboxes).map(cb => cb.value);
-
             const missionRef = await addDoc(publicPath('missions'), {
-                name: name,
-                status: 'ACTIVE',
-                leaderId: null, 
-                leaderName: null,
-                createdAt: serverTimestamp(),
-                vehicleCount: selectedVehicles.length
+                name: name, status: 'ACTIVE', leaderId: null, leaderName: null, createdAt: serverTimestamp(), vehicleCount: selectedVehicles.length
             });
-
             if (selectedVehicles.length > 0) {
                 const batch = writeBatch(db);
                 selectedVehicles.forEach(vehId => {
-                    const ref = publicDoc('vehicles', vehId);
-                    batch.update(ref, { 
-                        status: 'MISSION',
-                        missionId: missionRef.id
-                    });
+                    batch.update(publicDoc('vehicles', vehId), { status: 'MISSION', missionId: missionRef.id });
                 });
                 await batch.commit();
             }
-
-            addLog(`Nouvelle mission: ${name} (Véhicules: ${selectedVehicles.length})`, 'MISSION');
+            addLog(`Mission: ${name} (Véhicules: ${selectedVehicles.length})`, 'MISSION');
             toggleModal('mission-modal');
         };
 
-        // Mission Details View
         window.openMissionDetails = (missionId) => {
             if(unsubMissionDetails) unsubMissionDetails();
             if(unsubMissionVehicles) unsubMissionVehicles();
-
             const modal = document.getElementById('mission-details-modal');
             const titleEl = document.getElementById('detail-mission-name');
             const leaderEl = document.getElementById('detail-mission-leader');
             const vehiclesEl = document.getElementById('detail-mission-vehicles');
             const actionsEl = document.getElementById('sl-mission-actions');
-
             modal.classList.remove('hidden');
-            vehiclesEl.innerHTML = '<div class="text-center animate-pulse mt-4">CHARGEMENT DES DONNÉES...</div>';
+            vehiclesEl.innerHTML = '<div class="text-center animate-pulse mt-4">CHARGEMENT...</div>';
 
-            // Show Mission Control Buttons ONLY for SL
             if (userRole === 'SL') {
                 actionsEl.innerHTML = `
                     <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-green-900/50">
-                        <button onclick="closeMission('${missionId}', 'COMPLETED')" class="btn-tac bg-green-900/40 hover:bg-green-500 hover:text-black py-3 rounded font-bold">MISSION ACCOMPLIE</button>
-                        <button onclick="closeMission('${missionId}', 'CANCELLED')" class="btn-tac border-red-500 text-red-500 bg-red-900/20 hover:bg-red-500 hover:text-black py-3 rounded font-bold">ANNULER MISSION</button>
-                    </div>
-                `;
+                        <button onclick="closeMission('${missionId}', 'COMPLETED')" class="btn-tac bg-green-900/40 hover:bg-green-500 py-3 rounded font-bold">ACCOMPLIE</button>
+                        <button onclick="closeMission('${missionId}', 'CANCELLED')" class="btn-tac border-red-500 text-red-500 hover:bg-red-900/50 py-3 rounded font-bold">ANNULER</button>
+                    </div>`;
                 actionsEl.classList.remove('hidden');
-            } else {
-                actionsEl.innerHTML = '';
-                actionsEl.classList.add('hidden');
-            }
+            } else { actionsEl.classList.add('hidden'); }
 
-            // Listener 1: The Mission Metadata
             unsubMissionDetails = onSnapshot(publicDoc('missions', missionId), (doc) => {
-                if(!doc.exists()) {
-                    closeMissionDetails();
-                    return;
-                }
+                if(!doc.exists()) return closeMissionDetails();
                 const data = doc.data();
                 titleEl.innerText = data.name;
-                
-                // Leader Logic
-                if (data.leaderName) {
-                    leaderEl.innerHTML = `
-                        <div class="text-xs text-gray-500 mb-1">CHEF DE MISSION</div>
-                        <div class="text-xl font-bold text-green-400 border border-green-500/50 p-2 rounded bg-green-900/20 text-center">
-                            <i class="fas fa-crown mr-2 text-yellow-500"></i>${data.leaderName}
-                        </div>
-                    `;
-                } else {
-                    leaderEl.innerHTML = `
-                        <div class="text-xs text-gray-500 mb-1">COMMANDEMENT</div>
-                        <button onclick="volunteerForMission('${doc.id}')" class="w-full py-3 border border-yellow-500 text-yellow-500 bg-yellow-900/20 hover:bg-yellow-500 hover:text-black font-bold rounded animate-pulse transition-colors">
-                            <i class="fas fa-hand-point-up mr-2"></i>SE PROPOSER COMME CHEF
-                        </button>
-                    `;
-                }
+                leaderEl.innerHTML = data.leaderName 
+                    ? `<div class="text-xs text-gray-500 mb-1">CHEF</div><div class="text-xl font-bold text-green-400 border border-green-500/50 p-2 rounded bg-green-900/20 text-center"><i class="fas fa-crown mr-2 text-yellow-500"></i>${data.leaderName}</div>` 
+                    : `<div class="text-xs text-gray-500 mb-1">COMMANDEMENT</div><button onclick="volunteerForMission('${doc.id}')" class="w-full py-3 border border-yellow-500 text-yellow-500 bg-yellow-900/20 animate-pulse font-bold rounded">SE PROPOSER</button>`;
             });
 
-            // Listener 2: The Vehicles
             unsubMissionVehicles = onSnapshot(publicPath('vehicles'), (snap) => {
                 vehiclesEl.innerHTML = '';
-                let count = 0;
                 snap.forEach(doc => {
                     const data = doc.data();
-                    if(data.missionId === missionId) {
-                        count++;
-                        const card = createVehicleCard(doc.id, data);
-                        vehiclesEl.appendChild(card);
-                    }
+                    if(data.missionId === missionId) vehiclesEl.appendChild(createVehicleCard(doc.id, data));
                 });
-                if(count === 0) {
-                    vehiclesEl.innerHTML = '<div class="text-center text-gray-500 py-10">AUCUN VÉHICULE ASSIGNÉ</div>';
-                }
             });
         };
 
         window.closeMissionDetails = () => {
-            const modal = document.getElementById('mission-details-modal');
-            modal.classList.add('hidden');
+            document.getElementById('mission-details-modal').classList.add('hidden');
             if(unsubMissionDetails) unsubMissionDetails();
             if(unsubMissionVehicles) unsubMissionVehicles();
         };
 
         window.volunteerForMission = async (missionId) => {
-            if(!currentUserId) return;
-            if(!confirm("Voulez-vous prendre le commandement de cette mission ?")) return;
-            
+            if(!confirm("Prendre le commandement ?")) return;
             const myName = `${userGrade} ${userPseudo}`;
-            
-            await updateDoc(publicDoc('missions', missionId), {
-                leaderId: currentUserId,
-                leaderName: myName
-            });
-            addLog(`${myName} a pris le commandement de la mission.`, 'MISSION');
+            await updateDoc(publicDoc('missions', missionId), { leaderId: currentUserId, leaderName: myName });
+            addLog(`${myName} a pris le commandement.`, 'MISSION');
         };
 
-        // === CRITICAL: SL MISSION CLOSING LOGIC ===
         window.closeMission = async (missionId, reason) => {
             if (userRole !== 'SL') return;
-            const confirmMsg = reason === 'COMPLETED' ? "Confirmer la fin de mission ? (Tous les véhicules repasseront OPS)" : "Annuler la mission ? (Tous les véhicules repasseront OPS)";
-            if (!confirm(confirmMsg)) return;
-
-            try {
-                // 1. Get all vehicles in this mission
-                const vehQuery = query(publicPath('vehicles'), where('missionId', '==', missionId));
-                const vehSnap = await getDocs(vehQuery);
-
-                const batch = writeBatch(db);
-
-                // 2. Archive Mission
-                const missionRef = publicDoc('missions', missionId);
-                batch.update(missionRef, { status: reason === 'COMPLETED' ? 'ARCHIVED' : 'CANCELLED' });
-
-                // 3. Reset all vehicles to OPS and clear missionId
-                vehSnap.forEach(v => {
-                    batch.update(v.ref, {
-                        status: 'OPS',
-                        missionId: null,
-                        // Optionally verify seats, but usually we leave people inside until they get out? 
-                        // Let's leave seats as is, just change status.
-                    });
-                });
-
-                await batch.commit();
-                
-                const logMsg = reason === 'COMPLETED' ? "MISSION ACCOMPLIE - RETOUR BASE EFFECTUÉ" : "MISSION ANNULÉE PAR LE COMMANDEMENT";
-                addLog(logMsg, "MISSION", true); // Priority Alert
-                closeMissionDetails();
-
-            } catch (error) {
-                console.error("Error closing mission:", error);
-                alert("Erreur lors de la clôture de la mission.");
-            }
+            if (!confirm("Confirmer ? (Les véhicules repasseront OPS)")) return;
+            const vehQuery = query(publicPath('vehicles'), where('missionId', '==', missionId));
+            const vehSnap = await getDocs(vehQuery);
+            const batch = writeBatch(db);
+            batch.update(publicDoc('missions', missionId), { status: reason === 'COMPLETED' ? 'ARCHIVED' : 'CANCELLED' });
+            vehSnap.forEach(v => batch.update(v.ref, { status: 'OPS', missionId: null }));
+            await batch.commit();
+            addLog(reason === 'COMPLETED' ? "MISSION ACCOMPLIE" : "MISSION ANNULÉE", "MISSION", true);
+            closeMissionDetails();
         };
 
         function setupMissionsListener() {
             const container = document.getElementById('mission-list');
-            if(!container) return;
-            const q = publicPath('missions');
-            
-            onSnapshot(q, (snap) => {
+            onSnapshot(publicPath('missions'), (snap) => {
                 container.innerHTML = '';
                 let docs = snap.docs.map(d => ({id: d.id, ...d.data()}));
                 docs.sort((a, b) => getMillis(b.createdAt) - getMillis(a.createdAt));
-
                 docs.forEach(data => {
                     if(data.status === 'ARCHIVED' || data.status === 'CANCELLED') return;
-                    
                     const el = document.createElement('div');
-                    el.className = "border border-green-500/50 p-3 mb-2 bg-green-900/10 rounded cursor-pointer hover:bg-green-900/30 transition-colors";
-                    const leaderDisplay = data.leaderName 
-                        ? `<div class="text-[10px] text-green-400 font-bold"><i class="fas fa-crown text-yellow-500 mr-1"></i>${data.leaderName}</div>` 
-                        : `<div class="text-[10px] text-gray-500 italic">CHEF: AUCUN</div>`;
-                    
-                    const vehDisplay = data.vehicleCount ? `<span class="text-[9px] bg-gray-800 px-1 rounded text-gray-300 ml-2"><i class="fas fa-car"></i> ${data.vehicleCount}</span>` : '';
-
+                    el.className = "border border-green-500/50 p-3 mb-2 bg-green-900/10 rounded cursor-pointer hover:bg-green-900/30";
                     el.onclick = () => openMissionDetails(data.id);
-
-                    el.innerHTML = `
-                        <div class="flex justify-between items-start mb-1 pointer-events-none">
-                            <div>
-                                <h3 class="font-bold text-green-400 truncate pr-2 leading-tight">${data.name}</h3>
-                                ${leaderDisplay}
-                            </div>
-                            <div class="flex items-center">
-                                <span class="text-[9px] bg-green-900 text-green-200 px-1 rounded flex-shrink-0">ACTIF</span>
-                                ${vehDisplay}
-                            </div>
-                        </div>
-                        <div class="mt-2 text-[10px] text-green-600 flex justify-end pointer-events-none">
-                             <span>DÉTAILS <i class="fas fa-chevron-right ml-1"></i></span>
-                        </div>
-                    `;
+                    const leaderDisplay = data.leaderName ? `<div class="text-[10px] text-green-400 font-bold"><i class="fas fa-crown text-yellow-500 mr-1"></i>${data.leaderName}</div>` : `<div class="text-[10px] text-gray-500 italic">CHEF: AUCUN</div>`;
+                    const vehDisplay = data.vehicleCount ? `<span class="text-[9px] bg-gray-800 px-1 rounded text-gray-300 ml-2"><i class="fas fa-car"></i> ${data.vehicleCount}</span>` : '';
+                    el.innerHTML = `<div class="flex justify-between items-start mb-1 pointer-events-none"><div><h3 class="font-bold text-green-400 truncate pr-2">${data.name}</h3>${leaderDisplay}</div><div class="flex items-center"><span class="text-[9px] bg-green-900 text-green-200 px-1 rounded flex-shrink-0">ACTIF</span>${vehDisplay}</div></div>`;
                     container.appendChild(el);
                 });
             });
         }
 
-        window.sendCitrep = async (missionName) => {
-            const text = prompt("Message CITREP :");
-            if(text) addLog(`[CITREP ${missionName}] ${text}`, 'RADIO', true); // Priority
-        };
-
-        window.requestRTB = () => {
-            addLog(`DEMANDE DE RTB (RETOUR BASE) POUR ${userPseudo}`, 'RADIO', true); // Priority
-        };
-
-        // --- UTILS FOR UI ---
-        window.toggleModal = (id) => {
-            const el = document.getElementById(id);
-            if(el) el.classList.toggle('hidden');
-        };
-
+        window.sendCitrep = async (m) => { const t = prompt("Message:"); if(t) addLog(`[CITREP ${m}] ${t}`, 'RADIO', true); };
+        window.requestRTB = () => addLog(`DEMANDE DE RTB POUR ${userPseudo}`, 'RADIO', true);
+        window.toggleModal = (id) => document.getElementById(id).classList.toggle('hidden');
         window.toggleSidebar = () => {
-            const sidebar = document.getElementById('sidebar');
-            const backdrop = document.getElementById('sidebar-backdrop');
-            
-            if (sidebar && backdrop) {
-                if (sidebar.classList.contains('-translate-x-full')) {
-                    sidebar.classList.remove('-translate-x-full');
-                    backdrop.classList.remove('hidden');
-                } else {
-                    sidebar.classList.add('-translate-x-full');
-                    backdrop.classList.add('hidden');
-                }
-            }
+            const s = document.getElementById('sidebar'), b = document.getElementById('sidebar-backdrop');
+            s.classList.contains('-translate-x-full') ? (s.classList.remove('-translate-x-full'), b.classList.remove('hidden')) : (s.classList.add('-translate-x-full'), b.classList.add('hidden'));
         };
-
     </script>
 
     <!-- Custom CSS -->
@@ -981,6 +805,12 @@
                 </div>
                  <div id="log-controls" class="p-4 hidden">
                     <button onclick="requestRTB()" class="btn-tac w-full py-3 text-sm border-orange-500 text-orange-500 active:bg-orange-500 active:text-black font-bold rounded flex items-center justify-center gap-2"><i class="fas fa-home"></i> DEMANDER RTB</button>
+                </div>
+                
+                <!-- GLOBAL LOGOUT / END SERVICE AREA -->
+                <div class="p-4 border-t border-green-900/30 space-y-2">
+                    <button id="btn-end-service" onclick="endServiceGlobal()" class="hidden btn-tac w-full py-3 text-sm border-red-600 text-red-500 bg-red-900/20 hover:bg-red-600 hover:text-white font-bold rounded flex items-center justify-center gap-2"><i class="fas fa-power-off"></i> FIN DE SERVICE</button>
+                    <button onclick="logoutSelf()" class="btn-tac w-full py-2 text-xs border-gray-600 text-gray-400 hover:bg-gray-700 hover:text-white rounded">DÉCONNEXION</button>
                 </div>
             </div>
         </aside>
