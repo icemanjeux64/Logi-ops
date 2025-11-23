@@ -1,784 +1,198 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>LOGIOPS V2 // MILITARY LOGISTICS</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>LOGIOPS V2 // OPTIMIZED</title>
 
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background:#050505; color:#e2e8f0; font-family:'Share Tech Mono',monospace; overflow:hidden }
+    .hud  { background:rgba(10,15,10,.95); border:1px solid rgba(34,197,94,.3) }
+    .btn  { border:1px solid #22c55e; color:#22c55e; background:rgba(34,197,94,.05); transition:.1s }
+    .btn:active { background:#22c55e; color:#000 }
+    .modal { background:rgba(0,0,0,.9); backdrop-filter:blur(5px) }
+  </style>
 
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, collection, doc, setDoc, getDoc, updateDoc, 
-            onSnapshot, deleteDoc, serverTimestamp, query, orderBy, addDoc, where, getDocs, writeBatch 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- CONFIGURATION ---
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
-            authDomain: "logiops-data.firebaseapp.com",
-            projectId: "logiops-data",
-            storageBucket: "logiops-data.firebasestorage.app",
-            messagingSenderId: "791163499354",
-            appId: "1:791163499354:web:2bb76506331db9d240b963",
-            measurementId: "G-FFMXKH47M9"
-        };
+    /* =============================
+       CONFIG
+    ============================= */
+    const firebaseConfig = {
+      apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
+      authDomain: "logiops-data.firebaseapp.com",
+      projectId: "logiops-data",
+      storageBucket: "logiops-data.firebasestorage.app",
+      messagingSenderId: "791163499354",
+      appId: "1:791163499354:web:2bb76506331db9d240b963"
+    };
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'logiops-v2-production';
-        
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
 
-        // --- PATH HELPERS ---
-        const publicPath = (col) => collection(db, 'artifacts', appId, 'public', 'data', col);
-        const publicDoc = (col, id) => doc(db, 'artifacts', appId, 'public', 'data', col, id);
+    /* =============================
+       HELPERS
+    ============================= */
+    const path = c      => collection(db, 'artifacts', 'logiops-v2-production', 'public', 'data', c);
+    const ref  = (c,id) => doc(db, 'artifacts', 'logiops-v2-production', 'public', 'data', c, id);
 
-        // --- GLOBAL STATE ---
-        let currentUser = null;
-        let userRole = null;
-        let userPseudo = null;
-        let userGrade = null;
-        let currentUserId = null;
-        let lastNotificationTime = Date.now();
-        let slSessionActive = false;
-        
-        // Filtering
-        let currentFilter = 'ALL'; 
-        let vehicleDataCache = [];
+    // Local helper + attach to window so inline handlers can use it
+    const getById = id => document.getElementById(id);
+    window.$ = getById;   // <-- FIX: expose $ globally to avoid "$ is not defined"
 
-        // Requests Queue
-        let pendingRequests = [];
+    const log = (msg, type = "INFO") => addDoc(path('logs'), { msg, type, t: Date.now() });
 
-        // Cleanups
-        let listeners = [];
+    /* =============================
+       GLOBAL STATE
+    ============================= */
+    let user   = null;
+    let role   = null;
+    let pseudo = null;
+    let grade  = null;
 
-        // --- DATA CONSTANTS ---
-        const RANKS = [
-            "Sdt", "1re Cl", "Cpl", "Cpl-Chef", 
-            "Sgt", "Sgt-Chef", "Adj", "Adj-Chef", "Major", 
-            "Asp", "S-Lt", "Lt", "Cne", "Cdt", "Lt-Col", "Col", "Gen"
-        ];
+    /* =============================
+       AUTH
+    ============================= */
+    async function initAuth() {
+      await signInAnonymously(auth);
+    }
+    initAuth();
 
-        const VEHICLE_DATABASE = [
-            { name: "Jeep EM", category: "Transport EM", cost: 110, code: "JEEP-EM" },
-            { name: "Camion réparation", category: "Maintenance", cost: 175, code: "MAINT" },
-            { name: "QG Mobile", category: "EM", cost: 420, code: "QG" },
-            { name: "Camion Citerne", category: "Ravitaillement", cost: 160, code: "FUEL" },
-            { name: "Camion Arsenal", category: "Ravitaillement", cost: 380, code: "AMMO" },
-            { name: "Camion Construction", category: "Ravitaillement", cost: 260, code: "CONST" },
-            { name: "Camion", category: "Transport de troupes", cost: 200, code: "TRM" },
-            { name: "VAB", category: "Transport de troupes", cost: 1200, code: "VAB" },
-            { name: "Stryker (non armé)", category: "Transport de troupes", cost: 1000, code: "STR-NA" },
-            { name: "JLTV M1280 (non-armée)", category: "Véhicule blindé multi-rôle", cost: 650, code: "JLTV-NA" },
-            { name: "JLTV M1281 - M2HB (12,7)", category: "Véhicule blindé multi-rôle", cost: 1000, code: "JLTV-127" },
-            { name: "JLTV M1281 - M134 (7,62)", category: "Véhicule blindé multi-rôle", cost: 2000, code: "JLTV-762" },
-            { name: "JLTV M1278 - M2HB (12,7 télé)", category: "Véhicule blindé multi-rôle", cost: 1500, code: "JLTV-TOP" },
-            { name: "JLTV AN-MSY-2 v2 (7,62 télé)", category: "Véhicule blindé multi-rôle", cost: 2750, code: "JLTV-RECO" },
-            { name: "JLTV M1278 - M230LF (30mm)", category: "Véhicule blindé multi-rôle", cost: 2750, code: "JLTV-30" },
-            { name: "JLTV M1278 (30mm + javeline)", category: "Véhicule blindé multi-rôle", cost: 3700, code: "JLTV-AT" },
-            { name: "JLTV AN-MSY-2 v1 (30mm + stinger)", category: "Véhicule blindé multi-rôle", cost: 3700, code: "JLTV-AA" },
-            { name: "Stryker M1126 - M2HB (12,7 télé)", category: "VCI", cost: 2000, code: "STR-TOP" },
-            { name: "Stryker M1296 (30mm)", category: "VCI", cost: 3000, code: "STR-30" },
-            { name: "Stryker M1128 (105mm)", category: "VCI", cost: 5000, code: "STR-105" },
-            { name: "Stryker EVASAN", category: "Sanitaire", cost: 975, code: "STR-MED" },
-            { name: "VAB EVASAN", category: "Sanitaire", cost: 1200, code: "VAB-MED" },
-            { name: "Leclerc", category: "Char de bataille", cost: 8000, code: "LCL" },
-            { name: "Leclerc XLR", category: "Char de bataille", cost: 8300, code: "LCL-XLR" },
-            { name: "NH90 “Faucon” (MEDEVAC)", category: "ALAT", cost: 3000, code: "NH90-MED" },
-            { name: "NH90 “Faucon” (Transport)", category: "ALAT", cost: 3000, code: "NH90" },
-            { name: "Gazelle SA342L (non-armée)", category: "ALAT", cost: 2500, code: "GAZ-NA" },
-            { name: "Gazelle SA342L Strike (Barret)", category: "ALAT", cost: 3000, code: "GAZ-SNP" },
-            { name: "Gazelle SA342L Canon (20 mm)", category: "ALAT", cost: 3500, code: "GAZ-20" },
-            { name: "Gazelle SA342L HAP (Roquette)", category: "ALAT", cost: 3500, code: "GAZ-RKT" },
-            { name: "EC665 Tigre", category: "ALAT", cost: 7000, code: "TIGRE" }
-        ];
+    onAuthStateChanged(auth, u => {
+      if (!u) return;
+      user = u;
+      const authScreen = document.getElementById('auth');
+      if (authScreen) authScreen.classList.remove('hidden');
+    });
 
-        // --- UTILS ---
-        const formatTime = (date) => {
-            if (!date) return "--:--";
-            const d = date.toDate ? date.toDate() : new Date(date);
-            return d.toLocaleTimeString('fr-FR', { hour12: false, hour: '2-digit', minute: '2-digit' });
-        };
-        
-        const getMillis = (d) => d && d.toMillis ? d.toMillis() : (new Date(d).getTime() || 0);
-        const safeSetText = (id, text) => { 
-            const els = document.querySelectorAll(`.${id}`); 
-            els.forEach(el => el.innerText = text);
-            const el = document.getElementById(id);
-            if(el) el.innerText = text; 
-        };
+    /* =============================
+       LOGIN LOGIC
+    ============================= */
+    window.loginSL = async () => {
+      const g = getById('sl-grade').value;
+      const p = getById('sl-pseudo').value.toUpperCase();
+      if (!p) return;
 
-        // --- MODAL SYSTEM ---
-        window.hudConfirm = (title, message, onYes, onNo) => {
-            const m = document.getElementById('hud-confirm-modal');
-            if(!m) return;
-            document.getElementById('hud-confirm-title').innerText = title;
-            document.getElementById('hud-confirm-msg').innerHTML = message;
-            m.classList.remove('hidden');
-            
-            const btnYes = document.getElementById('btn-confirm-yes');
-            const newBtnYes = btnYes.cloneNode(true);
-            btnYes.parentNode.replaceChild(newBtnYes, btnYes);
-            newBtnYes.onclick = () => { m.classList.add('hidden'); if(onYes) onYes(); };
-            
-            const btnNo = document.getElementById('btn-confirm-no');
-            const newBtnNo = btnNo.cloneNode(true);
-            btnNo.parentNode.replaceChild(newBtnNo, btnNo);
-            newBtnNo.onclick = () => { m.classList.add('hidden'); if(onNo) onNo(); };
-        };
-        
-        window.hudPrompt = (title, message, onSubmit) => {
-            const m = document.getElementById('hud-prompt-modal');
-            document.getElementById('hud-prompt-title').innerText = title;
-            document.getElementById('hud-prompt-msg').innerText = message;
-            const input = document.getElementById('hud-prompt-input');
-            input.value = ''; m.classList.remove('hidden'); input.focus();
-            const btnOk = document.getElementById('btn-prompt-ok');
-            const newBtn = btnOk.cloneNode(true);
-            btnOk.parentNode.replaceChild(newBtn, btnOk);
-            newBtn.onclick = () => { if(input.value.trim()) { m.classList.add('hidden'); onSubmit(input.value.trim()); } };
-        };
+      await setDoc(ref('settings', 'global'), {
+        slSessionId: user.uid,
+        slName: `${g} ${p}`
+      }, { merge: true });
 
-        window.hudAlert = (title, message) => {
-            const m = document.getElementById('hud-alert-modal');
-            document.getElementById('hud-alert-title').innerText = title;
-            document.getElementById('hud-alert-msg').innerText = message;
-            m.classList.remove('hidden');
-        };
-        
-        window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
-        window.toggleModal = (id) => document.getElementById(id).classList.toggle('hidden');
+      await setDoc(ref('users', user.uid), {
+        pseudo: p,
+        grade: g,
+        role: 'SL',
+        isOnline: true
+      }, { merge: true });
 
-        // --- AUTHENTICATION ---
-        async function initAuth() {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                 await signInWithCustomToken(auth, __initial_auth_token);
-            } else { await signInAnonymously(auth); }
-        }
-        initAuth();
+      role   = 'SL';
+      pseudo = p;
+      grade  = g;
 
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                currentUser = user; 
-                currentUserId = user.uid;
-                
-                const storedUid = localStorage.getItem('logiops_sl_uid');
-                if(storedUid) restoreSession(user.uid);
-                else checkAppState();
+      getById('auth').classList.add('hidden');
+      getById('ui').classList.remove('hidden');
+    };
 
-                const unsubMe = onSnapshot(publicDoc('users', user.uid), (doc) => {
-                    if(doc.exists()) {
-                        const d = doc.data();
-                        if(d.rtbStatus === 'APPROVED') {
-                            hudAlert("FIN DE SERVICE", "Demande RTB validée. Rompez.");
-                            updateDoc(publicDoc('users', user.uid), { rtbStatus: 'OFFLINE', isOnline: false });
-                            localStorage.removeItem('logiops_sl_uid');
-                            setTimeout(() => location.reload(), 3000);
-                        }
-                        if(d.rtbStatus === 'KICKED') {
-                            alert("VOUS AVEZ ÉTÉ EXCLU DU SERVICE.");
-                            localStorage.removeItem('logiops_sl_uid');
-                            location.reload();
-                        }
-                        if(d.role && d.role !== userRole && userRole !== null) {
-                            userRole = d.role;
-                            loadInterface();
-                        }
-                    }
-                });
-                listeners.push(unsubMe);
-            }
-        });
+    window.loginLOG = async (id, p, g) => {
+      await setDoc(ref('users', user.uid), {
+        pseudo: p,
+        grade: g,
+        role: 'LOG',
+        rosterId: id,
+        isOnline: true
+      }, { merge: true });
 
-        async function restoreSession(uid) {
-            try {
-                const s = await getDoc(publicDoc('settings', 'global'));
-                if (!s.exists() || s.data().serviceStatus !== 'ACTIVE') { 
-                    localStorage.removeItem('logiops_sl_uid'); 
-                    checkAppState(); 
-                    return; 
-                }
-                const u = await getDoc(publicDoc('users', uid));
-                if(u.exists() && u.data().isOnline && u.data().role === 'SL') {
-                    const d = u.data(); userRole = d.role; userPseudo = d.pseudo; userGrade = d.grade;
-                    lastNotificationTime = Date.now(); checkAppState();
-                } else { 
-                    localStorage.removeItem('logiops_sl_uid'); 
-                    checkAppState(); 
-                }
-            } catch(e) { checkAppState(); }
-        }
+      role   = 'LOG';
+      pseudo = p;
+      grade  = g;
 
-        // --- APP LOGIC ---
-        function checkAppState() {
-            const unsub = onSnapshot(publicDoc('settings', 'global'), (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    const headerSlEl = document.getElementById('header-sl-name');
-                    
-                    if (data.slSessionId) {
-                        slSessionActive = true;
-                        if (headerSlEl) { 
-                            headerSlEl.innerHTML = `CMD: ${data.slName}`; 
-                            headerSlEl.className = "text-xs border border-green-800 px-2 py-1 rounded text-green-600 font-bold whitespace-nowrap"; 
-                            headerSlEl.onclick = null; 
-                        }
-                        const slLoginBtn = document.getElementById('btn-login-sl');
-                        if(slLoginBtn && currentUserId !== data.slSessionId && !userRole) slLoginBtn.classList.add('hidden');
-                    } else {
-                        slSessionActive = false;
-                        if (headerSlEl) { 
-                            headerSlEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> PAS DE SL`; 
-                            headerSlEl.className = "text-xs border border-red-800 bg-red-900/20 px-2 py-1 rounded text-red-500 font-bold whitespace-nowrap animate-pulse cursor-pointer"; 
-                            headerSlEl.onclick = takeCommand; 
-                        }
-                        const slLoginBtn = document.getElementById('btn-login-sl');
-                        if(slLoginBtn) slLoginBtn.classList.remove('hidden');
-                    }
+      getById('auth').classList.add('hidden');
+      getById('ui').classList.remove('hidden');
+    };
 
-                    if (data.serviceStatus === 'ENDED' && userRole) {
-                        localStorage.removeItem('logiops_sl_uid');
-                        alert("FIN DE SERVICE ORDONNÉE");
-                        location.reload();
-                    }
-                } else {
-                    setDoc(publicDoc('settings', 'global'), { slSessionId: null, slName: 'AUCUN', serviceStatus: 'ACTIVE' });
-                }
-            });
-            listeners.push(unsub);
+    /* =============================
+       VEHICLE LIVE GRID (MINIMAL TEST VIEW)
+    ============================= */
+    onSnapshot(path('vehicles'), snap => {
+      const grid = document.getElementById('grid');
+      if (!grid) return;
+      grid.innerHTML = "";
 
-            setupDepotsListener();
-            setupPresenceListener();
-            
-            if(userRole === 'SL') {
-                setupSLRequestListeners();
-            }
-            setupMissionTargetListener();
+      // Basic rendering + a few simple visual "test cases"
+      snap.forEach(d => {
+        const v = d.data();
+        const status = v.status || 'UNKNOWN';
+        const color  = status === 'OPS' ? 'text-green-400' : status === 'MISSION' ? 'text-blue-400' : 'text-gray-300';
 
-            if (userRole) {
-                loadInterface();
-            } else {
-                document.getElementById('auth-screen').classList.remove('hidden');
-                populateRankSelects();
-            }
-        }
+        const card = document.createElement('div');
+        card.className = 'p-3 border border-green-900/40 rounded bg-black/40 flex flex-col gap-1';
+        card.innerHTML = `
+          <div class="font-bold text-green-400 truncate">${v.name || 'SANS NOM'}</div>
+          <div class="text-xs text-gray-400">${v.category || 'NC'}</div>
+          <div class="text-xs ${color}">STATUT: ${status}</div>
+        `;
+        grid.appendChild(card);
+      });
 
-        function populateRankSelects() {
-            const opts = RANKS.map(r => `<option value="${r}">${r}</option>`).join('');
-            const slSel = document.getElementById('sl-grade');
-            if(slSel) slSel.innerHTML = opts;
-        }
-
-        // --- STATISTICS ---
-        function setupDepotsListener() {
-            listeners.push(onSnapshot(publicPath('depots'), (snapshot) => {
-                let total = 0;
-                snapshot.forEach(doc => total += (parseInt(doc.data().amount) || 0));
-                safeSetText('supply-count', total);
-                const modal = document.getElementById('supply-modal');
-                if (modal && !modal.classList.contains('hidden')) renderDepotsList(snapshot);
-            }));
-        }
-
-        function setupPresenceListener() {
-            listeners.push(onSnapshot(publicPath('users'), (snap) => {
-                let connected = 0;
-                let total = 0; 
-                snap.forEach(d => {
-                    if (d.data().role === 'LOG') { 
-                        total++; 
-                        if (d.data().isOnline && d.data().rtbStatus !== 'APPROVED' && d.data().rtbStatus !== 'KICKED') connected++;
-                    }
-                });
-                safeSetText('stat-log-count', `${connected}/${total}`);
-            }));
-        }
-
-        // --- REQUESTS SYSTEM ---
-        function setupSLRequestListeners() {
-            listeners.push(onSnapshot(query(publicPath('users'), where('rtbStatus', '==', 'REQUESTED')), (snap) => {
-                snap.forEach(doc => {
-                    addPendingRequest({
-                        id: `rtb-${doc.id}`,
-                        type: 'RTB',
-                        title: 'DEMANDE RTB',
-                        desc: `Agent: ${doc.data().pseudo}`,
-                        data: { uid: doc.id, name: doc.data().pseudo }
-                    });
-                });
-                updateRequestsUI();
-            }));
-
-            listeners.push(onSnapshot(query(publicPath('missions'), where('transferRequest.state', '==', 'WAITING_SL')), (snap) => {
-                snap.forEach(doc => {
-                    const req = doc.data().transferRequest;
-                    addPendingRequest({
-                        id: `lead-${doc.id}`,
-                        type: 'LEAD',
-                        title: 'TRANSFERT DE LEAD',
-                        desc: `Mission: ${doc.data().name}<br>Candidat: ${req.targetName}`,
-                        data: { mId: doc.id, targetId: req.targetId, targetName: req.targetName }
-                    });
-                });
-                updateRequestsUI();
-            }));
-        }
-
-        function addPendingRequest(req) {
-            if(!pendingRequests.find(r => r.id === req.id)) {
-                pendingRequests.push(req);
-            }
-        }
-
-        function updateRequestsUI() {
-            const btn = document.getElementById('btn-requests-alert');
-            const countEl = document.getElementById('requests-count');
-            if(pendingRequests.length > 0) {
-                btn.classList.remove('hidden');
-                countEl.innerText = pendingRequests.length;
-            } else {
-                btn.classList.add('hidden');
-            }
-        }
-
-        // --- MISSION TARGET LISTENER ---
-        function setupMissionTargetListener() {
-            listeners.push(onSnapshot(publicPath('missions'), (snap) => {
-                snap.docChanges().forEach(change => {
-                    const mData = change.doc.data();
-                    const mId = change.doc.id;
-                    if (change.type !== 'removed' && mData.transferRequest) {
-                        const req = mData.transferRequest;
-                        if (req.targetId === currentUserId && req.state === 'WAITING_TARGET') {
-                            hudConfirm("PROMOTION CHAMP", `On vous propose le commandement de la mission <strong>${mData.name}</strong>.<br>Accepter ?`, async () => {
-                                await updateDoc(publicDoc('missions', mId), { "transferRequest.state": 'WAITING_SL' });
-                                addLog(`${userPseudo} a accepté le commandement (En attente SL).`, 'MISSION');
-                            });
-                        }
-                    }
-                });
-            }));
-        }
-
-        // --- UI LOADING FUNCTION ---
-        function loadInterface() {
-            document.getElementById('main-interface').classList.remove('hidden');
-            
-            document.getElementById('profile-card').innerHTML = `
-                <div class="text-xs text-gray-500 mb-1">IDENTITÉ</div>
-                <div class="font-bold text-lg text-white">${userGrade} ${userPseudo}</div>
-                <div class="text-xs bg-gray-800 px-2 py-1 rounded inline-block mt-1 text-green-400 border border-green-900">${userRole}</div>
-            `;
-
-            setupNotifications();
-            setupVehiclesListener();
-            setupMissionsListener();
-            populateSelects();
-
-            const slDiv = document.getElementById('sl-controls');
-            const logDiv = document.getElementById('log-controls');
-            const btnLeavePost = document.getElementById('btn-leave-post');
-            const btnEndService = document.getElementById('btn-end-service');
-            const btnCreateVeh = document.getElementById('btn-create-vehicle');
-
-            if (userRole === 'SL') {
-                slDiv.classList.remove('hidden');
-                logDiv.classList.add('hidden');
-                btnLeavePost.classList.remove('hidden');
-                btnEndService.classList.remove('hidden');
-                if(btnCreateVeh) btnCreateVeh.classList.remove('hidden');
-                setupSLRequestListeners(); 
-            } else {
-                slDiv.classList.add('hidden');
-                logDiv.classList.remove('hidden');
-                btnLeavePost.classList.add('hidden');
-                btnEndService.classList.add('hidden');
-                if(btnCreateVeh) btnCreateVeh.classList.add('hidden');
-            }
-        }
-
-        function populateSelects() {
-             // Only Ranks are dropdown, Garage is Grid
-        }
-
-        function setupVehiclesListener() {
-            const grid = document.getElementById('vehicle-grid');
-            listeners.push(onSnapshot(publicPath('vehicles'), (snap) => {
-                let stats = { total: 0, ops: 0, mission: 0, repair: 0, destroyed: 0 };
-                vehicleDataCache = [];
-                
-                snap.forEach(doc => {
-                    const d = doc.data();
-                    const item = { id: doc.id, data: d };
-                    vehicleDataCache.push(item);
-                    
-                    stats.total++;
-                    if(d.status === 'OPS') stats.ops++;
-                    if(d.status === 'MISSION') stats.mission++;
-                    if(d.status === 'MAINTENANCE' || d.status === 'REPAIR') stats.repair++;
-                    if(d.status === 'DESTROYED') stats.destroyed++;
-                });
-
-                safeSetText('count-total', stats.total);
-                safeSetText('count-ops', stats.ops);
-                safeSetText('count-mission', stats.mission);
-                safeSetText('count-repair', stats.repair);
-                safeSetText('count-destroyed', stats.destroyed);
-
-                renderVehicleGrid();
-            }));
-        }
-
-        // --- VEHICLE GRID ---
-        window.setFilter = (f) => { currentFilter = f; renderVehicleGrid(); };
-        
-        function renderVehicleGrid() {
-            const grid = document.getElementById('vehicle-grid');
-            if(!grid) return;
-            grid.innerHTML = '';
-            const list = currentFilter === 'ALL' ? vehicleDataCache.filter(v => v.data.status !== 'DESTROYED') : vehicleDataCache.filter(v => v.data.status === currentFilter);
-            list.forEach(v => grid.appendChild(createVehicleCard(v.id, v.data)));
-        }
-
-        function createVehicleCard(id, data, isMissionView = false) {
-            const div = document.createElement('div');
-            const statusColors = { 'OPS': 'border-green-500', 'MISSION': 'border-blue-500', 'MAINTENANCE': 'border-orange-500 bg-orange-900/20', 'REPAIR': 'border-orange-500', 'DESTROYED': 'border-red-600 opacity-60' };
-            div.className = `bg-gray-900/90 border-2 ${statusColors[data.status] || 'border-gray-500'} p-3 rounded relative flex flex-col gap-2 cursor-pointer hover:bg-gray-800 transition`;
-            div.onclick = (e) => { 
-                if(e.target.tagName === 'BUTTON' || e.target.closest('button')) return; 
-                window.openVehicleDetail(id); 
-            };
-
-            div.innerHTML = `<div class="flex justify-between items-start border-b border-gray-700 pb-2"><div><div class="text-xs text-gray-400">${data.category}</div><div class="font-bold text-white truncate w-24">${data.name}</div></div><div class="text-xs font-bold px-1 bg-black rounded">${data.status}</div></div>`;
-            
-            if (data.status === 'MAINTENANCE') {
-                div.innerHTML += `<div class="my-2 text-xs text-orange-300 text-center"><div>ESSENCE: ${data.fuel}%</div><div>ÉTAT: ${data.integrity}%</div></div><button onclick="performMaintenance('${id}', '${data.name}')" class="mt-auto w-full py-2 bg-orange-500 text-black font-bold rounded animate-pulse">EFFECTUER MAINTENANCE</button>`;
-                return div;
-            }
-
-            const seatsDiv = document.createElement('div'); seatsDiv.className = "grid grid-cols-3 gap-1";
-            ['driver', 'copilot', 'gunner'].forEach(role => {
-                const occ = data.seats[role]; const btn = document.createElement('button'); const isMe = occ && occ.uid === currentUserId;
-                btn.className = `h-12 border rounded text-[9px] flex flex-col items-center justify-center ${isMe ? 'bg-green-500 text-black font-bold' : (occ ? 'bg-green-900/50 text-green-300' : 'bg-gray-800 text-gray-500')}`;
-                btn.innerHTML = `<span>${role.substr(0,3).toUpperCase()}</span><span>${occ ? occ.name : 'LIBRE'}</span>`;
-                if(data.status !== 'DESTROYED') btn.onclick = () => window.toggleSeat(id, data, role);
-                seatsDiv.appendChild(btn);
-            });
-            div.appendChild(seatsDiv);
-
-            if(isMissionView) {
-                 const uActs = document.createElement('div');
-                 uActs.className = "grid grid-cols-2 gap-1 mt-auto pt-2 text-[10px]";
-                 uActs.innerHTML = `<button onclick="unitSitrep('${data.name}')" class="border border-blue-500 text-blue-300">SITREP</button><button onclick="unitRtb('${data.name}')" class="border border-orange-500 text-orange-300">RTB</button>`;
-                 div.appendChild(uActs);
-            }
-            return div;
-        }
-
-        // --- EXPORTED FUNCTIONS ---
-        window.selectLoginMode = (mode) => {
-            if(mode === 'SL') { 
-                if(slSessionActive) {
-                    const slName = document.getElementById('header-sl-name')?.innerText.replace('CMD: ', '') || "INCONNU";
-                    hudConfirm("DÉJÀ EN POSTE", `Le poste est occupé par <strong>${slName}</strong>.<br>Êtes-vous ce soldat ?`, 
-                        async () => {
-                             document.getElementById('btn-login-log').classList.add('hidden'); 
-                             document.getElementById('login-sl-form').classList.remove('hidden');
-                        },
-                        () => {
-                             document.getElementById('btn-login-log').classList.add('hidden'); 
-                             document.getElementById('login-sl-form').classList.remove('hidden');
-                        }
-                    );
-                } else {
-                    document.getElementById('btn-login-log').classList.add('hidden'); 
-                    document.getElementById('login-sl-form').classList.remove('hidden'); 
-                }
-            }
-            else { 
-                document.getElementById('btn-login-sl').classList.add('hidden'); 
-                document.getElementById('login-log-form').classList.remove('hidden'); 
-                window.showLogLogin(); 
-            }
-        };
-        window.resetLoginSelection = () => { document.getElementById('btn-login-sl').classList.remove('hidden'); document.getElementById('btn-login-log').classList.remove('hidden'); document.getElementById('login-sl-form').classList.add('hidden'); document.getElementById('login-log-form').classList.add('hidden'); };
-        window.triggerLoginSL = () => { const p = document.getElementById('sl-pseudo').value.toUpperCase(); const g = document.getElementById('sl-grade').value; if(!p) return; window.loginSL(g, p, false); }
-        
-        window.loginSL = async (grade, pseudo, isRestore) => { 
-             await setDoc(publicDoc('settings', 'global'), { slSessionId: currentUserId, slName: `${grade} ${pseudo}`, serviceStatus: 'ACTIVE' }, {merge:true}); 
-             await setDoc(publicDoc('users', currentUserId), { pseudo: pseudo, grade: grade, role: 'SL', isOnline: true, lastActive: serverTimestamp() }); 
-             userRole = 'SL'; userPseudo = pseudo; userGrade = grade; 
-             localStorage.setItem('logiops_sl_uid', currentUserId); 
-             lastNotificationTime = Date.now(); 
-             if(!isRestore) addLog(`PRISE DE SERVICE SL: ${grade} ${pseudo}`, 'CMD', true);
-             document.getElementById('auth-screen').classList.add('hidden'); 
-             loadInterface(); 
-        };
-        
-        window.showLogLogin = () => { const list = document.getElementById('roster-list-login'); onSnapshot(publicPath('roster'), (snap) => { list.innerHTML = ''; snap.forEach(doc => { const d = doc.data(); const btn = document.createElement('button'); btn.className = "w-full text-left border border-green-900 bg-black/40 p-4 mb-2 rounded flex justify-between items-center touch-manipulation hover:bg-green-900/20"; btn.innerHTML = `<span class="font-bold text-green-400">${d.grade} ${d.pseudo}</span>`; btn.onclick = () => window.loginLOG(doc.id, d.pseudo, d.grade); list.appendChild(btn); }); }); };
-        
-        window.loginLOG = async (rid, p, g) => { 
-            await setDoc(publicDoc('users', currentUserId), { pseudo: p, grade: g, role: 'LOG', rosterId: rid, isOnline: true, rtbStatus: 'NONE', lastActive: serverTimestamp() }); 
-            userRole = 'LOG'; userPseudo = p; userGrade = g; 
-            localStorage.removeItem('logiops_sl_uid'); 
-            lastNotificationTime = Date.now(); 
-            addLog(`CONNEXION: ${g} ${p}`, 'CONNECT'); 
-            document.getElementById('auth-screen').classList.add('hidden'); 
-            loadInterface(); 
-        };
-
-        window.leaveSLPost = () => { hudConfirm("QUITTER", "Vous passerez Logisticien.", async () => { await updateDoc(publicDoc('settings', 'global'), { slSessionId: null, slName: null }); await updateDoc(publicDoc('users', currentUserId), { role: 'LOG' }); localStorage.removeItem('logiops_sl_uid'); const rSnap = await getDocs(query(publicPath('roster'), where('pseudo', '==', userPseudo))); if(rSnap.empty) await addDoc(publicPath('roster'), { grade: userGrade, pseudo: userPseudo }); userRole = 'LOG'; loadInterface(); }, null); };
-        window.takeCommand = () => { if(userRole !== 'SL') hudConfirm("COMMANDEMENT", "Prendre le poste ?", async () => { await updateDoc(publicDoc('settings', 'global'), { slSessionId: currentUserId, slName: `${userGrade} ${userPseudo}` }); await updateDoc(publicDoc('users', currentUserId), { role: 'SL' }); userRole = 'SL'; localStorage.setItem('logiops_sl_uid', currentUserId); loadInterface(); }, null); };
-        
-        window.openVehicleDetail = (vid) => {
-            document.getElementById('vehicle-detail-modal').classList.remove('hidden');
-            onSnapshot(publicDoc('vehicles', vid), (doc) => {
-                if(!doc.exists()) return document.getElementById('vehicle-detail-modal').classList.add('hidden');
-                const d = doc.data();
-                document.getElementById('vd-name').innerText = d.name; document.getElementById('vd-type').innerText = d.category;
-                document.getElementById('vd-status').innerText = d.status; document.getElementById('vd-cost').innerText = d.cost;
-                const acts = document.getElementById('vd-actions'); acts.innerHTML = '';
-                if(d.status === 'DESTROYED') {
-                    const b = document.createElement('button'); b.className="btn-tac w-full border-red-500 text-red-500 py-3 font-bold rounded"; b.innerText="ARCHIVER ÉPAVE";
-                    b.onclick = () => { hudConfirm("ARCHIVER", "Supprimer ?", async () => { await deleteDoc(publicDoc('vehicles', vid)); document.getElementById('vehicle-detail-modal').classList.add('hidden'); }, null); };
-                    acts.appendChild(b);
-                } else if(d.status === 'OPS' && !d.missionId) {
-                    if(userRole === 'SL') {
-                        const b = document.createElement('button'); b.className="btn-tac w-full border-green-500 text-green-500 py-3 font-bold rounded"; b.innerText=`RETOUR GARAGE (+${d.cost})`;
-                        b.onclick = () => { hudConfirm("GARAGE", "Rentrer véhicule ?", async () => { await refundGlobalSupply(d.cost); await deleteDoc(publicDoc('vehicles', vid)); document.getElementById('vehicle-detail-modal').classList.add('hidden'); }, null); };
-                        acts.appendChild(b);
-                    } else acts.innerHTML = '<div class="text-center text-gray-500">SL REQUIS</div>';
-                }
-            });
-        };
-
-        window.toggleSeat = async (vehId, data, role) => { if(!currentUserId) return; const targetOccupant = data.seats[role]; if (targetOccupant && targetOccupant.uid === currentUserId) { await updateDoc(publicDoc('vehicles', vehId), { [`seats.${role}`]: null }); addLog(`${userPseudo} est descendu de ${data.name}`); return; } if (targetOccupant) return hudAlert("Occupé", `Place occupée par ${targetOccupant.name}`); let currentVehId = null, currentSeatRole = null, currentVehName = null; for (const v of vehicleDataCache) { for (const [r, occ] of Object.entries(v.data.seats)) { if (occ && occ.uid === currentUserId) { currentVehId = v.id; currentSeatRole = r; currentVehName = v.data.name; break; } } if (currentVehId) break; } if (currentVehId) { hudConfirm("CHANGEMENT", `Quitter <strong>${currentVehName}</strong> pour <strong>${data.name}</strong> ?`, async () => { const batch = writeBatch(db); batch.update(publicDoc('vehicles', currentVehId), { [`seats.${currentSeatRole}`]: null }); batch.update(publicDoc('vehicles', vehId), { [`seats.${role}`]: { uid: currentUserId, name: userPseudo } }); await batch.commit(); addLog(`${userPseudo} a changé de véhicule.`); }); } else { await updateDoc(publicDoc('vehicles', vehId), { [`seats.${role}`]: { uid: currentUserId, name: userPseudo } }); addLog(`${userPseudo} est monté dans ${data.name}`); } };
-        window.toggleSidebar = () => { const s = document.getElementById('sidebar'); const b = document.getElementById('mobile-backdrop'); if(s.classList.contains('-translate-x-full')) { s.classList.remove('-translate-x-full'); b.classList.remove('hidden'); } else { s.classList.add('-translate-x-full'); b.classList.add('hidden'); } };
-        window.setupNotifications = () => { const feed = document.getElementById('notif-feed'); listeners.push(onSnapshot(publicPath('notifications'), (snap) => { snap.docChanges().forEach(change => { if (change.type === 'added') { const d = change.doc.data(); if (d.isPriority && getMillis(d.timestamp) > lastNotificationTime && !(userRole === 'SL' && d.message.includes('demande une FIN DE SERVICE'))) { window.hudAlert(d.type, d.message); } } }); feed.innerHTML = ''; let docs = snap.docs.map(d => d.data()).sort((a,b) => getMillis(b.timestamp) - getMillis(a.timestamp)); docs.slice(0, 50).forEach(d => { const el = document.createElement('div'); el.className = `text-xs border-b border-green-900/30 p-2 font-mono ${d.isPriority ? 'text-red-400 bg-red-900/10' : 'text-green-300'}`; el.innerHTML = `<span class="opacity-50">[${formatTime(d.timestamp)}]</span> <b>${d.type}:</b> ${d.message}`; feed.appendChild(el); }); })); };
-        window.requestLogRTB = async () => { hudConfirm("FIN DE SERVICE", "Demander RTB ?", async () => { await updateDoc(publicDoc('users', currentUserId), { rtbStatus: 'REQUESTED' }); addLog(`${userPseudo} demande un RTB.`, 'ADMIN', true); hudAlert("EN ATTENTE", "Demande envoyée."); }, null); };
-        window.logoutSelf = async () => { hudConfirm("DÉCONNEXION", "Quitter ?", async () => { await updateDoc(publicDoc('users', currentUserId), { isOnline: false }); localStorage.removeItem('logiops_sl_uid'); location.reload(); }, null); };
-        window.endServiceGlobal = () => { hudConfirm("FIN SERVICE GLOBAL", "Déconnexion de TOUS ?", async () => { await updateDoc(publicDoc('settings', 'global'), { serviceStatus: 'ENDED' }); addLog("FIN DE SERVICE", "CMD", true); }, null); };
-        
-        window.unitSitrep = (n) => hudPrompt(`SITREP ${n}`, "Message :", (msg) => addLog(`[SITREP ${n}] ${msg}`, 'RADIO', true)); window.unitRtb = (n) => addLog(`ORDRE RTB POUR ${n}`, 'CMD', true); window.sendSitrep = (m) => hudPrompt(`SITREP MISSION`, "Message global :", (msg) => addLog(`[SITREP GLOBAL] ${msg}`, 'MISSION', true)); window.requestRTB = (m) => addLog(`ORDRE RTB GLOBAL MISSION ${m}`, 'MISSION', true);
-        window.requestGlobalRTB = async (mName, mId) => { if(!confirm("Ordonner le RETOUR BASE pour toute la mission ?")) return; await updateDoc(publicDoc('missions', mId), { status: 'RTB_IN_PROGRESS' }); addLog(`[ORDRE RTB GLOBAL // ${mName}] RETOUR BASE IMMÉDIAT DEMANDÉ`, 'MISSION', true); };
-        window.openRequestsModal = () => { const m = document.getElementById('requests-modal'); const list = document.getElementById('requests-list'); m.classList.remove('hidden'); list.innerHTML = ''; if(pendingRequests.length === 0) { list.innerHTML = '<div class="text-center text-gray-500">Aucune demande.</div>'; return; } pendingRequests.forEach((req, index) => { const div = document.createElement('div'); div.className = "border border-yellow-500/50 bg-yellow-900/10 p-3 rounded mb-2"; div.innerHTML = `<div class="flex justify-between items-start mb-2"><div class="font-bold text-yellow-500">${req.title}</div><div class="text-xs text-gray-400">${req.type}</div></div><div class="text-sm text-white mb-3">${req.desc}</div><div class="grid grid-cols-2 gap-2"><button onclick="resolveRequest(${index}, true)" class="bg-green-900/50 border border-green-500 text-green-400 text-xs py-2 rounded font-bold">ACCEPTER</button><button onclick="resolveRequest(${index}, false)" class="bg-red-900/50 border border-red-500 text-red-400 text-xs py-2 rounded font-bold">REFUSER</button></div>`; list.appendChild(div); }); };
-        window.resolveRequest = async (index, accepted) => { const req = pendingRequests[index]; if (req.type === 'RTB') { const newStatus = accepted ? 'APPROVED' : 'DENIED'; await updateDoc(publicDoc('users', req.data.uid), { rtbStatus: newStatus, isOnline: accepted ? false : true }); if(accepted) addLog(`${req.data.name} RTB Validé.`, 'ADMIN'); } else if (req.type === 'LEAD') { if(accepted) { await updateDoc(publicDoc('missions', req.data.mId), { leaderId: req.data.targetId, leaderName: req.data.targetName, transferRequest: null }); addLog(`SL a validé ${req.data.targetName} Chef.`, 'CMD'); } else { await updateDoc(publicDoc('missions', req.data.mId), { transferRequest: null }); } } pendingRequests.splice(index, 1); updateRequestsUI(); const m = document.getElementById('requests-modal'); if(!m.classList.contains('hidden')) openRequestsModal(); };
-        window.openMissionModal = async () => { document.getElementById('mission-modal').classList.remove('hidden'); const list = document.getElementById('mission-vehicle-list'); const warnDiv = document.getElementById('maintenance-warning'); list.innerHTML = '...'; warnDiv.innerHTML = ''; const snap = await getDocs(publicPath('vehicles')); list.innerHTML = ''; let opsCount = 0; let maintCount = 0; let maintNames = []; snap.forEach(doc => { const d = doc.data(); if (d.status === 'MAINTENANCE') { maintCount++; maintNames.push(d.name); } if(d.status === 'OPS' && !d.missionId) { opsCount++; const l = document.createElement('label'); l.className = "flex items-center gap-3 p-3 bg-black/40 border border-green-900/50 rounded cursor-pointer"; l.innerHTML = `<input type="checkbox" class="accent-green-500 w-5 h-5 m-chk" value="${doc.id}"><div class="text-sm font-bold text-green-400">${d.name} <span class="text-xs text-gray-500">(${d.category})</span></div>`; list.appendChild(l); } }); if (maintCount > 0) { warnDiv.innerHTML = `<div class="p-2 bg-orange-900/30 border border-orange-500 text-orange-300 text-xs rounded mb-2"><i class="fas fa-wrench"></i> <strong>ATTENTION :</strong> ${maintCount} véhicules en maintenance<br><span class="italic text-[9px]">${maintNames.join(', ')}</span></div>`; } if(opsCount===0) list.innerHTML = '<div class="text-center text-gray-500 py-4">Aucun véhicule OPS.</div>'; };
-        window.confirmMission = async () => { const name = document.getElementById('mission-name').value; if(!name) return; const chks = document.querySelectorAll('.m-chk:checked'); const vIds = Array.from(chks).map(c => c.value); const mRef = await addDoc(publicPath('missions'), { name, status: 'ACTIVE', leaderId: null, leaderName: null, createdAt: serverTimestamp(), vehicleCount: vIds.length }); const batch = writeBatch(db); vIds.forEach(id => batch.update(publicDoc('vehicles', id), { status: 'MISSION', missionId: mRef.id })); await batch.commit(); addLog(`Mission lancée : ${name}`, 'MISSION'); document.getElementById('mission-modal').classList.add('hidden'); };
-        window.openRTBCheckModal = async (mId) => { const m = document.getElementById('rtb-check-modal'); const list = document.getElementById('rtb-check-list'); m.classList.remove('hidden'); const snap = await getDocs(query(publicPath('vehicles'), where('missionId', '==', mId))); list.innerHTML = ''; snap.forEach(doc => { const d = doc.data(); const div = document.createElement('div'); div.className = "mb-4 p-3 border border-green-900/50 bg-black/40 rounded"; div.innerHTML = `<div class="font-bold text-green-400 mb-2">${d.name} (${d.category})</div><div class="grid grid-cols-2 gap-2"><div><label class="text-[10px] text-gray-400">CARBURANT %</label><input type="number" min="0" max="100" value="100" class="w-full bg-black border border-green-700 text-white text-center p-1 rtb-fuel" data-id="${doc.id}"></div><div><label class="text-[10px] text-gray-400">ÉTAT %</label><input type="number" min="0" max="100" value="100" class="w-full bg-black border border-green-700 text-white text-center p-1 rtb-health" data-id="${doc.id}"></div></div>`; list.appendChild(div); }); document.getElementById('btn-confirm-rtb-check').onclick = () => submitRTBCheck(mId); };
-        window.submitRTBCheck = async (mId) => { const fuels = document.querySelectorAll('.rtb-fuel'); const healths = document.querySelectorAll('.rtb-health'); const batch = writeBatch(db); let mCount = 0; for (let i = 0; i < fuels.length; i++) { const vid = fuels[i].dataset.id; const fVal = parseInt(fuels[i].value); const hVal = parseInt(healths[i].value); const vRef = publicDoc('vehicles', vid); if (fVal < 100 || hVal < 100) { batch.update(vRef, { status: 'MAINTENANCE', missionId: null, fuel: fVal, integrity: hVal }); mCount++; } else { batch.update(vRef, { status: 'OPS', missionId: null, fuel: 100, integrity: 100 }); } } batch.update(publicDoc('missions', mId), { status: 'ARCHIVED' }); await batch.commit(); addLog(`Mission terminée. ${mCount} maintenance.`, 'LOGISTICS'); document.getElementById('rtb-check-modal').classList.add('hidden'); document.getElementById('mission-details-modal').classList.add('hidden'); };
-        window.performMaintenance = (vid, name) => { hudConfirm("MAINTENANCE", `Réparer ${name} ?`, async () => { await updateDoc(publicDoc('vehicles', vid), { status: 'OPS', fuel: 100, integrity: 100 }); addLog(`Maintenance effectuée sur ${name}.`, 'LOGISTICS'); }, null); };
-
-    </script>
-
-    <!-- Custom CSS -->
-    <style>
-        :root { --neon-green: #22c55e; --bg-dark: #0f172a; }
-        body { background-color: #050505; color: #e2e8f0; font-family: 'Share Tech Mono', monospace; overflow: hidden; }
-        .hud-panel { background: rgba(10, 15, 10, 0.95); border: 1px solid rgba(34, 197, 94, 0.3); box-shadow: 0 0 15px rgba(34, 197, 94, 0.1); }
-        .btn-tac { border: 1px solid #22c55e; color: #22c55e; background: rgba(34, 197, 94, 0.05); transition: 0.1s; }
-        .btn-tac:active { background: #22c55e; color: black; }
-        .modal-bg { background: rgba(0,0,0,0.9); backdrop-filter: blur(5px); }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .mobile-drawer { transition: transform 0.3s ease-in-out; }
-        .btn-return { border: 1px solid #6b7280; color: #9ca3af; }
-        .alert-border { border: 2px solid red; animation: flash 1s infinite; }
-        @keyframes flash { 0%, 100% { border-color: red; } 50% { border-color: transparent; } }
-        .blink { animation: blinker 1s linear infinite; }
-        @keyframes blinker { 50% { opacity: 0.5; } }
-        @media (max-width: 768px) { .desktop-only { display: none; } }
-    </style>
+      // Simple visual test card if no vehicles exist
+      if (snap.empty) {
+        const testCard = document.createElement('div');
+        testCard.className = 'p-3 border border-dashed border-gray-600 rounded bg-black/40 text-xs text-gray-400';
+        testCard.innerHTML = `Aucun véhicule en base. <span class="text-green-400">(Test: affichage OK)</span>`;
+        grid.appendChild(testCard);
+      }
+    });
+  </script>
 </head>
-<body class="h-screen w-screen flex flex-col text-sm md:text-base">
+<body class="h-screen w-screen">
 
-    <!-- AUTH SCREEN -->
-    <div id="auth-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-black p-4">
-        <div class="hud-panel w-full max-w-md p-6 rounded relative">
-            <h1 class="text-4xl text-green-500 text-center mb-6 font-bold">LOGIOPS V2</h1>
-            
-            <!-- SELECTION BUTTONS -->
-            <div class="flex flex-col gap-4 mb-4">
-                <button id="btn-login-sl" onclick="selectLoginMode('SL')" class="py-4 border border-green-600 text-green-400 rounded font-bold hover:bg-green-900/30 transition-all flex items-center justify-center gap-3">
-                    <i class="fas fa-chess-king text-2xl"></i> SQUAD LEADER
-                </button>
-                <button id="btn-login-log" onclick="selectLoginMode('LOG')" class="py-4 border border-green-600 text-green-400 rounded font-bold hover:bg-green-900/30 transition-all flex items-center justify-center gap-3">
-                    <i class="fas fa-boxes text-2xl"></i> LOGISTICIEN
-                </button>
-            </div>
+  <!-- AUTH -->
+  <div id="auth" class="hidden fixed inset-0 flex items-center justify-center p-4 bg-black">
+    <div class="hud p-6 rounded w-full max-w-md">
+      <h1 class="text-center text-3xl text-green-500 mb-6">LOGIOPS V2</h1>
 
-            <!-- SL FORM -->
-            <div id="login-sl-form" class="hidden">
-                <h2 class="text-green-500 mb-2 font-bold border-b border-green-800 pb-1">AUTHENTIFICATION CMD</h2>
-                <select id="sl-grade" class="w-full bg-gray-900 border border-green-800 p-3 mb-3 text-white rounded"></select>
-                <input id="sl-pseudo" class="w-full bg-gray-900 border border-green-800 p-3 mb-4 text-white uppercase rounded" placeholder="PSEUDO">
-                <button onclick="triggerLoginSL()" class="btn-tac w-full py-3 font-bold rounded mb-2">PRENDRE LE SERVICE</button>
-                <button onclick="resetLoginSelection()" class="btn-return w-full py-2 rounded text-xs">RETOUR</button>
-            </div>
+      <div class="flex flex-col gap-3">
+        <button onclick="$('sl').classList.toggle('hidden')" class="btn py-3 font-bold">SQUAD LEADER</button>
+        <button onclick="$('log').classList.toggle('hidden')" class="btn py-3 font-bold">LOGISTICIEN</button>
+      </div>
 
-            <!-- LOG FORM -->
-            <div id="login-log-form" class="hidden flex flex-col h-64">
-                <h2 class="text-green-500 mb-2 font-bold border-b border-green-800 pb-1">SÉLECTION IDENTITÉ</h2>
-                <div id="roster-list-login" class="flex-1 overflow-y-auto mb-4 pr-1"></div>
-                <button onclick="resetLoginSelection()" class="btn-return w-full py-2 rounded text-xs mt-auto">RETOUR</button>
-            </div>
-        </div>
+      <!-- SL FORM -->
+      <div id="sl" class="hidden mt-4">
+        <select id="sl-grade" class="w-full bg-black border border-green-700 p-2 mb-2">
+          <option value="Sgt">Sgt</option>
+          <option value="Sgt-Chef">Sgt-Chef</option>
+          <option value="Adj">Adj</option>
+        </select>
+        <input id="sl-pseudo" class="w-full bg-black border border-green-700 p-2 mb-3" placeholder="PSEUDO">
+        <button onclick="loginSL()" class="btn py-2 w-full">VALIDER</button>
+      </div>
+
+      <!-- LOG FORM (mini jeu de test : un seul profil en dur) -->
+      <div id="log" class="hidden mt-4">
+        <button onclick="loginLOG('ID123','WHIZZPER','Cpl')" class="btn py-2 w-full">WHIZZPER (Cpl)</button>
+      </div>
     </div>
+  </div>
 
-    <!-- MAIN UI -->
-    <div id="main-interface" class="hidden flex-1 flex flex-col h-full relative z-10">
-        
-        <!-- HEADER -->
-        <header class="h-16 border-b border-green-900/50 flex items-center px-4 bg-gray-900/95 gap-4 z-20 justify-between">
-            <div class="flex items-center gap-4">
-                <button onclick="toggleSidebar()" class="md:hidden text-green-500 p-2"><i class="fas fa-bars text-xl"></i></button>
-                <div id="header-sl-name" class="text-xs border border-green-800 px-3 py-1 rounded text-green-600 font-bold whitespace-nowrap">--</div>
-            </div>
-            
-            <!-- DESKTOP KPI (Hidden on mobile) -->
-            <div class="hidden md:flex flex-1 gap-6 items-center justify-center">
-                <div class="flex flex-col items-center cursor-pointer" onclick="openSupplyModal()">
-                    <span class="text-[9px] text-gray-500">SUPPLY</span>
-                    <span id="supply-count" class="supply-count text-lg font-bold text-white">0</span>
-                </div>
-                <div class="w-px bg-green-900/50 h-6"></div>
-                <div class="flex flex-col items-center">
-                    <span class="text-[9px] text-gray-500">EFFECTIFS</span>
-                    <span id="stat-log-count" class="stat-log-count text-lg font-bold text-green-400">0/0</span>
-                </div>
-                <!-- Vehicle Stats Desktop -->
-                <div class="flex gap-4 ml-4">
-                    <div class="flex flex-col items-center"><span class="text-[9px] text-gray-500">OPS</span><span id="count-ops" class="count-ops text-lg font-bold text-green-500">0</span></div>
-                    <div class="flex flex-col items-center"><span class="text-[9px] text-gray-500">MISS</span><span id="count-mission" class="count-mission text-lg font-bold text-blue-500">0</span></div>
-                    <div class="flex flex-col items-center"><span class="text-[9px] text-gray-500">MAINT</span><span id="count-repair" class="count-repair text-lg font-bold text-orange-500">0</span></div>
-                </div>
-            </div>
-            
-            <button id="garage-btn" onclick="openGarageModal()" class="btn-tac px-3 py-2 text-xs font-bold rounded flex items-center gap-2"><i class="fas fa-warehouse"></i> <span class="hidden md:inline">GARAGE</span></button>
-        </header>
-
-        <div class="flex-1 flex overflow-hidden relative">
-            <div id="mobile-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/80 z-30 hidden md:hidden"></div>
-
-            <!-- SIDEBAR (Mobile Drawer) -->
-            <aside id="sidebar" class="absolute md:relative inset-y-0 left-0 w-72 bg-gray-900/95 border-r border-green-900/50 flex flex-col transform -translate-x-full md:translate-x-0 mobile-drawer z-40">
-                <div class="p-2 flex justify-end md:hidden"><button onclick="toggleSidebar()" class="text-green-500 p-2"><i class="fas fa-times"></i></button></div>
-
-                <!-- MOBILE PROFILE & STATS -->
-                <div class="p-4 border-b border-green-900/30 bg-black/20">
-                    <div id="profile-card" class="mb-4"></div>
-                    
-                    <!-- Mobile Stats Grid -->
-                    <div class="md:hidden grid grid-cols-2 gap-2 mb-2">
-                        <div class="bg-black/40 p-2 rounded flex flex-col items-center" onclick="openSupplyModal()">
-                            <span class="text-[9px] text-gray-500">SUPPLY</span>
-                            <span class="supply-count text-green-400 font-bold">0</span>
-                        </div>
-                        <div class="bg-black/40 p-2 rounded flex flex-col items-center">
-                            <span class="text-[9px] text-gray-500">EFFECTIFS</span>
-                            <span class="stat-log-count text-green-400 font-bold">0</span>
-                        </div>
-                    </div>
-                    <div class="md:hidden grid grid-cols-4 gap-1 text-center text-[9px] text-gray-400">
-                        <div onclick="setFilter('ALL')" class="bg-black/40 p-1 rounded cursor-pointer">TOT<br><span class="count-total text-white font-bold">0</span></div>
-                        <div onclick="setFilter('OPS')" class="bg-black/40 p-1 rounded cursor-pointer text-green-500">OPS<br><span class="count-ops font-bold">0</span></div>
-                        <div onclick="setFilter('MISSION')" class="bg-black/40 p-1 rounded cursor-pointer text-blue-500">MISS<br><span class="count-mission font-bold">0</span></div>
-                        <div onclick="setFilter('DESTROYED')" class="bg-black/40 p-1 rounded cursor-pointer text-red-500">DÉTR<br><span class="count-destroyed font-bold">0</span></div>
-                    </div>
-                </div>
-
-                <div class="p-2 flex flex-col gap-2 overflow-y-auto flex-1">
-                    <div id="sl-controls" class="flex flex-col gap-2">
-                        <!-- Request Alert Button -->
-                        <button id="btn-requests-alert" onclick="openRequestsModal()" class="hidden w-full py-3 bg-yellow-900/50 border border-yellow-500 text-yellow-400 font-bold rounded blink mb-2">
-                            <i class="fas fa-bell mr-2"></i> REQUÊTES (<span id="requests-count">0</span>)
-                        </button>
-
-                        <button onclick="openMissionModal()" class="btn-tac py-3 text-xs font-bold rounded">CRÉER MISSION</button>
-                        <button onclick="openRosterModal()" class="btn-tac py-3 text-xs font-bold rounded">GESTION LOGS</button>
-                        <button onclick="openGarageModal()" class="btn-tac py-3 text-xs font-bold rounded md:hidden">GARAGE</button>
-                        <button onclick="resetOperation()" class="btn-tac bg-red-900/30 border-red-600 text-red-500 py-2 text-xs font-bold rounded mt-2 hover:bg-red-900">RÉINITIALISER OPÉRATION</button>
-                        <button id="btn-leave-post" onclick="leaveSLPost()" class="btn-tac border-red-500 text-red-500 py-2 text-xs font-bold rounded mt-2">QUITTER POSTE</button>
-                        <button id="btn-end-service" onclick="endServiceGlobal()" class="btn-tac bg-red-900/20 border-red-500 text-red-500 py-2 text-xs font-bold rounded">FIN SERVICE GLOBAL</button>
-                    </div>
-                    <div id="log-controls" class="flex flex-col gap-2">
-                        <!-- Hide default logout for LOGs -->
-                    </div>
-
-                    <div class="flex-1 flex flex-col min-h-0 mt-2">
-                        <div class="bg-green-900/20 px-2 py-1 text-[10px] font-bold text-green-500 border-y border-green-900/30">MISSIONS EN COURS</div>
-                        <div id="mission-list" class="space-y-2 pt-2"></div>
-                    </div>
-                </div>
-
-                <div class="p-2 border-t border-green-900/30">
-                    <button onclick="requestLogRTB()" class="btn-tac w-full border-orange-500 text-orange-500 py-3 text-xs font-bold rounded">DEMANDE RTB</button>
-                </div>
-            </aside>
-
-            <main class="flex-1 bg-gradient-to-b from-black/50 to-green-900/10 p-4 overflow-y-auto">
-                <!-- Desktop Filters (Optional, mostly redundant with header but good for big screens) -->
-                <div class="hidden md:flex gap-2 mb-4 border-b border-green-900/30 pb-2">
-                    <button onclick="setFilter('ALL')" class="text-xs px-3 py-1 bg-black/40 rounded hover:bg-green-900/30">TOUS</button>
-                    <button onclick="setFilter('OPS')" class="text-xs px-3 py-1 bg-black/40 rounded hover:bg-green-900/30 text-green-500">OPÉRATIONNEL</button>
-                    <button onclick="setFilter('MISSION')" class="text-xs px-3 py-1 bg-black/40 rounded hover:bg-green-900/30 text-blue-500">EN MISSION</button>
-                    <button onclick="setFilter('REPAIR')" class="text-xs px-3 py-1 bg-black/40 rounded hover:bg-green-900/30 text-orange-500">MAINTENANCE</button>
-                </div>
-                <div id="vehicle-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20"></div>
-            </main>
-        </div>
-
-        <footer class="h-32 bg-black border-t border-green-900 flex flex-col z-20">
-            <div class="bg-green-900/20 p-1 text-green-500 text-xs font-bold px-2">LIVE FEED</div>
-            <div id="notif-feed" class="flex-1 overflow-y-auto p-2"></div>
-        </footer>
-    </div>
-
-    <!-- MODALS -->
-    <!-- 1. RTB CHECK MODAL (NEW) -->
-    <div id="rtb-check-modal" class="modal-bg fixed inset-0 z-[90] hidden flex items-center justify-center p-4">
-        <div class="hud-panel w-full max-w-md p-6 rounded relative max-h-[80vh] flex flex-col">
-            <h3 class="text-xl text-orange-500 font-bold mb-4 border-b border-orange-900 pb-2">CHECK RETOUR MISSION</h3>
-            <div id="rtb-check-list" class="flex-1 overflow-y-auto pr-2 mb-4"></div>
-            <button id="btn-confirm-rtb-check" class="btn-tac w-full py-3 font-bold border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black">VALIDER & CLÔTURER</button>
-        </div>
-    </div>
-
-    <!-- 2. REQUESTS MODAL -->
-    <div id="requests-modal" class="modal-bg fixed inset-0 z-[80] hidden flex items-center justify-center p-4">
-        <div class="hud-panel w-full max-w-md p-6 rounded relative max-h-[80vh] flex flex-col">
-            <button onclick="closeModal('requests-modal')" class="absolute top-2 right-2 text-gray-500"><i class="fas fa-times"></i></button>
-            <h3 class="text-xl text-yellow-500 font-bold mb-4 border-b border-yellow-900 pb-2">REQUÊTES EN ATTENTE</h3>
-            <div id="requests-list" class="flex-1 overflow-y-auto pr-1"></div>
-        </div>
-    </div>
-
-    <!-- 3. MISSION CREATE -->
-    <div id="mission-modal" class="hidden modal-bg fixed inset-0 z-50 flex items-center justify-center p-4"><div class="hud-panel p-6 rounded w-full max-w-md h-[80vh] flex flex-col"><h3 class="text-xl text-green-500 font-bold mb-4">NOUVELLE MISSION</h3><input id="mission-name" class="w-full bg-black border border-green-700 p-2 text-white mb-4" placeholder="NOM OPÉRATION"><div id="maintenance-warning" class="mb-2"></div><div id="mission-vehicle-list" class="flex-1 overflow-y-auto border border-green-900/50 p-2 mb-4"></div><button onclick="confirmMission()" class="btn-tac w-full py-3 font-bold">LANCER</button><button onclick="closeModal('mission-modal')" class="mt-2 text-gray-500 w-full">ANNULER</button></div></div>
-
-    <!-- OTHER MODALS -->
-    <div id="hud-confirm-modal" class="modal-bg fixed inset-0 z-[100] hidden flex items-center justify-center p-6"><div class="hud-panel w-full max-w-sm p-6 text-center rounded"><h3 id="hud-confirm-title" class="text-xl font-bold text-white mb-4">CONFIRMATION</h3><p id="hud-confirm-msg" class="text-green-300 mb-6"></p><div class="grid grid-cols-2 gap-4"><button id="btn-confirm-yes" class="btn-tac py-3 font-bold rounded">OUI</button><button id="btn-confirm-no" class="border border-gray-600 text-gray-400 py-3 rounded">NON</button></div></div></div>
-    <div id="hud-prompt-modal" class="modal-bg fixed inset-0 z-[100] hidden flex items-center justify-center p-6"><div class="hud-panel w-full max-w-sm p-6 rounded"><h3 id="hud-prompt-title" class="text-xl font-bold text-white mb-2">SAISIE</h3><p id="hud-prompt-msg" class="text-xs text-gray-400 mb-4"></p><input id="hud-prompt-input" class="w-full bg-black border border-green-700 p-3 text-white mb-4 rounded"><div class="grid grid-cols-2 gap-4"><button id="btn-prompt-ok" class="btn-tac py-2 font-bold rounded">VALIDER</button><button onclick="document.getElementById('hud-prompt-modal').classList.add('hidden')" class="border border-gray-600 text-gray-400 py-2 rounded">ANNULER</button></div></div></div>
-    <div id="hud-alert-modal" class="modal-bg fixed inset-0 z-[100] hidden flex items-center justify-center p-6"><div class="hud-panel w-full max-w-sm p-6 text-center rounded border-red-500 alert-border"><h3 id="hud-alert-title" class="text-2xl font-bold text-red-500 mb-4">ALERTE</h3><p id="hud-alert-msg" class="text-white mb-6 text-lg"></p><button onclick="document.getElementById('hud-alert-modal').classList.add('hidden')" class="w-full py-3 bg-red-900/50 text-white font-bold border border-red-500 rounded">REÇU</button></div></div>
-    <div id="vehicle-detail-modal" class="modal-bg fixed inset-0 z-[60] hidden flex items-center justify-center p-4"><div class="hud-panel w-full max-w-md p-6 rounded relative"><button onclick="closeModal('vehicle-detail-modal')" class="absolute top-2 right-2 text-gray-500"><i class="fas fa-times"></i></button><h3 class="text-xl text-green-500 font-bold mb-4 border-b border-green-900 pb-2">FICHE VÉHICULE</h3><div class="space-y-2 mb-6 text-sm font-mono text-gray-300"><div class="flex justify-between"><span>ID:</span><span id="vd-name" class="text-white font-bold">--</span></div><div class="flex justify-between"><span>TYPE:</span><span id="vd-type">--</span></div><div class="flex justify-between"><span>STATUT:</span><span id="vd-status" class="font-bold">--</span></div><div class="flex justify-between"><span>COÛT:</span><span id="vd-cost">--</span></div><div class="flex justify-between"><span>SORTIE:</span><span id="vd-date">--</span></div></div><div id="vd-actions" class="border-t border-green-900/50 pt-4"></div></div></div>
-    <div id="roster-modal" class="hidden modal-bg fixed inset-0 z-50 flex items-center justify-center p-4"><div class="hud-panel p-6 rounded w-full max-w-md h-[60vh] flex flex-col"><h3 class="text-xl text-green-500 font-bold mb-4 border-b border-green-900 pb-2">GESTION EFFECTIFS</h3><div id="sl-roster-list" class="flex-1 overflow-y-auto pr-1 mb-4"></div><button onclick="addToRoster()" class="btn-tac w-full py-3 font-bold mb-2">CRÉER PROFIL</button><button onclick="closeModal('roster-modal')" class="btn-return w-full py-2 rounded text-xs">FERMER</button></div></div>
-    <div id="mission-details-modal" class="modal-bg fixed inset-0 z-50 hidden flex items-center justify-center p-4"><div class="hud-panel w-full max-w-4xl h-[90vh] flex flex-col p-4 rounded relative"><button onclick="closeModal('mission-details-modal')" class="absolute top-4 right-4 text-red-500 text-xl"><i class="fas fa-times"></i></button><div id="detail-mission-header" class="flex justify-between items-center border-b border-green-900 pb-4 mb-4"><h2 id="detail-mission-name" class="text-3xl font-bold text-white">MISSION</h2><div class="text-right"><div id="detail-mission-status" class="text-green-500 font-bold">ACTIVE</div><div id="detail-mission-leader" class="mt-2"></div></div></div><div id="leader-mission-actions" class="hidden mb-4 p-2 border border-blue-900/30 rounded bg-blue-900/10"></div><div class="flex-1 overflow-y-auto bg-black/30 p-2 rounded border border-green-900/30"><div id="detail-mission-vehicles" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div></div><div id="sl-mission-actions" class="hidden mt-4"></div></div></div>
-    <div id="transfer-select-modal" class="modal-bg fixed inset-0 z-[110] hidden flex items-center justify-center p-4"><div class="hud-panel w-full max-w-md p-4 rounded max-h-[80vh] flex flex-col"><h3 class="text-white font-bold mb-4">SÉLECTIONNER LE NOUVEAU CHEF</h3><div id="transfer-list" class="flex-1 overflow-y-auto"></div><button onclick="closeModal('transfer-select-modal')" class="mt-4 py-2 border border-gray-600 text-gray-400">ANNULER</button></div></div>
-    <div id="supply-modal" class="hidden modal-bg fixed inset-0 z-50 flex items-center justify-center p-4"><div class="hud-panel p-6 rounded w-full max-w-md h-[70vh] flex flex-col"><h3 class="text-xl text-green-500 font-bold mb-4">LOGISTIQUE & STOCKS</h3><div id="depots-list" class="flex-1 overflow-y-auto space-y-2 pr-1"></div><button onclick="createDepot()" class="btn-tac w-full py-3 font-bold mt-4">NOUVEAU DÉPÔT</button><button onclick="closeModal('supply-modal')" class="mt-2 text-gray-500 w-full text-center">FERMER</button></div></div>
-    <div id="garage-modal" class="hidden modal-bg fixed inset-0 z-50 flex items-center justify-center p-4"><div class="hud-panel p-6 rounded w-full max-w-4xl h-[90vh] flex flex-col"><div class="flex justify-between items-center mb-4 border-b border-green-900 pb-2"><h3 class="text-xl text-green-500 font-bold">GARAGE CENTRAL</h3><button onclick="closeModal('garage-modal')" class="text-green-500"><i class="fas fa-times text-xl"></i></button></div><div class="flex gap-4 mb-4"><div class="flex-1"><input id="new-veh-name" class="w-full bg-black border border-green-700 p-3 text-white uppercase rounded" placeholder="NOM DE CODE (Optionnel)"></div></div><div id="garage-content" class="flex-1 overflow-y-auto overflow-x-auto flex gap-4 pb-4"></div></div></div>
+  <!-- MAIN UI MINIMALE POUR TEST -->
+  <div id="ui" class="hidden flex flex-col h-full">
+    <header class="p-4 border-b border-green-900 text-green-400 font-bold flex justify-between items-center">
+      <span>LOGIOPS — INTERFACE</span>
+      <span class="text-xs text-gray-400">(mode démo optimisé)</span>
+    </header>
+    <main class="flex-1 overflow-y-auto p-4">
+      <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+    </main>
+  </div>
 
 </body>
 </html>
