@@ -55,14 +55,9 @@
         let lastNotificationTime = Date.now();
         let slSessionActive = false;
         
-        // Filtering
         let currentFilter = 'ALL'; 
         let vehicleDataCache = [];
-
-        // Requests Queue
         let pendingRequests = [];
-
-        // Cleanups
         let listeners = [];
 
         // --- DATA CONSTANTS ---
@@ -272,14 +267,8 @@
                 loadInterface();
             } else {
                 document.getElementById('auth-screen').classList.remove('hidden');
-                populateRankSelects();
+                populateSelects();
             }
-        }
-
-        function populateRankSelects() {
-            const opts = RANKS.map(r => `<option value="${r}">${r}</option>`).join('');
-            const slSel = document.getElementById('sl-grade');
-            if(slSel) slSel.innerHTML = opts;
         }
 
         // --- STATISTICS ---
@@ -373,29 +362,8 @@
             }));
         }
 
-        // --- MISSION LISTENERS (FIXED) ---
-        function setupMissionsListener() { 
-            const container = document.getElementById('mission-list'); 
-            listeners.push(onSnapshot(publicPath('missions'), (snap) => { 
-                container.innerHTML = ''; 
-                let docs = snap.docs.map(d => ({id: d.id, ...d.data()})); 
-                docs.sort((a, b) => getMillis(b.createdAt) - getMillis(a.createdAt)); 
-                docs.forEach(data => { 
-                    if(data.status === 'ARCHIVED' || data.status === 'CANCELLED') return; 
-                    const el = document.createElement('div'); 
-                    const statusClass = data.status === 'RTB_IN_PROGRESS' ? 'border-orange-500 bg-orange-900/10' : 'border-green-500/50 bg-green-900/10'; 
-                    el.className = `border ${statusClass} p-3 mb-2 rounded cursor-pointer hover:bg-green-900/30`; 
-                    el.onclick = () => window.openMissionDetails(data.id); 
-                    const leaderDisplay = data.leaderName ? `<div class="text-[10px] text-green-400 font-bold"><i class="fas fa-crown text-yellow-500 mr-1"></i>${data.leaderName}</div>` : `<div class="text-[10px] text-gray-500 italic">CHEF: AUCUN</div>`; 
-                    const statusText = data.status === 'RTB_IN_PROGRESS' ? '<span class="text-[9px] bg-orange-900 text-orange-200 px-1 rounded animate-pulse">RTB</span>' : '<span class="text-[9px] bg-green-900 text-green-200 px-1 rounded">ACTIF</span>'; 
-                    el.innerHTML = `<div class="flex justify-between items-start mb-1 pointer-events-none"><div><h3 class="font-bold text-green-400 truncate pr-2">${data.name}</h3>${leaderDisplay}</div><div class="flex items-center">${statusText}</div></div>`; 
-                    container.appendChild(el); 
-                }); 
-            })); 
-        }
-
         // --- UI LOADING FUNCTION ---
-        function loadInterface() {
+        window.loadInterface = function() {
             document.getElementById('main-interface').classList.remove('hidden');
             document.getElementById('profile-card').innerHTML = `
                 <div class="text-xs text-gray-500 mb-1">IDENTITÉ</div>
@@ -412,23 +380,29 @@
             const logDiv = document.getElementById('log-controls');
             const btnLeavePost = document.getElementById('btn-leave-post');
             const btnEndService = document.getElementById('btn-end-service');
-            const btnCreateVeh = document.getElementById('btn-create-vehicle');
+            
+            // FIX: Check if button exists (mobile garage button is in HTML)
+            const btnCreateVeh = document.getElementById('garage-btn-mobile'); // hypothetical ID if it was specific, but here garage is general
 
             if (userRole === 'SL') {
                 slDiv.classList.remove('hidden');
                 logDiv.classList.add('hidden');
                 btnLeavePost.classList.remove('hidden');
                 btnEndService.classList.remove('hidden');
-                if(btnCreateVeh) btnCreateVeh.classList.remove('hidden');
                 setupSLRequestListeners(); 
             } else {
                 slDiv.classList.add('hidden');
                 logDiv.classList.remove('hidden');
                 btnLeavePost.classList.add('hidden');
                 btnEndService.classList.add('hidden');
-                if(btnCreateVeh) btnCreateVeh.classList.add('hidden');
             }
-        }
+        };
+
+        window.populateSelects = function() {
+            const opts = RANKS.map(r => `<option value="${r}">${r}</option>`).join('');
+            const slSel = document.getElementById('sl-grade');
+            if(slSel) slSel.innerHTML = opts;
+        };
 
         function setupVehiclesListener() {
             const grid = document.getElementById('vehicle-grid');
@@ -458,9 +432,50 @@
             }));
         }
 
-        // --- VEHICLE GRID ---
+        function setupMissionsListener() { 
+            const container = document.getElementById('mission-list'); 
+            listeners.push(onSnapshot(publicPath('missions'), (snap) => { 
+                container.innerHTML = ''; 
+                let docs = snap.docs.map(d => ({id: d.id, ...d.data()})); 
+                docs.sort((a, b) => getMillis(b.createdAt) - getMillis(a.createdAt)); 
+                docs.forEach(data => { 
+                    if(data.status === 'ARCHIVED' || data.status === 'CANCELLED') return; 
+                    const el = document.createElement('div'); 
+                    const statusClass = data.status === 'RTB_IN_PROGRESS' ? 'border-orange-500 bg-orange-900/10' : 'border-green-500/50 bg-green-900/10'; 
+                    el.className = `border ${statusClass} p-3 mb-2 rounded cursor-pointer hover:bg-green-900/30`; 
+                    el.onclick = () => window.openMissionDetails(data.id); 
+                    const leaderDisplay = data.leaderName ? `<div class="text-[10px] text-green-400 font-bold"><i class="fas fa-crown text-yellow-500 mr-1"></i>${data.leaderName}</div>` : `<div class="text-[10px] text-gray-500 italic">CHEF: AUCUN</div>`; 
+                    const statusText = data.status === 'RTB_IN_PROGRESS' ? '<span class="text-[9px] bg-orange-900 text-orange-200 px-1 rounded animate-pulse">RTB</span>' : '<span class="text-[9px] bg-green-900 text-green-200 px-1 rounded">ACTIF</span>'; 
+                    el.innerHTML = `<div class="flex justify-between items-start mb-1 pointer-events-none"><div><h3 class="font-bold text-green-400 truncate pr-2">${data.name}</h3>${leaderDisplay}</div><div class="flex items-center">${statusText}</div></div>`; 
+                    container.appendChild(el); 
+                }); 
+            })); 
+        }
+
+        function setupNotifications() { 
+            const feed = document.getElementById('notif-feed'); 
+            listeners.push(onSnapshot(publicPath('notifications'), (snap) => { 
+                snap.docChanges().forEach(change => { 
+                    if (change.type === 'added') { 
+                        const d = change.doc.data(); 
+                        if (d.isPriority && getMillis(d.timestamp) > lastNotificationTime && !(userRole === 'SL' && d.message.includes('demande une FIN DE SERVICE'))) { 
+                            window.hudAlert(d.type, d.message); 
+                        } 
+                    } 
+                }); 
+                feed.innerHTML = ''; 
+                let docs = snap.docs.map(d => d.data()).sort((a,b) => getMillis(b.timestamp) - getMillis(a.timestamp)); 
+                docs.slice(0, 50).forEach(d => { 
+                    const el = document.createElement('div'); 
+                    el.className = `text-xs border-b border-green-900/30 p-2 font-mono ${d.isPriority ? 'text-red-400 bg-red-900/10' : 'text-green-300'}`; 
+                    el.innerHTML = `<span class="opacity-50">[${formatTime(d.timestamp)}]</span> <b>${d.type}:</b> ${d.message}`; 
+                    feed.appendChild(el); 
+                }); 
+            })); 
+        }
+
+        // --- EXPORTED FUNCTIONS ---
         window.setFilter = (f) => { currentFilter = f; renderVehicleGrid(); };
-        
         function renderVehicleGrid() {
             const grid = document.getElementById('vehicle-grid');
             if(!grid) return;
@@ -504,7 +519,7 @@
             return div;
         }
 
-        // --- EXPORTED FUNCTIONS ---
+        // ACTIONS
         window.selectLoginMode = (mode) => {
             if(mode === 'SL') { 
                 if(slSessionActive) {
@@ -583,7 +598,6 @@
 
         window.toggleSeat = async (vehId, data, role) => { if(!currentUserId) return; const targetOccupant = data.seats[role]; if (targetOccupant && targetOccupant.uid === currentUserId) { await updateDoc(publicDoc('vehicles', vehId), { [`seats.${role}`]: null }); addLog(`${userPseudo} est descendu de ${data.name}`); return; } if (targetOccupant) return hudAlert("Occupé", `Place occupée par ${targetOccupant.name}`); let currentVehId = null, currentSeatRole = null, currentVehName = null; for (const v of vehicleDataCache) { for (const [r, occ] of Object.entries(v.data.seats)) { if (occ && occ.uid === currentUserId) { currentVehId = v.id; currentSeatRole = r; currentVehName = v.data.name; break; } } if (currentVehId) break; } if (currentVehId) { hudConfirm("CHANGEMENT", `Quitter <strong>${currentVehName}</strong> pour <strong>${data.name}</strong> ?`, async () => { const batch = writeBatch(db); batch.update(publicDoc('vehicles', currentVehId), { [`seats.${currentSeatRole}`]: null }); batch.update(publicDoc('vehicles', vehId), { [`seats.${role}`]: { uid: currentUserId, name: userPseudo } }); await batch.commit(); addLog(`${userPseudo} a changé de véhicule.`); }); } else { await updateDoc(publicDoc('vehicles', vehId), { [`seats.${role}`]: { uid: currentUserId, name: userPseudo } }); addLog(`${userPseudo} est monté dans ${data.name}`); } };
         window.toggleSidebar = () => { const s = document.getElementById('sidebar'); const b = document.getElementById('mobile-backdrop'); if(s.classList.contains('-translate-x-full')) { s.classList.remove('-translate-x-full'); b.classList.remove('hidden'); } else { s.classList.add('-translate-x-full'); b.classList.add('hidden'); } };
-        window.setupNotifications = () => { const feed = document.getElementById('notif-feed'); listeners.push(onSnapshot(publicPath('notifications'), (snap) => { snap.docChanges().forEach(change => { if (change.type === 'added') { const d = change.doc.data(); if (d.isPriority && getMillis(d.timestamp) > lastNotificationTime && !(userRole === 'SL' && d.message.includes('demande une FIN DE SERVICE'))) { window.hudAlert(d.type, d.message); } } }); feed.innerHTML = ''; let docs = snap.docs.map(d => d.data()).sort((a,b) => getMillis(b.timestamp) - getMillis(a.timestamp)); docs.slice(0, 50).forEach(d => { const el = document.createElement('div'); el.className = `text-xs border-b border-green-900/30 p-2 font-mono ${d.isPriority ? 'text-red-400 bg-red-900/10' : 'text-green-300'}`; el.innerHTML = `<span class="opacity-50">[${formatTime(d.timestamp)}]</span> <b>${d.type}:</b> ${d.message}`; feed.appendChild(el); }); })); };
         window.requestLogRTB = async () => { hudConfirm("FIN DE SERVICE", "Demander RTB ?", async () => { await updateDoc(publicDoc('users', currentUserId), { rtbStatus: 'REQUESTED' }); addLog(`${userPseudo} demande un RTB.`, 'ADMIN', true); hudAlert("EN ATTENTE", "Demande envoyée."); }, null); };
         window.logoutSelf = async () => { hudConfirm("DÉCONNEXION", "Quitter ?", async () => { await updateDoc(publicDoc('users', currentUserId), { isOnline: false }); localStorage.removeItem('logiops_sl_uid'); location.reload(); }, null); };
         window.endServiceGlobal = () => { hudConfirm("FIN SERVICE GLOBAL", "Déconnexion de TOUS ?", async () => { await updateDoc(publicDoc('settings', 'global'), { serviceStatus: 'ENDED' }); addLog("FIN DE SERVICE", "CMD", true); }, null); };
