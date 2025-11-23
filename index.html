@@ -2,8 +2,8 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGIOPS - Centre Opérationnel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LOGIOPS V2 - Mobile Command</title>
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -19,17 +19,17 @@
                     },
                     colors: {
                         mil: {
-                            900: '#0a0f0d',
-                            800: '#111a16',
-                            700: '#1a2621',
+                            black: '#050807',
+                            dark: '#0e1411',
+                            panel: '#151f1a',
                             green: '#00ff41',
                             dim: '#008F11',
                             alert: '#ff3333',
                             warn: '#ffcc00'
                         }
                     },
-                    backgroundImage: {
-                        'grid-pattern': "linear-gradient(to right, #1a2621 1px, transparent 1px), linear-gradient(to bottom, #1a2621 1px, transparent 1px)"
+                    animation: {
+                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                     }
                 }
             }
@@ -47,50 +47,28 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics-compat.js"></script>
 
     <style>
-        body {
-            background-color: #050807;
-            color: #e0e0e0;
-        }
+        body { background-color: #050807; color: #e0e0e0; -webkit-font-smoothing: antialiased; }
+        /* Scanlines reduites pour mobile */
         .scanline {
-            width: 100%;
-            height: 100px;
-            z-index: 10;
-            background: linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0, 255, 65, 0.04) 50%, rgba(0,0,0,0) 100%);
-            opacity: 0.1;
-            position: absolute;
-            bottom: 100%;
-            animation: scanline 10s linear infinite;
-            pointer-events: none;
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+            background-size: 100% 4px; pointer-events: none; z-index: 50; opacity: 0.15;
         }
-        @keyframes scanline {
-            0% { bottom: 100%; }
-            100% { bottom: -100px; }
+        .crt-overlay {
+            background: radial-gradient(circle, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 100%);
+            position: fixed; inset: 0; pointer-events: none; z-index: 49;
         }
-        /* Custom scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #111a16; }
-        ::-webkit-scrollbar-thumb { background: #008F11; }
-        ::-webkit-scrollbar-thumb:hover { background: #00ff41; }
-        
-        .crt-flicker {
-            animation: flicker 0.15s infinite;
-        }
-        @keyframes flicker {
-            0% { opacity: 0.97; }
-            50% { opacity: 1; }
-            100% { opacity: 0.98; }
-        }
+        input, select, textarea { font-size: 16px; } /* Prevents iOS zoom */
     </style>
 </head>
-<body class="font-mono overflow-hidden h-screen w-screen text-sm">
+<body class="font-mono h-screen w-screen overflow-hidden text-sm select-none">
     <div id="root"></div>
 
     <script type="text/babel">
         /*******************************************************
-         * 1. CONFIGURATION & INITIALISATION FIREBASE
+         * CONFIGURATION FIREBASE & UTILS
          *******************************************************/
         const firebaseConfig = {
             apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
@@ -99,593 +77,398 @@
             storageBucket: "logiops-data.firebasestorage.app",
             messagingSenderId: "791163499354",
             appId: "1:791163499354:web:2bb76506331db9d240b963",
-            measurementId: "G-FFMXKH47M9"
         };
 
-        let db = null;
-        let USE_FIREBASE = false;
-        let IS_CUSTOM_DB = false;
+        let db = null; let USE_FIREBASE = false;
 
         try {
-            if (!firebase.apps.length) {
-                const app = firebase.initializeApp(firebaseConfig);
-                if (typeof firebase.analytics === 'function') firebase.analytics();
-            }
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
             db = firebase.firestore();
             USE_FIREBASE = true;
-            IS_CUSTOM_DB = true;
-            console.log("🔥 Firebase connecté à :", firebaseConfig.projectId);
-        } catch (e) {
-            console.warn("⚠️ Erreur Initialisation Firebase (Mode Local):", e);
-            USE_FIREBASE = false;
-        }
+        } catch (e) { console.warn("Mode Offline Activé"); }
 
-        /*******************************************************
-         * 2. SERVICE DE STOCKAGE (HYBRIDE)
-         *******************************************************/
-        const LOCAL_STORAGE_KEY = "logiops_v19_1";
+        const LOCAL_KEY = "logiops_v2_mobile";
         
+        // Structure de données enrichie pour le Crewing
         const DEFAULT_DATA = {
-            units: [],
+            units: [], // { id, type, name, status, hp, fuel, crew: { driver: null, gunner: null, pax: [] } }
             logs: [],
-            squad: [],
             sitreps: [],
-            destroyedHistory: [],
-            missions: [],
-            supplySources: [{ id: "main", name: "BASE PRINCIPALE", amount: 5000 }]
+            supply: { fuel: 5000, ammo: 2000, parts: 500 } // Simplifié pour mobile
         };
 
-        const StorageService = {
-            // Sauvegarde (Cloud ou Local)
-            save: async (newData) => {
-                const timestamp = new Date().toISOString();
+        const Storage = {
+            save: async (data) => {
                 if (USE_FIREBASE && db) {
-                    try {
-                        await db.collection('logiops').doc('operation_actuelle').set(newData, { merge: true });
-                    } catch (err) {
-                        console.error("Save Error Firebase:", err);
-                    }
+                    await db.collection('logiops').doc('mobile_ops').set(data, { merge: true });
                 } else {
-                    // LocalStorage Fallback
-                    const current = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || JSON.stringify(DEFAULT_DATA));
-                    const merged = { ...current, ...newData };
-                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
+                    const prev = JSON.parse(localStorage.getItem(LOCAL_KEY) || JSON.stringify(DEFAULT_DATA));
+                    localStorage.setItem(LOCAL_KEY, JSON.stringify({ ...prev, ...data }));
                 }
             },
-
-            // Chargement initial + Subscription
-            loadInitial: (onUpdate) => {
+            subscribe: (cb) => {
                 if (USE_FIREBASE && db) {
-                    // Mode Temps Réel
-                    return db.collection('logiops').doc('operation_actuelle')
-                        .onSnapshot((doc) => {
-                            if (doc.exists) {
-                                const data = doc.data();
-                                // Merge soft pour éviter d'écraser des champs manquants
-                                onUpdate({ ...DEFAULT_DATA, ...data });
-                            } else {
-                                // Init doc s'il n'existe pas
-                                db.collection('logiops').doc('operation_actuelle').set(DEFAULT_DATA);
-                                onUpdate(DEFAULT_DATA);
-                            }
-                        }, (error) => {
-                            console.error("Snapshot Error:", error);
-                            // Fallback si la co coupe en cours de route ?
-                        });
+                    return db.collection('logiops').doc('mobile_ops').onSnapshot(doc => {
+                        cb(doc.exists ? { ...DEFAULT_DATA, ...doc.data() } : DEFAULT_DATA);
+                    });
                 } else {
-                    // Mode Local
-                    const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
-                    if (localData) {
-                        onUpdate(JSON.parse(localData));
-                    } else {
-                        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(DEFAULT_DATA));
-                        onUpdate(DEFAULT_DATA);
-                    }
-                    // Simulation d'un "listener" local rudimentaire via setInterval ou events si besoin
-                    // Ici on renvoie une fonction de cleanup vide
-                    return () => {}; 
+                    cb(JSON.parse(localStorage.getItem(LOCAL_KEY) || JSON.stringify(DEFAULT_DATA)));
+                    return () => {};
                 }
             }
         };
 
         /*******************************************************
-         * 3. ICONS (SVG)
+         * ICONS (Optimisées)
          *******************************************************/
         const Icons = {
-            Tank: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>,
-            Truck: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>,
-            Wrench: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
-            Alert: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
-            Check: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
-            Refresh: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
-            Trash: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            Menu: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>,
+            X: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+            User: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
+            Steering: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+            Target: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
+            LogBook: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+            Gas: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
         };
 
-        /*******************************************************
-         * 4. HOOKS & UTILS
-         *******************************************************/
-        
-        function useData() {
-            const [data, setData] = React.useState(null);
-            const [isConnected, setIsConnected] = React.useState(false);
-
-            React.useEffect(() => {
-                const unsubscribe = StorageService.loadInitial((newData) => {
-                    setData(newData);
-                    setIsConnected(USE_FIREBASE);
-                });
-                return () => unsubscribe();
-            }, []);
-
-            const save = (updatePayload) => {
-                // updatePayload doit contenir l'objet complet ou partiel pour Firestore merge
-                StorageService.save(updatePayload);
-            };
-
-            const addLog = (message, author) => {
-                if (!data) return;
-                const newLog = {
-                    id: Date.now(),
-                    timestamp: new Date().toLocaleTimeString(),
-                    message,
-                    author
-                };
-                const updatedLogs = [newLog, ...data.logs].slice(0, 50); // Garder les 50 derniers
-                save({ logs: updatedLogs });
-            };
-
-            return { data, save, addLog, isConnected };
-        }
-
-        const VEHICLE_CATALOG = [
-            { id: 'logi_truck', name: 'Logi Truck (R-37)', cost: 0, type: 'logi', maxHp: 100, maxFuel: 1000 },
-            { id: 'transport', name: 'Transport Troop', cost: 0, type: 'transport', maxHp: 80, maxFuel: 600 },
-            { id: 'jeep_mg', name: 'Light Jeep MG', cost: 0, type: 'light', maxHp: 50, maxFuel: 400 },
-            { id: 'apc_wheel', name: 'BTR-80 (Wheeled)', cost: 0, type: 'armor', maxHp: 300, maxFuel: 800 },
-            { id: 'mbt', name: 'T-72 (MBT)', cost: 0, type: 'armor', maxHp: 1200, maxFuel: 1200 },
+        const CATALOG = [
+            { id: 'logi', name: 'Logi Truck', slots: ['driver', 'copilot'], hp: 100, fuel: 500 },
+            { id: 'jeep', name: 'Light Jeep', slots: ['driver', 'gunner', 'pax', 'pax'], hp: 60, fuel: 300 },
+            { id: 'btr', name: 'BTR-80', slots: ['driver', 'gunner', 'cmdr', 'pax', 'pax', 'pax'], hp: 300, fuel: 800 },
+            { id: 'tank', name: 'T-72 Main', slots: ['driver', 'gunner', 'cmdr'], hp: 1200, fuel: 1000 },
         ];
 
         /*******************************************************
-         * 5. COMPOSANTS UI
+         * COMPOSANTS
          *******************************************************/
 
-        // --- AUTHENTIFICATION ---
-        const AuthScreen = ({ onLogin }) => {
-            const [pseudo, setPseudo] = React.useState('');
-            const [role, setRole] = React.useState('SL');
-            const [grade, setGrade] = React.useState('Sgt');
-
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                if(pseudo.trim()) onLogin({ pseudo, role, grade });
-            };
-
+        // --- AUTH ---
+        const Login = ({ onJoin }) => {
+            const [data, setData] = React.useState({ pseudo: '', role: 'LOGI' });
             return (
-                <div className="flex items-center justify-center h-screen bg-mil-900 bg-[size:20px_20px] bg-grid-pattern relative">
-                    <div className="scanline"></div>
-                    <div className="border border-mil-green/50 bg-mil-800 p-8 w-96 shadow-[0_0_15px_rgba(0,255,65,0.2)]">
-                        <h1 className="text-2xl font-bold text-mil-green mb-6 text-center tracking-widest">LOGIOPS ACCESS</h1>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-xs text-mil-green mb-1">IDENTIFIANT</label>
-                                <input 
-                                    type="text" 
-                                    value={pseudo} 
-                                    onChange={e => setPseudo(e.target.value.toUpperCase())}
-                                    className="w-full bg-mil-900 border border-mil-700 text-mil-green p-2 focus:outline-none focus:border-mil-green"
-                                    placeholder="CALLSIGN..."
-                                />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs text-mil-green mb-1">ROLE</label>
-                                    <select value={role} onChange={e => setRole(e.target.value)} className="w-full bg-mil-900 border border-mil-700 text-mil-green p-2">
-                                        <option value="SL">SQUAD LEAD</option>
-                                        <option value="LOGI">LOGISTIQUE</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs text-mil-green mb-1">GRADE</label>
-                                    <select value={grade} onChange={e => setGrade(e.target.value)} className="w-full bg-mil-900 border border-mil-700 text-mil-green p-2">
-                                        <option value="Cpl">Cpl</option>
-                                        <option value="Sgt">Sgt</option>
-                                        <option value="Lt">Lt</option>
-                                        <option value="Cpt">Cpt</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <button type="submit" className="w-full bg-mil-dim hover:bg-mil-green text-black font-bold py-2 px-4 transition-colors">
-                                CONNEXION SYSTÈME
-                            </button>
-                        </form>
-                        <div className="mt-4 text-xs text-center text-mil-green/50">
-                            {USE_FIREBASE ? "CLOUD UPLINK: ACTIF" : "CLOUD UPLINK: ERREUR (MODE LOCAL)"}
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        // --- DASHBOARD VEHICULE ---
-        const UnitCard = ({ unit, user, onUpdate, onDelete }) => {
-            const getStatusColor = (s) => {
-                switch(s) {
-                    case 'operational': return 'text-mil-green border-mil-green';
-                    case 'mission': return 'text-blue-400 border-blue-400';
-                    case 'rtb_requested': return 'text-yellow-400 border-yellow-400 animate-pulse';
-                    case 'maintenance': return 'text-orange-500 border-orange-500';
-                    case 'destroyed': return 'text-red-600 border-red-600';
-                    default: return 'text-gray-500 border-gray-500';
-                }
-            };
-
-            const handleAction = (action) => {
-                let updates = {};
-                if (action === 'start_mission') updates = { status: 'mission' };
-                if (action === 'request_rtb') updates = { status: 'rtb_requested' };
-                if (action === 'validate_rtb') {
-                    // Logic check
-                    if (unit.hp < unit.maxHp * 0.9) updates = { status: 'maintenance' };
-                    else updates = { status: 'operational' };
-                }
-                if (action === 'finish_maintenance') updates = { status: 'operational', hp: unit.maxHp, fuel: unit.maxFuel };
-                if (action === 'report_destroyed') updates = { status: 'destroyed' };
-                
-                onUpdate(unit.id, updates);
-            };
-
-            const handleDamage = (amount) => {
-                const newHp = Math.max(0, unit.hp - amount);
-                onUpdate(unit.id, { hp: newHp });
-            }
-
-            return (
-                <div className={`border p-2 mb-2 bg-mil-900/80 flex flex-col gap-2 ${getStatusColor(unit.status)}`}>
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2 font-bold">
-                            {unit.type === 'armor' ? <Icons.Tank /> : <Icons.Truck />}
-                            {unit.name} <span className="text-xs opacity-70">#{unit.id.slice(-4)}</span>
-                        </div>
-                        <span className="text-xs uppercase px-1 border border-current">{unit.status.replace('_', ' ')}</span>
-                    </div>
-
-                    {/* Barres de vie / fuel */}
-                    <div className="space-y-1 text-xs">
-                        <div className="flex justify-between">
-                            <span>INTÉGRITÉ</span>
-                            <span>{Math.round((unit.hp/unit.maxHp)*100)}%</span>
-                        </div>
-                        <div className="w-full bg-gray-800 h-1">
-                            <div className="bg-current h-1" style={{ width: `${(unit.hp/unit.maxHp)*100}%` }}></div>
-                        </div>
-                        
-                        <div className="flex justify-between text-blue-300">
-                            <span>CARBURANT</span>
-                            <span>{Math.round((unit.fuel/unit.maxFuel)*100)}%</span>
-                        </div>
-                        <div className="w-full bg-gray-800 h-1">
-                            <div className="bg-blue-500 h-1" style={{ width: `${(unit.fuel/unit.maxFuel)*100}%` }}></div>
-                        </div>
-                    </div>
-
-                    {/* Actions contextuelles */}
-                    <div className="grid grid-cols-2 gap-1 mt-1">
-                        {user.role === 'SL' && unit.status === 'operational' && (
-                            <button onClick={() => handleAction('start_mission')} className="bg-blue-900/50 hover:bg-blue-900 text-xs p-1">DEPART MISSION</button>
-                        )}
-                        {user.role === 'SL' && unit.status === 'mission' && (
-                            <button onClick={() => handleAction('request_rtb')} className="bg-yellow-900/50 hover:bg-yellow-900 text-xs p-1">DEMANDE RTB</button>
-                        )}
-                        {user.role === 'SL' && unit.status !== 'destroyed' && (
-                            <button onClick={() => handleAction('report_destroyed')} className="bg-red-900/50 hover:bg-red-900 text-xs p-1 col-span-2">SIGNALER DÉTRUIT</button>
-                        )}
-
-                        {user.role === 'LOGI' && unit.status === 'rtb_requested' && (
-                            <button onClick={() => handleAction('validate_rtb')} className="bg-mil-dim hover:bg-mil-green text-black text-xs p-1 col-span-2">VALIDER RETOUR</button>
-                        )}
-                        {user.role === 'LOGI' && unit.status === 'maintenance' && (
-                            <button onClick={() => handleAction('finish_maintenance')} className="bg-mil-dim hover:bg-mil-green text-black text-xs p-1 col-span-2">FIN MAINTENANCE</button>
-                        )}
-                         {user.role === 'LOGI' && unit.status !== 'destroyed' && (
-                             <>
-                                <button onClick={() => handleDamage(10)} className="border border-red-500 text-red-500 text-xs p-1">-10 HP</button>
-                                <button onClick={() => onDelete(unit.id)} className="border border-red-900 text-red-900 text-xs p-1">SUPPRIMER</button>
-                             </>
-                        )}
-                    </div>
-                </div>
-            );
-        };
-
-        // --- GARAGE (Modal) ---
-        const GaragePanel = ({ isOpen, onClose, onBuy }) => {
-            if (!isOpen) return null;
-            return (
-                <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
-                    <div className="border border-mil-green bg-mil-900 w-full max-w-2xl p-4 max-h-[80vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-4 border-b border-mil-green/30 pb-2">
-                            <h2 className="text-xl font-bold text-mil-green">RÉQUISITION VÉHICULE</h2>
-                            <button onClick={onClose} className="text-red-500 font-bold">X</button>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {VEHICLE_CATALOG.map(v => (
-                                <div key={v.id} className="border border-mil-green/50 p-3 hover:bg-mil-green/10 cursor-pointer" 
-                                     onClick={() => { onBuy(v); onClose(); }}>
-                                    <div className="font-bold text-mil-green">{v.name}</div>
-                                    <div className="text-xs text-gray-400">HP: {v.maxHp} | Fuel: {v.maxFuel}</div>
-                                    <div className="text-xs text-mil-green mt-2 text-right">REQUISITIONNER &gt;</div>
-                                </div>
+                <div className="h-full flex flex-col items-center justify-center p-6 bg-mil-black relative">
+                    <div className="border border-mil-green p-6 w-full max-w-sm bg-mil-panel shadow-[0_0_20px_rgba(0,255,65,0.1)]">
+                        <h1 className="text-2xl font-bold text-mil-green text-center mb-6 tracking-widest">LOGIOPS MOBILE</h1>
+                        <input className="w-full bg-black border border-mil-green/50 text-mil-green p-3 mb-4 uppercase placeholder-mil-green/30 focus:outline-none focus:border-mil-green"
+                            placeholder="VOTRE PSEUDO..." value={data.pseudo} onChange={e => setData({...data, pseudo: e.target.value.toUpperCase()})} />
+                        <div className="flex gap-2 mb-6">
+                            {['SL', 'LOGI'].map(r => (
+                                <button key={r} onClick={() => setData({...data, role: r})}
+                                    className={`flex-1 p-3 font-bold border transition-all ${data.role === r ? 'bg-mil-green text-black border-mil-green' : 'text-mil-green border-mil-green/30'}`}>
+                                    {r}
+                                </button>
                             ))}
                         </div>
+                        <button onClick={() => data.pseudo && onJoin(data)} className="w-full bg-mil-dim text-white font-bold py-3 hover:bg-mil-green hover:text-black">INITIALISER SYSTÈME</button>
                     </div>
                 </div>
             );
         };
 
-        // --- SITREP MODAL ---
-        const SitrepModal = ({ isOpen, onClose, onSend }) => {
-            const [text, setText] = React.useState('');
-            if (!isOpen) return null;
-            return (
-                <div className="fixed inset-0 bg-red-900/20 backdrop-blur-sm z-50 flex items-center justify-center">
-                    <div className="border-2 border-red-600 bg-black p-6 w-full max-w-lg shadow-[0_0_50px_rgba(255,0,0,0.3)]">
-                        <h2 className="text-red-500 font-bold text-2xl mb-4 animate-pulse">ALERTE SITREP</h2>
-                        <textarea 
-                            className="w-full bg-mil-900 border border-red-500/50 p-2 text-red-100 h-32 focus:outline-none"
-                            placeholder="NATURE DE L'ALERTE / CONTACT / POSITION..."
-                            value={text} onChange={e => setText(e.target.value)}
-                        />
-                        <div className="flex gap-2 mt-4">
-                            <button onClick={() => { onSend(text); onClose(); setText(''); }} className="flex-1 bg-red-600 text-black font-bold py-2">DIFFUSER L'ALERTE</button>
-                            <button onClick={onClose} className="border border-red-600 text-red-600 px-4">ANNULER</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        // --- MAIN APP COMPONENT ---
-        const App = () => {
-            const [user, setUser] = React.useState(null);
-            const { data, save, addLog, isConnected } = useData();
+        // --- CREW SLOT BUTTON ---
+        const CrewSlot = ({ label, occupant, onAction, user, isMySlot }) => {
+            const isTaken = !!occupant;
             
-            // UI States
-            const [showGarage, setShowGarage] = React.useState(false);
-            const [showSitrep, setShowSitrep] = React.useState(false);
-            const [activeFilter, setActiveFilter] = React.useState('all');
+            // Si c'est mon slot -> Rouge (Sortir)
+            // Si c'est pris par un autre -> Gris (Occupé)
+            // Si c'est libre -> Vert (Embarquer)
+            
+            let btnClass = "border border-mil-green/30 text-mil-green/50 cursor-not-allowed";
+            if (isMySlot) btnClass = "border border-red-500 bg-red-900/20 text-red-500 hover:bg-red-900/40";
+            else if (!isTaken) btnClass = "border border-mil-green bg-mil-green/10 text-mil-green hover:bg-mil-green/20";
+            else btnClass = "border border-gray-700 bg-gray-900 text-gray-500 cursor-not-allowed";
 
-            if (!user) return <AuthScreen onLogin={setUser} />;
-            if (!data) return <div className="h-screen flex items-center justify-center text-mil-green animate-pulse">INITIALISATION DATALINK...</div>;
+            return (
+                <button 
+                    onClick={() => !isTaken || isMySlot ? onAction() : null}
+                    disabled={isTaken && !isMySlot}
+                    className={`flex flex-col items-center justify-center p-2 text-xs rounded transition-colors ${btnClass}`}
+                >
+                    <span className="opacity-70 text-[10px] uppercase mb-1">{label}</span>
+                    <span className="font-bold truncate w-full text-center">
+                        {occupant || "LIBRE"}
+                    </span>
+                </button>
+            );
+        };
 
-            // Logique Métier
-            const handleBuyVehicle = (template) => {
-                const newUnit = {
-                    ...template,
-                    id: `${template.id}_${Date.now().toString().slice(-4)}`,
-                    status: 'operational',
-                    hp: template.maxHp,
-                    fuel: template.maxFuel
-                };
-                save({ units: [...data.units, newUnit] });
-                addLog(`Réquisition véhicule : ${newUnit.name}`, user.pseudo);
-            };
+        // --- UNIT CARD ---
+        const UnitCard = ({ unit, user, onUpdate, onDelete }) => {
+            const [expanded, setExpanded] = React.useState(false);
 
-            const handleUpdateUnit = (id, updates) => {
-                const newUnits = data.units.map(u => {
-                    if (u.id === id) {
-                        const updated = { ...u, ...updates };
-                        // Si détruit, déplacer vers historique
-                        if (updated.status === 'destroyed') {
-                            // On le supprime de units dans le useEffect ou ici ? 
-                            // Pour simplifier, on le garde en status 'destroyed' jusqu'à nettoyage, ou on bouge direct.
-                            // Bougeons le direct pour l'archive.
-                            return null;
-                        }
-                        return updated;
-                    }
-                    return u;
-                }).filter(Boolean);
+            // Gestion Crew
+            const handleCrew = (slotName) => {
+                const currentOccupant = unit.crew[slotName];
+                let newCrew = { ...unit.crew };
 
-                // Gestion destruction
-                const destroyedUnit = data.units.find(u => u.id === id);
-                let newHistory = data.destroyedHistory || [];
-                if (updates.status === 'destroyed' && destroyedUnit) {
-                    newHistory = [...newHistory, { ...destroyedUnit, destroyedAt: new Date().toISOString(), destroyedBy: user.pseudo }];
-                    addLog(`PERTE CONFIRMÉE: ${destroyedUnit.name}`, user.pseudo);
+                if (currentOccupant === user.pseudo) {
+                    // Sortir
+                    newCrew[slotName] = null;
+                } else if (!currentOccupant) {
+                    // Rentrer (Vérifier si déjà ailleurs si on veut être strict, mais ici simple)
+                    newCrew[slotName] = user.pseudo;
                 }
-
-                save({ units: newUnits, destroyedHistory: newHistory });
-                
-                // Logs auto pour changement de status
-                if(updates.status && updates.status !== 'destroyed') {
-                    const unitName = data.units.find(u => u.id === id)?.name || id;
-                    addLog(`Unit ${unitName} status: ${updates.status}`, "SYS");
-                }
+                onUpdate(unit.id, { crew: newCrew });
             };
 
-            const handleDeleteUnit = (id) => {
-                 const newUnits = data.units.filter(u => u.id !== id);
-                 save({ units: newUnits });
-                 addLog(`Véhicule supprimé manuellement`, user.pseudo);
-            }
+            // Actions SL
+            const handleStatus = (status) => onUpdate(unit.id, { status });
 
-            const handleSitrep = (msg) => {
-                const newSitrep = { id: Date.now(), msg, time: new Date().toLocaleTimeString(), author: user.pseudo };
-                save({ sitreps: [newSitrep, ...data.sitreps] });
-                addLog(`SITREP: ${msg}`, user.pseudo);
-            };
-
-            const handleSupplyUpdate = (id, amount) => {
-                const newSources = data.supplySources.map(s => s.id === id ? { ...s, amount: parseInt(amount) } : s);
-                save({ supplySources: newSources });
-            };
-
-            const filteredUnits = data.units.filter(u => activeFilter === 'all' || u.type === activeFilter);
-
-            // Stats
-            const stats = {
-                ops: data.units.filter(u => u.status === 'operational').length,
-                mission: data.units.filter(u => u.status === 'mission').length,
-                maint: data.units.filter(u => u.status === 'maintenance' || u.status === 'rtb_requested').length,
-                loss: (data.destroyedHistory || []).length
+            const statusColors = {
+                operational: 'border-mil-green text-mil-green',
+                mission: 'border-blue-500 text-blue-400',
+                maintenance: 'border-orange-500 text-orange-500',
+                destroyed: 'border-red-600 text-red-600 bg-red-900/10'
             };
 
             return (
-                <div className="flex h-screen bg-mil-900 bg-[size:30px_30px] bg-grid-pattern overflow-hidden relative">
-                    {/* Scanline Effect */}
-                    <div className="scanline"></div>
-
-                    {/* --- LEFT SIDEBAR (NAV & STATS) --- */}
-                    <aside className="w-64 border-r border-mil-green/30 bg-mil-800/50 flex flex-col p-4 z-20 backdrop-blur-sm">
-                        <div className="mb-6 border-b border-mil-green pb-2">
-                            <h1 className="text-xl font-bold text-mil-green tracking-widest">LOGIOPS V1</h1>
-                            <div className="text-xs text-mil-green/60 mt-1">
-                                {user.grade} {user.pseudo} [{user.role}]
-                                <div className={`w-2 h-2 rounded-full inline-block ml-2 ${isConnected ? 'bg-mil-green' : 'bg-red-500'}`}></div>
+                <div className={`mb-3 bg-mil-panel border-l-4 p-3 shadow-lg transition-all ${statusColors[unit.status] || 'border-gray-500'}`}>
+                    {/* Header Carte */}
+                    <div className="flex justify-between items-start mb-2">
+                        <div onClick={() => setExpanded(!expanded)} className="flex-1 cursor-pointer">
+                            <h3 className="font-bold text-lg leading-none">{unit.name}</h3>
+                            <div className="text-xs opacity-70 mt-1 flex gap-2">
+                                <span>HP: {unit.hp}%</span>
+                                <span>FUEL: {unit.fuel}L</span>
+                                <span className="uppercase tracking-wide font-bold">[{unit.status}]</span>
                             </div>
                         </div>
-
-                        <div className="space-y-4 flex-1">
-                            <div className="border border-mil-green/30 p-2">
-                                <h3 className="text-xs text-mil-green mb-2 border-b border-mil-green/20">ÉTAT FLOTTE</h3>
-                                <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                                    <div className="bg-mil-green/10 p-1 rounded">
-                                        <div className="text-mil-green font-bold text-lg">{stats.ops}</div>
-                                        <div className="text-gray-400">PRÊT</div>
-                                    </div>
-                                    <div className="bg-blue-900/30 p-1 rounded">
-                                        <div className="text-blue-400 font-bold text-lg">{stats.mission}</div>
-                                        <div className="text-gray-400">MSN</div>
-                                    </div>
-                                    <div className="bg-orange-900/30 p-1 rounded">
-                                        <div className="text-orange-400 font-bold text-lg">{stats.maint}</div>
-                                        <div className="text-gray-400">MAINT</div>
-                                    </div>
-                                    <div className="bg-red-900/30 p-1 rounded">
-                                        <div className="text-red-500 font-bold text-lg">{stats.loss}</div>
-                                        <div className="text-gray-400">PERTE</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <nav className="space-y-1">
-                                <button onClick={() => setActiveFilter('all')} className={`w-full text-left px-2 py-1 text-sm ${activeFilter === 'all' ? 'bg-mil-green text-black' : 'text-mil-green hover:bg-mil-green/20'}`}>TOUS LES VÉHICULES</button>
-                                <button onClick={() => setActiveFilter('logi')} className={`w-full text-left px-2 py-1 text-sm ${activeFilter === 'logi' ? 'bg-mil-green text-black' : 'text-mil-green hover:bg-mil-green/20'}`}>LOGISTIQUES</button>
-                                <button onClick={() => setActiveFilter('armor')} className={`w-full text-left px-2 py-1 text-sm ${activeFilter === 'armor' ? 'bg-mil-green text-black' : 'text-mil-green hover:bg-mil-green/20'}`}>BLINDÉS</button>
-                            </nav>
-
-                            <div className="mt-auto border-t border-mil-green/30 pt-4 space-y-2">
-                                {user.role === 'SL' && (
-                                    <>
-                                        <button onClick={() => setShowGarage(true)} className="w-full border border-mil-green text-mil-green py-2 hover:bg-mil-green hover:text-black font-bold transition-all">
-                                            + RÉQUISITION
-                                        </button>
-                                        <button onClick={() => setShowSitrep(true)} className="w-full border border-red-500 text-red-500 py-2 hover:bg-red-500 hover:text-black font-bold animate-pulse">
-                                            ! SITREP !
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </aside>
-
-                    {/* --- CENTER (DASHBOARD) --- */}
-                    <main className="flex-1 p-4 overflow-y-auto z-10 relative">
-                        {/* ALERTS BANNER */}
-                        {data.sitreps.length > 0 && (
-                            <div className="mb-4 space-y-2">
-                                {data.sitreps.slice(0, 2).map(s => (
-                                    <div key={s.id} className="bg-red-900/40 border-l-4 border-red-600 p-2 flex justify-between items-start animate-pulse">
-                                        <div>
-                                            <span className="font-bold text-red-400">SITREP [{s.time}] {s.author}:</span>
-                                            <span className="ml-2 text-red-200">{s.msg}</span>
-                                        </div>
-                                        <button onClick={() => save({ sitreps: data.sitreps.filter(x => x.id !== s.id) })} className="text-red-500 hover:text-white">x</button>
-                                    </div>
-                                ))}
+                        {user.role === 'SL' && (
+                            <div className="flex flex-col gap-1 ml-2">
+                                <button onClick={() => onDelete(unit.id)} className="text-red-500 text-xs border border-red-500/30 px-2 py-1">X</button>
                             </div>
                         )}
+                    </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {filteredUnits.length === 0 ? (
-                                <div className="col-span-3 text-center text-gray-600 py-10 border border-gray-800 border-dashed">AUCUNE UNITÉ DANS CE SECTEUR</div>
-                            ) : (
-                                filteredUnits.map(unit => (
-                                    <UnitCard 
-                                        key={unit.id} 
-                                        unit={unit} 
-                                        user={user} 
-                                        onUpdate={handleUpdateUnit}
-                                        onDelete={handleDeleteUnit}
-                                    />
-                                ))
+                    {/* Crew Grid */}
+                    <div className="grid grid-cols-3 gap-2 mt-3">
+                        {Object.entries(unit.crew).map(([slot, occupant]) => (
+                            <CrewSlot 
+                                key={slot}
+                                label={slot}
+                                occupant={occupant}
+                                user={user}
+                                isMySlot={occupant === user.pseudo}
+                                onAction={() => handleCrew(slot)}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Actions Contextuelles (Expandable) */}
+                    {expanded && (
+                        <div className="mt-4 pt-3 border-t border-white/10 grid grid-cols-2 gap-2 animate-fadeIn">
+                            {user.role === 'SL' && (
+                                <>
+                                    <button onClick={() => handleStatus('mission')} className="bg-blue-900/40 text-blue-300 py-2 text-xs border border-blue-800">DÉPART MSN</button>
+                                    <button onClick={() => handleStatus('operational')} className="bg-mil-green/20 text-mil-green py-2 text-xs border border-mil-green/50">RETOUR BASE</button>
+                                    <button onClick={() => handleStatus('destroyed')} className="col-span-2 bg-red-900/50 text-red-500 py-2 text-xs border border-red-800">SIGNALER DÉTRUIT</button>
+                                </>
+                            )}
+                            {user.role === 'LOGI' && (
+                                <>
+                                    <button onClick={() => handleStatus('maintenance')} className="bg-orange-900/40 text-orange-300 py-2 text-xs border border-orange-800">EN PANNE</button>
+                                    <button onClick={() => onUpdate(unit.id, { hp: Math.min(100, unit.hp + 20) })} className="bg-mil-green/20 text-mil-green py-2 text-xs border border-mil-green/50">RÉPARER (+20)</button>
+                                    <button onClick={() => onUpdate(unit.id, { fuel: unit.maxFuel })} className="col-span-2 bg-blue-900/30 text-blue-300 py-2 text-xs border border-blue-800">RAVITAILLER FULL</button>
+                                </>
                             )}
                         </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- VIEWS ---
+        const Dashboard = ({ data, user, save }) => {
+            const myVehicle = data.units.find(u => Object.values(u.crew).includes(user.pseudo));
+
+            return (
+                <div className="pb-20">
+                    {/* Status Personnel */}
+                    {myVehicle && (
+                        <div className="bg-mil-green/10 border-b border-mil-green p-3 mb-4 flex justify-between items-center sticky top-14 z-20 backdrop-blur-md">
+                            <div>
+                                <div className="text-[10px] text-mil-green uppercase">Véhicule Actuel</div>
+                                <div className="font-bold text-mil-green">{myVehicle.name}</div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-xs text-white">HP: {myVehicle.hp}</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Liste */}
+                    <div className="p-3">
+                        {data.units.length === 0 && <div className="text-center text-gray-600 mt-10">GARAGE VIDE</div>}
+                        {data.units.map(u => (
+                            <UnitCard 
+                                key={u.id} 
+                                unit={u} 
+                                user={user}
+                                onUpdate={(id, up) => {
+                                    const updated = data.units.map(unit => unit.id === id ? { ...unit, ...up } : unit);
+                                    save({ units: updated });
+                                }}
+                                onDelete={(id) => save({ units: data.units.filter(u => u.id !== id) })}
+                            />
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const ResourcesView = ({ data, save }) => (
+            <div className="p-4 pt-20">
+                <h2 className="text-xl text-mil-green mb-6 border-b border-mil-green pb-2">STOCKS LOGISTIQUE</h2>
+                <div className="space-y-4">
+                    {Object.entries(data.supply).map(([key, val]) => (
+                        <div key={key} className="bg-mil-panel border border-mil-green/30 p-4 flex justify-between items-center">
+                            <span className="uppercase text-lg">{key}</span>
+                            <div className="flex items-center gap-4">
+                                <span className="font-bold text-2xl text-mil-green">{val}</span>
+                                <div className="flex flex-col gap-1">
+                                    <button onClick={() => save({ supply: { ...data.supply, [key]: val + 100 } })} className="bg-mil-green/20 px-2 text-mil-green">+</button>
+                                    <button onClick={() => save({ supply: { ...data.supply, [key]: Math.max(0, val - 100) } })} className="bg-red-900/20 px-2 text-red-500">-</button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+
+        const JMOView = ({ data, save, user }) => {
+            const [input, setInput] = React.useState('');
+            const send = () => {
+                if(!input.trim()) return;
+                const newLog = { id: Date.now(), time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), msg: input, author: user.pseudo };
+                save({ logs: [newLog, ...data.logs] });
+                setInput('');
+            };
+
+            return (
+                <div className="flex flex-col h-[calc(100vh-60px)] pt-14">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                        {data.logs.map(log => (
+                            <div key={log.id} className="border-b border-gray-800 pb-2 text-xs">
+                                <span className="text-gray-500 mr-2">{log.time}</span>
+                                <span className="text-mil-green font-bold mr-2">{log.author}:</span>
+                                <span className="text-gray-300 break-words">{log.msg}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="p-3 bg-mil-dark border-t border-mil-green/30 flex gap-2">
+                        <input className="flex-1 bg-black border border-gray-700 p-2 text-white focus:border-mil-green outline-none" 
+                            value={input} onChange={e => setInput(e.target.value)} placeholder="Message..." />
+                        <button onClick={send} className="bg-mil-green text-black font-bold px-4">SEND</button>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- APP SHELL ---
+        const App = () => {
+            const [user, setUser] = React.useState(null);
+            const [data, setData] = React.useState(null);
+            const [view, setView] = React.useState('dashboard'); // dashboard, resources, jmo, garage
+            const [menuOpen, setMenuOpen] = React.useState(false);
+
+            React.useEffect(() => {
+                return Storage.subscribe(setData);
+            }, []);
+
+            if (!user) return <Login onJoin={setUser} />;
+            if (!data) return <div className="flex h-screen items-center justify-center text-mil-green animate-pulse">UPLINKING...</div>;
+
+            const save = (payload) => Storage.save(payload);
+
+            const buyVehicle = (template) => {
+                const id = Date.now().toString();
+                // Construire l'objet crew dynamique selon le template
+                const crewObj = {};
+                template.slots.forEach(s => crewObj[s] = null); // 'driver': null, etc.
+
+                const newUnit = {
+                    id, 
+                    name: template.name,
+                    type: template.id,
+                    status: 'operational',
+                    hp: 100, maxHp: template.hp,
+                    fuel: template.fuel, maxFuel: template.fuel,
+                    crew: crewObj
+                };
+                save({ units: [...data.units, newUnit] });
+                setView('dashboard');
+                setMenuOpen(false);
+            };
+
+            return (
+                <div className="h-screen w-full relative bg-mil-black flex flex-col">
+                    <div className="scanline"></div>
+                    <div className="crt-overlay"></div>
+
+                    {/* HEADER FIXE */}
+                    <header className="h-14 bg-mil-dark border-b border-mil-green/50 flex items-center justify-between px-4 z-40 fixed w-full top-0">
+                        <div className="flex items-center gap-3">
+                            <button onClick={() => setMenuOpen(!menuOpen)} className="text-mil-green">
+                                {menuOpen ? <Icons.X /> : <Icons.Menu />}
+                            </button>
+                            <h1 className="font-bold text-mil-green tracking-wider text-lg">LOGIOPS</h1>
+                        </div>
+                        <div className="text-right text-xs">
+                            <div className="text-mil-green font-bold">{user.pseudo}</div>
+                            <div className="text-gray-500 tracking-tighter text-[10px]">ROLE: {user.role}</div>
+                        </div>
+                    </header>
+
+                    {/* MENU LATÉRAL (DRAWER) */}
+                    {menuOpen && (
+                        <div className="fixed inset-0 z-30 bg-black/90 backdrop-blur-sm pt-16 px-6 animate-fadeIn">
+                            <nav className="flex flex-col gap-4 text-lg">
+                                <button onClick={() => { setView('dashboard'); setMenuOpen(false); }} className={`p-4 border ${view === 'dashboard' ? 'border-mil-green text-mil-green' : 'border-gray-800 text-gray-500'}`}>FLOTTE (DASHBOARD)</button>
+                                <button onClick={() => { setView('jmo'); setMenuOpen(false); }} className={`p-4 border ${view === 'jmo' ? 'border-mil-green text-mil-green' : 'border-gray-800 text-gray-500'}`}>JOURNAL (JMO)</button>
+                                <button onClick={() => { setView('resources'); setMenuOpen(false); }} className={`p-4 border ${view === 'resources' ? 'border-mil-green text-mil-green' : 'border-gray-800 text-gray-500'}`}>STOCKS & LOGISTIQUE</button>
+                                
+                                {user.role === 'SL' && (
+                                    <div className="mt-8 border-t border-gray-800 pt-4">
+                                        <div className="text-xs text-mil-green mb-2 uppercase">Commandement</div>
+                                        <button onClick={() => { setView('garage'); setMenuOpen(false); }} className="w-full bg-mil-dim text-black font-bold p-3 mb-2">ACHAT VÉHICULE</button>
+                                        <button onClick={() => { save({ logs: [], sitreps: [] }); setMenuOpen(false); }} className="w-full border border-red-900 text-red-500 p-3">NETTOYAGE JMO</button>
+                                    </div>
+                                )}
+                            </nav>
+                        </div>
+                    )}
+
+                    {/* CONTENU PRINCIPAL */}
+                    <main className="flex-1 overflow-y-auto mt-14 bg-mil-black relative z-10">
+                        {view === 'dashboard' && <Dashboard data={data} user={user} save={save} />}
+                        {view === 'jmo' && <JMOView data={data} save={save} user={user} />}
+                        {view === 'resources' && <ResourcesView data={data} save={save} />}
+                        
+                        {view === 'garage' && (
+                            <div className="p-4">
+                                <h2 className="text-xl text-mil-green mb-4 flex items-center gap-2"><button onClick={() => setView('dashboard')}>&lt;</button> CATALOGUE</h2>
+                                <div className="grid gap-4">
+                                    {CATALOG.map(v => (
+                                        <div key={v.id} onClick={() => buyVehicle(v)} className="bg-mil-panel border border-mil-green/30 p-4 active:bg-mil-green/20">
+                                            <div className="font-bold text-lg text-mil-green">{v.name}</div>
+                                            <div className="text-xs text-gray-400 mt-1">Slots: {v.slots.join(', ')}</div>
+                                            <div className="mt-2 text-right text-mil-green text-xs font-bold">REQ &gt;</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </main>
 
-                    {/* --- RIGHT SIDEBAR (LOGS & SUPPLY) --- */}
-                    <aside className="w-72 bg-mil-800/80 border-l border-mil-green/30 flex flex-col z-20 backdrop-blur-sm">
-                        
-                        {/* SUPPLY PANEL */}
-                        <div className="h-1/3 border-b border-mil-green/30 p-2 overflow-y-auto">
-                            <h3 className="text-xs text-mil-green font-bold mb-2 sticky top-0 bg-mil-800">LOGISTIQUE / RESSOURCES</h3>
-                            {data.supplySources.map(source => (
-                                <div key={source.id} className="mb-2 bg-black/40 p-2 border border-mil-green/20">
-                                    <div className="flex justify-between text-xs mb-1">
-                                        <span className="text-gray-300">{source.name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="text-mil-green font-bold text-lg">{source.amount}</div>
-                                        {user.role === 'LOGI' && (
-                                            <div className="flex gap-1 ml-auto">
-                                                <button onClick={() => handleSupplyUpdate(source.id, source.amount + 500)} className="bg-mil-green/20 text-mil-green px-1 text-xs">+</button>
-                                                <button onClick={() => handleSupplyUpdate(source.id, Math.max(0, source.amount - 500))} className="bg-red-900/20 text-red-400 px-1 text-xs">-</button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* JMO / LOGS */}
-                        <div className="flex-1 p-2 overflow-hidden flex flex-col">
-                            <div className="flex justify-between items-center mb-2">
-                                <h3 className="text-xs text-mil-green font-bold">JMO (LOGS)</h3>
-                                {user.role === 'SL' && (
-                                    <button onClick={() => save({ logs: [] })} className="text-[10px] text-red-500 border border-red-900 px-1 hover:bg-red-900">CLEAR</button>
-                                )}
-                            </div>
-                            <div className="flex-1 overflow-y-auto font-mono text-xs space-y-1 pr-1 bg-black/20 p-1">
-                                {data.logs.map(log => (
-                                    <div key={log.id} className="border-b border-gray-800 pb-1">
-                                        <span className="text-gray-500">[{log.timestamp}]</span>
-                                        <span className="text-mil-dim font-bold ml-1">{log.author}:</span>
-                                        <span className="text-gray-300 ml-1">{log.message}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* CHAT INPUT (SIMPLE LOG) */}
-                        <div className="p-2 border-t border-mil-green/30">
-                            <input 
-                                type="text" 
-                                placeholder="Ajouter entrée JMO..."
-                                className="w-full bg-black border border-mil-green/30 text-mil-green text-xs p-2 focus:outline-none focus:border-mil-green"
-                                onKeyDown={(e) => {
-                                    if(e.key === 'Enter' && e.target.value.trim()) {
-                                        addLog(e.target.value, user.pseudo);
-                                        e.target.value = '';
-                                    }
-                                }}
-                            />
-                        </div>
-                    </aside>
-
-                    {/* MODALS */}
-                    <GaragePanel isOpen={showGarage} onClose={() => setShowGarage(false)} onBuy={handleBuyVehicle} />
-                    <SitrepModal isOpen={showSitrep} onClose={() => setShowSitrep(false)} onSend={handleSitrep} />
-
+                    {/* ALERTE SITREP FLOTTANTE (SI REÇUE) */}
+                    {data.sitreps.length > 0 && (
+                         <div className="fixed bottom-4 left-4 right-4 bg-red-600 text-white p-3 shadow-lg z-50 animate-bounce cursor-pointer"
+                              onClick={() => { setView('jmo'); save({ sitreps: [] }); }}>
+                             <div className="font-bold">⚠️ SITREP ACTIF</div>
+                             <div className="text-xs truncate">{data.sitreps[0].msg}</div>
+                         </div>
+                    )}
                 </div>
             );
         };
