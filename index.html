@@ -37,7 +37,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // --- CONFIGURATION FIREBASE (FORCÉE SUR logiops-data) ---
+        // --- CONFIGURATION FIREBASE ---
         const firebaseConfig = {
             apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
             authDomain: "logiops-data.firebaseapp.com",
@@ -50,31 +50,30 @@
 
         let db = null;
         let USE_FIREBASE = false;
-        
-        // Modification ici : On vérifie D'ABORD ta config perso avant celle de l'environnement
-        const hasUserConfig = firebaseConfig.projectId !== "PROJECT_ID";
+        const isConfigured = firebaseConfig.projectId !== "PROJECT_ID";
 
-        try {
-            if (hasUserConfig) {
-                console.log("Connexion à la Firebase PERSONNELLE:", firebaseConfig.projectId);
-                if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-                db = firebase.firestore();
-                USE_FIREBASE = true;
-            } else if (typeof __firebase_config !== 'undefined') {
-                console.log("Connexion à la Firebase ENVIRONNEMENT (Défaut)");
+        if (typeof __firebase_config !== 'undefined') {
+            try {
                 const envConfig = JSON.parse(__firebase_config);
                 if (!firebase.apps.length) firebase.initializeApp(envConfig);
                 db = firebase.firestore();
                 USE_FIREBASE = true;
-            } else {
-                console.warn("Aucune config Firebase valide trouvée. Mode LOCAL.");
+            } catch (e) { console.warn("Erreur init Canvas config", e); }
+        } else if (isConfigured) {
+            try {
+                if (!firebase.apps.length) {
+                    const app = firebase.initializeApp(firebaseConfig);
+                    if (firebase.analytics) { firebase.analytics(); }
+                }
+                db = firebase.firestore();
+                USE_FIREBASE = true;
+            } catch (e) {
+                USE_FIREBASE = false;
             }
-        } catch (e) {
-            console.error("Erreur Initialisation Firebase:", e);
+        } else {
             USE_FIREBASE = false;
         }
 
-        // On remet l'ID de session de la V17 pour retrouver les données
         const SESSION_ID = typeof __app_id !== 'undefined' ? __app_id : "operation_actuelle";
         
         const getRef = () => {
@@ -102,16 +101,14 @@
                     const auth = firebase.auth();
                     if (!auth.currentUser) {
                         try {
-                            // On force l'anonyme si pas de token, car c'est souvent le cas sur les projets perso
-                            await auth.signInAnonymously();
+                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await auth.signInWithCustomToken(__initial_auth_token);
+                            else await auth.signInAnonymously();
                         } catch (e) { console.warn("Auth Anonyme échouée (CORS?):", e); }
                     }
                     return getRef().onSnapshot((doc) => {
                         if (doc.exists) {
-                            console.log("Données Cloud récupérées !");
                             callback(doc.data());
                         } else {
-                            console.log("Aucune donnée Cloud trouvée pour cette session.");
                             callback(null);
                         }
                     }, err => {
