@@ -1,602 +1,1067 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LOGIOPS V2.5 - Full Command</title>
-    
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        mono: ['"JetBrains Mono"', 'monospace'],
-                    },
-                    colors: {
-                        mil: {
-                            black: '#050807',
-                            dark: '#0e1411',
-                            panel: '#151f1a',
-                            green: '#00ff41',
-                            dim: '#008F11',
-                            alert: '#ff3333',
-                            warn: '#ffcc00',
-                            blue: '#00a8ff'
-                        }
-                    },
-                    animation: {
-                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                        'flash': 'flash 0.5s infinite',
-                    },
-                    keyframes: {
-                        flash: {
-                            '0%, 100%': { opacity: '1' },
-                            '50%': { opacity: '0.5' },
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>LOGIOPS V2 // MILITARY LOGISTICS</title>
 
-    <!-- React & ReactDOM (UMD) -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    
-    <!-- Babel -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Firebase Compat SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <style>
-        body { background-color: #050807; color: #e0e0e0; -webkit-font-smoothing: antialiased; }
-        .scanline {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
-            background-size: 100% 3px; pointer-events: none; z-index: 50; opacity: 0.2;
+  <!-- Google Fonts: Share Tech Mono for that HUD look -->
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import {
+      getFirestore, collection, doc, setDoc, getDoc, updateDoc,
+      onSnapshot, deleteDoc, serverTimestamp, query, orderBy, addDoc
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // --- CONFIGURATION ---
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+      apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
+      authDomain: "logiops-data.firebaseapp.com",
+      projectId: "logiops-data",
+      storageBucket: "logiops-data.firebasestorage.app",
+      messagingSenderId: "791163499354",
+      appId: "1:791163499354:web:2bb76506331db9d240b963",
+      measurementId: "G-FFMXKH47M9"
+    };
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'logiops-v2-production';
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Global State
+    let currentUser = null;
+    let userRole = null; // 'SL' or 'LOG'
+    let userPseudo = null;
+    let userGrade = null;
+    let currentUserId = null;
+
+    // --- UTILS ---
+    const formatTime = (date) => {
+      if (!date) return "--:--:--";
+      const d = date.toDate ? date.toDate() : new Date(date);
+      return d.toLocaleTimeString('fr-FR', { hour12: false, hour: '2-digit', minute: '2-digit' });
+    };
+
+    const getMillis = (d) => {
+      if (!d) return 0;
+      return d.toMillis ? d.toMillis() : new Date(d).getTime();
+    };
+
+    const safeSetText = (id, text) => {
+      const el = document.getElementById(id);
+      if (el) el.innerText = text;
+    };
+
+    // --- PATH HELPERS ---
+    const publicPath = (col) => collection(db, 'artifacts', appId, 'public', 'data', col);
+    const publicDoc = (col, id) => doc(db, 'artifacts', appId, 'public', 'data', col, id);
+
+    // --- AUTHENTICATION & INIT ---
+    async function initAuth() {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
         }
-        .crt-overlay {
-            background: radial-gradient(circle, rgba(18, 16, 16, 0) 60%, rgba(0, 0, 0, 0.6) 100%);
-            position: fixed; inset: 0; pointer-events: none; z-index: 49;
+      } catch (error) {
+        console.error("Auth Error:", error);
+        alert("Erreur de connexion au système. Veuillez rafraîchir.");
+      }
+    }
+
+    initAuth();
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        currentUser = user;
+        currentUserId = user.uid;
+        console.log("System Connected. UID:", currentUserId);
+        checkAppState();
+      } else {
+        console.log("Waiting for auth...");
+      }
+    });
+
+    // --- APP LOGIC ---
+
+    function checkAppState() {
+      // Listen to Global Settings
+      onSnapshot(publicDoc('settings', 'global'), (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          safeSetText('supply-count', data.supply || 0);
+
+          const headerSlEl = document.getElementById('header-sl-name');
+          if (headerSlEl && data.slName) {
+            headerSlEl.innerText = `CMD: ${data.slName}`;
+          }
+        } else {
+          // Create if not exists (fail-safe)
+          setDoc(publicDoc('settings', 'global'), { supply: 1000, slSessionId: null, slName: 'AUCUN' }).catch(console.error);
         }
-        /* Custom Range Slider */
-        input[type=range] {
-            -webkit-appearance: none; width: 100%; background: transparent;
+      }, (error) => {
+        console.error("Settings listener error:", error);
+      });
+
+      if (userRole) {
+        loadInterface();
+      } else {
+        const authScreen = document.getElementById('auth-screen');
+        if (authScreen) authScreen.classList.remove('hidden');
+      }
+    }
+
+    async function addLog(message, type = 'INFO') {
+      if (!currentUserId) return;
+      try {
+        await addDoc(publicPath('logs'), {
+          message: message,
+          type: type,
+          timestamp: serverTimestamp()
+        });
+        await addDoc(publicPath('notifications'), {
+          message: message,
+          type: type,
+          timestamp: serverTimestamp(),
+          read: false
+        });
+      } catch (e) {
+        console.error("Log error:", e);
+      }
+    }
+
+    // --- ACTIONS ---
+    window.loginSL = async () => {
+      if (!currentUserId) return alert("Connexion au réseau en cours... Veuillez patienter.");
+
+      const pseudo = document.getElementById('sl-pseudo').value.toUpperCase();
+      const grade = document.getElementById('sl-grade').value;
+
+      if (!pseudo) return alert("Pseudo requis");
+
+      try {
+        const globalSnap = await getDoc(publicDoc('settings', 'global'));
+        const globalData = globalSnap.data();
+
+        if (globalData && globalData.slSessionId && globalData.slSessionId !== currentUserId) {
+          if (!confirm(`⚠️ ALERTE SÉCURITÉ ⚠️\n\nLe Squad Leader ${globalData.slName} est déjà en poste.\n\nÊtes-vous certain de vouloir prendre le commandement et écraser sa session ?`)) {
+            return;
+          }
         }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #00ff41; margin-top: -6px;
+
+        // Use setDoc with merge to be safe if doc doesn't exist yet
+        await setDoc(publicDoc('settings', 'global'), {
+          slSessionId: currentUserId,
+          slName: `${grade} ${pseudo}`,
+          lastLogin: serverTimestamp()
+        }, { merge: true });
+
+        await setDoc(publicDoc('users', currentUserId), {
+          pseudo: pseudo,
+          grade: grade,
+          role: 'SL',
+          isOnline: true,
+          lastActive: serverTimestamp()
+        });
+
+        userRole = 'SL';
+        userPseudo = pseudo;
+        userGrade = grade;
+
+        addLog(`PRISE DE SERVICE SL: ${grade} ${pseudo}`, 'CMD');
+        document.getElementById('auth-screen').classList.add('hidden');
+        loadInterface();
+
+      } catch (error) {
+        console.error("Login SL Error:", error);
+        alert("Erreur lors de la prise de service. Vérifiez la console.");
+      }
+    };
+
+    window.showLogLogin = async () => {
+      document.getElementById('login-sl-form').classList.add('hidden');
+      document.getElementById('login-log-form').classList.remove('hidden');
+
+      const rosterDiv = document.getElementById('roster-list-login');
+      rosterDiv.innerHTML = '<div class="text-center animate-pulse py-4">CHARGEMENT DU ROSTER...</div>';
+
+      onSnapshot(publicPath('roster'), (snapshot) => {
+        rosterDiv.innerHTML = '';
+        if (snapshot.empty) {
+          rosterDiv.innerHTML = '<div class="text-red-500 text-center py-4">Aucun logisticien enregistré.</div>';
+          return;
         }
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%; height: 4px; background: #1a2621;
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const btn = document.createElement('button');
+          btn.className = "w-full text-left border border-green-900 bg-gray-900/50 active:bg-green-900/30 p-4 mb-2 rounded flex justify-between items-center group transition-all touch-manipulation";
+          btn.innerHTML = `
+                        <span class="font-bold text-green-400 text-lg">${data.grade} ${data.pseudo}</span>
+                        <i class="fas fa-sign-in-alt text-green-600"></i>
+                    `;
+          btn.onclick = () => loginLOG(doc.id, data.pseudo, data.grade);
+          rosterDiv.appendChild(btn);
+        });
+      }, (error) => {
+        rosterDiv.innerHTML = '<div class="text-red-500 text-center">Erreur chargement roster.</div>';
+      });
+    };
+
+    window.loginLOG = async (rosterId, pseudo, grade) => {
+      if (!currentUserId) return alert("Connexion au réseau en cours...");
+
+      try {
+        await setDoc(publicDoc('users', currentUserId), {
+          pseudo: pseudo,
+          grade: grade,
+          role: 'LOG',
+          rosterId: rosterId,
+          isOnline: true,
+          currentVehicle: null,
+          lastActive: serverTimestamp()
+        });
+
+        userRole = 'LOG';
+        userPseudo = pseudo;
+        userGrade = grade;
+
+        addLog(`CONNEXION LOGISTICIEN: ${grade} ${pseudo}`, 'CONNECT');
+        document.getElementById('auth-screen').classList.add('hidden');
+        loadInterface();
+      } catch (error) {
+        console.error("Login LOG Error:", error);
+        alert("Erreur de connexion.");
+      }
+    };
+
+    function loadInterface() {
+      const ui = document.getElementById('main-interface');
+      if (ui) ui.classList.remove('hidden');
+
+      safeSetText('user-identity', `${userGrade} ${userPseudo}`);
+      safeSetText('user-badge', userRole);
+
+      setupNotifications();
+      setupVehiclesListener();
+      setupMissionsListener();
+
+      const slControls = document.getElementById('sl-controls');
+      const logControls = document.getElementById('log-controls');
+
+      if (userRole === 'SL') {
+        setupSLInterface();
+        if (slControls) slControls.classList.remove('hidden');
+        if (logControls) logControls.classList.add('hidden');
+      } else {
+        // setupLOGInterface(); // Not needed if empty
+        if (slControls) slControls.classList.add('hidden');
+        if (logControls) logControls.classList.remove('hidden');
+      }
+    }
+
+    // --- NOTIFICATIONS & LOGS ---
+    function setupNotifications() {
+      const feed = document.getElementById('notif-feed');
+      const q = publicPath('notifications');
+
+      onSnapshot(q, (snapshot) => {
+        if (!feed) return;
+        feed.innerHTML = '';
+        let docs = snapshot.docs.map(doc => doc.data());
+        docs.sort((a, b) => getMillis(b.timestamp) - getMillis(a.timestamp));
+
+        docs.slice(0, 20).forEach(data => {
+          const div = document.createElement('div');
+          div.className = "text-xs border-b border-green-900/50 p-2 text-green-300 font-mono break-words";
+          div.innerHTML = `<span class="text-green-600">[${formatTime(data.timestamp)}]</span> ${data.message}`;
+          feed.appendChild(div);
+        });
+      });
+
+      // Always load logs table content, even if not SL, just in case.
+      // But we can filter visibility via CSS if needed.
+      const logBody = document.getElementById('vacation-log-body');
+      const qLogs = publicPath('logs');
+
+      if (logBody) {
+        onSnapshot(qLogs, (snapshot) => {
+          logBody.innerHTML = '';
+          let docs = snapshot.docs.map(doc => doc.data());
+          docs.sort((a, b) => getMillis(b.timestamp) - getMillis(a.timestamp));
+
+          docs.slice(0, 50).forEach(data => {
+            const row = document.createElement('tr');
+            row.className = "border-b border-green-900/30 hover:bg-green-900/10";
+            row.innerHTML = `
+                            <td class="p-2 text-green-600 whitespace-nowrap">${formatTime(data.timestamp)}</td>
+                            <td class="p-2 font-bold text-green-500 whitespace-nowrap">${data.type}</td>
+                            <td class="p-2 text-green-300 break-all">${data.message}</td>
+                        `;
+            logBody.appendChild(row);
+          });
+        });
+      }
+    }
+
+    // --- VEHICLE MANAGEMENT ---
+    function setupVehiclesListener() {
+      const container = document.getElementById('vehicle-grid');
+      onSnapshot(publicPath('vehicles'), (snapshot) => {
+        if (!container) return;
+        container.innerHTML = '';
+        let stats = { total: 0, ops: 0, mission: 0, repair: 0, destroyed: 0 };
+
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const id = doc.id;
+
+          stats.total++;
+          if (data.status === 'OPS') stats.ops++;
+          if (data.status === 'MISSION') stats.mission++;
+          if (data.status === 'REPAIR') stats.repair++;
+          if (data.status === 'DESTROYED') stats.destroyed++;
+
+          container.appendChild(createVehicleCard(id, data));
+        });
+        updateDashboardStats(stats);
+      });
+    }
+
+    function updateDashboardStats(stats) {
+      safeSetText('stat-total-veh', stats.total);
+      safeSetText('stat-ops', stats.ops);
+      safeSetText('stat-mission', stats.mission);
+      safeSetText('stat-repair', stats.repair);
+      safeSetText('stat-destroyed', stats.destroyed);
+    }
+
+    function createVehicleCard(id, data) {
+      const statusColors = {
+        'OPS': 'border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.2)]',
+        'MISSION': 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.2)]',
+        'REPAIR': 'border-orange-500 opacity-80',
+        'DESTROYED': 'border-red-600 opacity-50 grayscale'
+      };
+
+      const div = document.createElement('div');
+      div.className = `relative bg-gray-900/90 border-2 ${statusColors[data.status] || 'border-gray-500'} p-3 rounded clip-corner flex flex-col gap-2 transition-all active:scale-[0.99] touch-manipulation`;
+
+      div.innerHTML = `
+                <div class="flex justify-between items-start border-b border-gray-700 pb-2 mb-1">
+                    <div>
+                        <div class="text-[10px] text-gray-400 font-mono">${data.category}</div>
+                        <div class="text-lg font-bold font-mono tracking-widest text-white truncate max-w-[150px]">${data.name}</div>
+                    </div>
+                    <div class="font-bold text-xs px-2 py-1 bg-black/50 rounded ${data.status === 'DESTROYED' ? 'text-red-500' : 'text-white'}">${data.status}</div>
+                </div>
+            `;
+
+      const seatsContainer = document.createElement('div');
+      seatsContainer.className = "grid grid-cols-3 gap-2 my-2";
+
+      ['driver', 'copilot', 'gunner'].forEach(role => {
+        const occupant = data.seats[role];
+        const seatBtn = document.createElement('button');
+
+        let icon = role === 'driver' ? 'fa-steering-wheel' : (role === 'copilot' ? 'fa-map' : 'fa-crosshairs');
+
+        seatBtn.className = `p-2 text-xs border rounded flex flex-col items-center justify-center h-16 active:scale-95 transition-transform touch-manipulation
+                    ${occupant ? 'bg-green-900/60 border-green-500 text-green-300' : 'bg-gray-800 border-gray-700 text-gray-500 hover:border-green-500'}`;
+
+        seatBtn.innerHTML = `
+                    <i class="fas ${icon} mb-1 text-base"></i>
+                    <span class="truncate w-full text-center text-[9px] font-bold">${occupant ? occupant.name : 'LIBRE'}</span>
+                `;
+
+        if (data.status !== 'DESTROYED') {
+          seatBtn.onclick = (e) => { e.stopPropagation(); handleSeatClick(id, data, role); };
         }
-        input, select, textarea { font-size: 16px; } 
-    </style>
+
+        seatsContainer.appendChild(seatBtn);
+      });
+      div.appendChild(seatsContainer);
+
+      if (userRole === 'SL') {
+        const actions = document.createElement('div');
+        actions.className = "mt-auto pt-2 border-t border-gray-700 grid grid-cols-2 gap-2 text-xs";
+
+        const btnClass = "p-3 border rounded font-bold active:bg-opacity-50 touch-manipulation";
+
+        if (data.status !== 'DESTROYED') {
+          actions.innerHTML = `
+                        <button onclick="setVehicleStatus('${id}', 'REPAIR')" class="${btnClass} border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black">RÉPARER</button>
+                        <button onclick="setVehicleStatus('${id}', 'DESTROYED')" class="${btnClass} border-red-500 text-red-500 hover:bg-red-500 hover:text-black">DÉTRUIRE</button>
+                        <button onclick="setVehicleStatus('${id}', 'OPS')" class="${btnClass} border-green-500 text-green-500 hover:bg-green-500 hover:text-black col-span-2">RÉTABLIR OPS</button>
+                    `;
+        } else {
+          actions.innerHTML = `
+                         <button onclick="deleteVehicle('${id}')" class="${btnClass} border-red-900 text-red-900 hover:bg-red-900 hover:text-white col-span-2">SUPPRIMER L'ÉPAVE</button>
+                    `;
+        }
+        div.appendChild(actions);
+      }
+
+      return div;
+    }
+
+    window.handleSeatClick = async (vehId, vehData, seatRole) => {
+      if (!currentUserId) return;
+      const currentSeat = vehData.seats[seatRole];
+      if (currentSeat && currentSeat.uid === currentUserId) {
+        const newSeats = { ...vehData.seats, [seatRole]: null };
+        await updateDoc(publicDoc('vehicles', vehId), { seats: newSeats });
+        addLog(`${userPseudo} est descendu de ${vehData.name} (${seatRole})`);
+        return;
+      }
+      if (currentSeat) {
+        alert(`Place occupée par ${currentSeat.name}`);
+        return;
+      }
+      const newSeats = { ...vehData.seats, [seatRole]: { uid: currentUserId, name: userPseudo } };
+      await updateDoc(publicDoc('vehicles', vehId), { seats: newSeats });
+      addLog(`${userPseudo} est monté dans ${vehData.name} (${seatRole})`);
+    };
+
+    window.setVehicleStatus = async (id, status) => {
+      if (!currentUserId) return;
+      await updateDoc(publicDoc('vehicles', id), { status: status });
+      addLog(`Véhicule passé en ${status}`, 'VEHICULE');
+    };
+
+    window.deleteVehicle = async (id) => {
+      if (!currentUserId) return;
+      if (confirm('Supprimer définitivement ce véhicule ?')) {
+        await deleteDoc(publicDoc('vehicles', id));
+      }
+    };
+
+    // --- SL LOGIC ---
+    window.createVehicle = async () => {
+      if (!currentUserId) return;
+      const typeEl = document.getElementById('new-veh-type');
+      const nameEl = document.getElementById('new-veh-name');
+      if (!typeEl || !nameEl) return;
+
+      const type = typeEl.value;
+      const name = nameEl.value;
+      const costs = { 'LOGI': 300, 'JEEP': 100, 'TRANSPORT': 200, 'BLINDE': 600 };
+      const cost = costs[type];
+
+      const globalSnap = await getDoc(publicDoc('settings', 'global'));
+      const currentSupply = globalSnap.data()?.supply || 0;
+
+      if (currentSupply < cost) {
+        alert("Supply insuffisant !");
+        return;
+      }
+
+      await setDoc(publicDoc('settings', 'global'), { supply: currentSupply - cost }, { merge: true });
+      await addDoc(publicPath('vehicles'), {
+        name: name || `${type}-${Math.floor(Math.random() * 100)}`,
+        category: type,
+        cost: cost,
+        status: 'OPS',
+        missionId: null,
+        seats: { driver: null, copilot: null, gunner: null },
+        createdAt: serverTimestamp()
+      });
+
+      addLog(`Véhicule sorti du garage: ${type} (-${cost} supply)`, 'LOGISTICS');
+      toggleModal('garage-modal');
+    };
+
+    window.addToRoster = async () => {
+      if (!currentUserId) return;
+      const pseudo = prompt("Pseudo du logisticien:");
+      if (!pseudo) return;
+      const grade = prompt("Grade (ex: Sdt, Cpl):", "Sdt");
+
+      await addDoc(publicPath('roster'), {
+        pseudo: pseudo,
+        grade: grade,
+        addedAt: serverTimestamp()
+      });
+      addLog(`Ajout au roster: ${grade} ${pseudo}`, 'ADMIN');
+    };
+
+    function setupSLInterface() {
+      const list = document.getElementById('sl-roster-list');
+      if (!list) return;
+
+      onSnapshot(publicPath('roster'), (snap) => {
+        list.innerHTML = '';
+        snap.forEach(doc => {
+          const d = doc.data();
+          const div = document.createElement('div');
+          div.className = "flex justify-between items-center text-sm p-3 border-b border-green-900/30";
+          div.innerHTML = `
+                        <span class="text-green-300 font-bold">${d.grade} ${d.pseudo}</span> 
+                        <button class="text-red-500 p-2" onclick="removeFromRoster('${doc.id}')"><i class="fas fa-trash"></i></button>
+                    `;
+          list.appendChild(div);
+        });
+        safeSetText('stat-log-count', snap.size);
+      });
+    }
+
+    window.removeFromRoster = async (id) => {
+      if (confirm('Retirer du roster ?')) await deleteDoc(publicDoc('roster', id));
+    };
+
+    window.addSupply = async (amount) => {
+      if (!currentUserId) return;
+      const globalSnap = await getDoc(publicDoc('settings', 'global'));
+      const current = globalSnap.data()?.supply || 0;
+      await setDoc(publicDoc('settings', 'global'), { supply: current + amount }, { merge: true });
+      addLog(`Ravitaillement reçu: +${amount}`, 'SUPPLY');
+    };
+
+    window.clearLogs = async () => {
+      if (confirm("Effacer tout le journal ?")) {
+        addLog("JOURNAL EFFACÉ PAR LE SL", "ADMIN");
+      }
+    };
+
+    window.createMission = async () => {
+      if (!currentUserId) return;
+      const name = prompt("Nom de l'opération / Mission :");
+      if (!name) return;
+      await addDoc(publicPath('missions'), {
+        name: name,
+        status: 'ACTIVE',
+        leaderId: currentUserId,
+        createdAt: serverTimestamp()
+      });
+      addLog(`Nouvelle mission créée: ${name}`, 'MISSION');
+    };
+
+    function setupMissionsListener() {
+      const container = document.getElementById('mission-list');
+      if (!container) return;
+      const q = publicPath('missions');
+
+      onSnapshot(q, (snap) => {
+        container.innerHTML = '';
+        let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        docs.sort((a, b) => getMillis(b.createdAt) - getMillis(a.createdAt));
+
+        docs.forEach(data => {
+          if (data.status === 'ARCHIVED') return;
+          const el = document.createElement('div');
+          el.className = "border border-green-500/50 p-3 mb-2 bg-green-900/10 rounded";
+          el.innerHTML = `
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-bold text-green-400 truncate pr-2">${data.name}</h3>
+                            <span class="text-[10px] bg-green-900 text-green-200 px-1 rounded flex-shrink-0">ACTIF</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="sendCitrep('${data.name}')" class="flex-1 text-xs bg-blue-900/30 px-2 py-2 border border-blue-500 rounded text-blue-200 active:bg-blue-500 active:text-white">CITREP</button>
+                            ${userRole === 'SL' ? `<button onclick="archiveMission('${data.id}')" class="flex-1 text-xs bg-red-900/30 px-2 py-2 border border-red-500 rounded text-red-200 active:bg-red-500 active:text-white">FIN</button>` : ''}
+                        </div>
+                    `;
+          container.appendChild(el);
+        });
+      });
+    }
+
+    window.archiveMission = async (id) => {
+      await updateDoc(publicDoc('missions', id), { status: 'ARCHIVED' });
+      addLog("Mission terminée et archivée", "MISSION");
+    };
+
+    window.sendCitrep = async (missionName) => {
+      const text = prompt("Message CITREP :");
+      if (text) addLog(`[CITREP ${missionName}] ${text}`, 'RADIO');
+    };
+
+    window.requestRTB = () => {
+      addLog(`DEMANDE DE RTB (RETOUR BASE) POUR ${userPseudo}`, 'RADIO');
+    };
+
+    // --- UTILS FOR UI ---
+    window.toggleModal = (id) => {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('hidden');
+    };
+
+    window.toggleSidebar = () => {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+
+      if (sidebar && backdrop) {
+        if (sidebar.classList.contains('-translate-x-full')) {
+          sidebar.classList.remove('-translate-x-full');
+          backdrop.classList.remove('hidden');
+        } else {
+          sidebar.classList.add('-translate-x-full');
+          backdrop.classList.add('hidden');
+        }
+      }
+    };
+
+  </script>
+
+  <!-- Custom CSS for HUD & Mobile -->
+  <style>
+    :root {
+      --neon-green: #22c55e;
+      --bg-dark: #0f172a;
+    }
+
+    /* Mobile Reset & WebKit Tweaks */
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+      background-color: #050505;
+      color: #e2e8f0;
+      font-family: 'Share Tech Mono', monospace;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    /* Prevent rubber-banding on iOS */
+    body {
+      overscroll-behavior: none;
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #15803d;
+      border-radius: 2px;
+    }
+
+    /* Hide scrollbar utility */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* iOS Input Zoom Fix */
+    @media screen and (max-width: 768px) {
+
+      input,
+      select,
+      textarea {
+        font-size: 16px !important;
+      }
+    }
+
+    /* HUD Effects */
+    .hud-panel {
+      background: rgba(10, 20, 10, 0.95);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      box-shadow: 0 0 15px rgba(34, 197, 94, 0.1), inset 0 0 30px rgba(0, 0, 0, 0.9);
+      position: relative;
+    }
+
+    .hud-panel::before {
+      content: " ";
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background-size: 100% 2px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .clip-corner {
+      clip-path: polygon(0 0,
+          100% 0,
+          100% calc(100% - 15px),
+          calc(100% - 15px) 100%,
+          0 100%);
+    }
+
+    .text-glow {
+      text-shadow: 0 0 5px rgba(34, 197, 94, 0.8);
+    }
+
+    /* Scanline Animation - Subtle */
+    .scan-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to bottom, transparent, rgba(34, 197, 94, 0.05), transparent);
+      animation: scanline 6s linear infinite;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    @keyframes scanline {
+      0% {
+        transform: translateY(-100%);
+      }
+
+      100% {
+        transform: translateY(100vh);
+      }
+    }
+
+    .btn-tac {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid var(--neon-green);
+      color: var(--neon-green);
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      touch-action: manipulation;
+      /* Faster touch response */
+    }
+
+    .btn-tac:active {
+      background: var(--neon-green);
+      color: black;
+      box-shadow: 0 0 15px var(--neon-green);
+    }
+
+    .modal-bg {
+      background-color: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(4px);
+    }
+
+    /* Gradient Mask for scrolling containers */
+    .mask-gradient {
+      mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+      -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+    }
+  </style>
 </head>
-<body class="font-mono h-screen w-screen overflow-hidden text-sm select-none">
-    <div id="root"></div>
 
-    <script type="text/babel">
-        /*******************************************************
-         * CONFIG & UTILS
-         *******************************************************/
-        const firebaseConfig = {
-            apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
-            authDomain: "logiops-data.firebaseapp.com",
-            projectId: "logiops-data",
-            storageBucket: "logiops-data.firebasestorage.app",
-            messagingSenderId: "791163499354",
-            appId: "1:791163499354:web:2bb76506331db9d240b963",
-        };
+<body class="flex flex-col">
 
-        let db = null; let USE_FIREBASE = false;
-        try {
-            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-            USE_FIREBASE = true;
-        } catch (e) { console.warn("Mode Offline Activé"); }
+  <!-- Scanline Effect -->
+  <div class="scan-overlay"></div>
 
-        const LOCAL_KEY = "logiops_v2_5_full";
-        
-        const DEFAULT_DATA = {
-            units: [], 
-            missions: [], // { id, title, status: 'active'|'debrief', assignedUnits: [] }
-            logs: [],
-            sitreps: [], // { id, msg, author, type, ack: false, ackBy: null }
-            destroyedHistory: [],
-            supplySources: [
-                { id: 'main', name: 'BASE PRINCIPALE', resources: { fuel: 10000, ammo: 5000, parts: 2000 } }
-            ]
-        };
+  <!-- AUTHENTICATION SCREEN -->
+  <div id="auth-screen" class="fixed inset-0 z-[60] bg-black flex items-center justify-center p-4">
+    <div class="hud-panel w-full max-w-md p-6 clip-corner relative flex flex-col max-h-[90vh] overflow-y-auto">
+      <h1 class="text-3xl md:text-4xl font-bold text-center mb-2 text-green-500 text-glow tracking-tighter">LOGIOPS V2
+      </h1>
+      <div class="h-1 w-full bg-green-900 mb-6"></div>
 
-        const Storage = {
-            save: async (data) => {
-                if (USE_FIREBASE && db) {
-                    await db.collection('logiops').doc('full_ops').set(data, { merge: true });
-                } else {
-                    const prev = JSON.parse(localStorage.getItem(LOCAL_KEY) || JSON.stringify(DEFAULT_DATA));
-                    localStorage.setItem(LOCAL_KEY, JSON.stringify({ ...prev, ...data }));
-                }
-            },
-            subscribe: (cb) => {
-                if (USE_FIREBASE && db) {
-                    return db.collection('logiops').doc('full_ops').onSnapshot(doc => {
-                        cb(doc.exists ? { ...DEFAULT_DATA, ...doc.data() } : DEFAULT_DATA);
-                    });
-                } else {
-                    cb(JSON.parse(localStorage.getItem(LOCAL_KEY) || JSON.stringify(DEFAULT_DATA)));
-                    return () => {};
-                }
-            }
-        };
+      <!-- Role Selection -->
+      <div class="flex gap-4 mb-6">
+        <button
+          onclick="document.getElementById('login-sl-form').classList.remove('hidden'); document.getElementById('login-log-form').classList.add('hidden');"
+          class="flex-1 py-4 border border-green-700 active:bg-green-900/40 text-green-400 font-bold rounded touch-manipulation">
+          <i class="fas fa-chess-king mb-1 block text-2xl"></i> SQUAD LEADER
+        </button>
+        <button onclick="showLogLogin()"
+          class="flex-1 py-4 border border-green-700 active:bg-green-900/40 text-green-400 font-bold rounded touch-manipulation">
+          <i class="fas fa-boxes mb-1 block text-2xl"></i> LOGISTICIEN
+        </button>
+      </div>
 
-        const Icons = {
-            Menu: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>,
-            X: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
-            Wrench: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
-            Check: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
-            Alert: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-        };
+      <!-- SL Form -->
+      <div id="login-sl-form" class="space-y-4">
+        <div>
+          <label class="text-xs text-green-700 block mb-1">GRADE</label>
+          <div class="relative">
+            <select id="sl-grade"
+              class="w-full bg-gray-900 border border-green-800 p-3 text-white appearance-none rounded">
+              <option>Sgt</option>
+              <option>Sgt-Chef</option>
+              <option>Adj</option>
+              <option>Adj-Chef</option>
+              <option>Lt</option>
+              <option>Cpt</option>
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-green-500">
+              <i class="fas fa-chevron-down text-xs"></i>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-green-700 block mb-1">PSEUDO</label>
+          <input id="sl-pseudo" type="text"
+            class="w-full bg-gray-900 border border-green-800 p-3 text-white uppercase rounded" placeholder="NOM">
+        </div>
+        <button onclick="loginSL()" class="btn-tac w-full py-4 mt-4 font-bold rounded">PRENDRE LE SERVICE</button>
+      </div>
 
-        const CATALOG = [
-            { id: 'logi', name: 'Logi Truck', type:'logi', slots: ['driver', 'copilot'], hp: 100, fuel: 500, cost: { parts: 100 } },
-            { id: 'jeep', name: 'Light Jeep', type:'light', slots: ['driver', 'gunner', 'pax', 'pax'], hp: 60, fuel: 300, cost: { parts: 50 } },
-            { id: 'btr', name: 'BTR-80', type:'armor', slots: ['driver', 'gunner', 'cmdr', 'pax', 'pax', 'pax'], hp: 300, fuel: 800, cost: { parts: 400, ammo: 200 } },
-            { id: 'tank', name: 'T-72 Main', type:'armor', slots: ['driver', 'gunner', 'cmdr'], hp: 1200, fuel: 1000, cost: { parts: 800, ammo: 500 } },
-        ];
+      <!-- LOG Form -->
+      <div id="login-log-form" class="hidden flex-1 flex flex-col min-h-0">
+        <p class="text-xs text-green-600 mb-2 uppercase tracking-wider font-bold">Effectifs disponibles</p>
+        <div id="roster-list-login"
+          class="flex-1 overflow-y-auto pr-1 border border-green-900/30 bg-black/40 rounded p-2">
+          <!-- Dynamic List -->
+        </div>
+      </div>
 
-        // --- AUTH ---
-        const Login = ({ onJoin }) => {
-            const [form, setForm] = React.useState({ pseudo: '', role: 'LOGI', rank: 'Soldat' });
-            return (
-                <div className="h-full flex flex-col items-center justify-center p-6 bg-mil-black relative">
-                    <div className="border border-mil-green p-6 w-full max-w-sm bg-mil-panel shadow-[0_0_20px_rgba(0,255,65,0.1)]">
-                        <h1 className="text-2xl font-bold text-mil-green text-center mb-6 tracking-widest">LOGIOPS V2.5</h1>
-                        <div className="space-y-4">
-                            <input className="w-full bg-black border border-mil-green/50 text-mil-green p-3 uppercase focus:border-mil-green"
-                                placeholder="PSEUDO..." value={form.pseudo} onChange={e => setForm({...form, pseudo: e.target.value.toUpperCase()})} />
-                            
-                            <div className="flex gap-2">
-                                <select className="bg-black border border-mil-green/50 text-mil-green p-3 flex-1" 
-                                        value={form.rank} onChange={e => setForm({...form, rank: e.target.value})}>
-                                    <option value="Soldat">Soldat</option>
-                                    <option value="Caporal">Caporal</option>
-                                    <option value="Sergent">Sergent</option>
-                                    <option value="Lieutenant">Lieutenant</option>
-                                </select>
-                            </div>
-                            
-                            <div className="flex gap-2">
-                                {['SL', 'LOGI'].map(r => (
-                                    <button key={r} onClick={() => setForm({...form, role: r})}
-                                        className={`flex-1 p-3 font-bold border transition-all ${form.role === r ? 'bg-mil-green text-black border-mil-green' : 'text-mil-green border-mil-green/30'}`}>
-                                        {r}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <button onClick={() => form.pseudo && onJoin(form)} className="w-full mt-6 bg-mil-dim text-white font-bold py-3 hover:bg-mil-green hover:text-black">CONNEXION</button>
-                    </div>
-                </div>
-            );
-        };
+      <div class="mt-6 text-[10px] text-gray-600 text-center font-mono">
+        SECURE CONNECTION // ENCRYPTED // FIREBASE RELAY
+      </div>
+    </div>
+  </div>
 
-        // --- MAINTENANCE MODAL ---
-        const MaintenanceModal = ({ unit, onClose, onFinish }) => {
-            const [hp, setHp] = React.useState(unit.hp);
-            const [fuel, setFuel] = React.useState(unit.fuel);
-            
-            // Coûts simplifiés : 1 HP = 1 Part, 1 Fuel = 1 Fuel
-            const partsCost = Math.max(0, hp - unit.hp);
-            const fuelCost = Math.max(0, fuel - unit.fuel);
-            
-            const isFull = hp >= unit.maxHp * 0.95 && fuel >= unit.maxFuel * 0.95;
+  <!-- MAIN INTERFACE -->
+  <div id="main-interface" class="flex-1 flex hidden relative z-10 h-full overflow-hidden">
 
-            return (
-                <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
-                    <div className="border border-mil-green bg-mil-panel w-full max-w-md p-6 relative">
-                        <button onClick={onClose} className="absolute top-2 right-2 text-mil-green"><Icons.X /></button>
-                        <h2 className="text-xl font-bold text-mil-green mb-1">ATELIER MAINTENANCE</h2>
-                        <div className="text-xs text-gray-500 mb-6">{unit.name} [{unit.id}]</div>
+    <!-- MOBILE SIDEBAR BACKDROP -->
+    <div id="sidebar-backdrop" onclick="toggleSidebar()"
+      class="fixed inset-0 bg-black/80 z-30 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
 
-                        <div className="space-y-6">
-                            <div>
-                                <div className="flex justify-between text-xs mb-2">
-                                    <span className={hp < unit.maxHp ? "text-orange-500" : "text-mil-green"}>INTÉGRITÉ: {Math.round(hp)}/{unit.maxHp}</span>
-                                    <span className="text-gray-400">Coût: {partsCost} Pts</span>
-                                </div>
-                                <input type="range" min={unit.hp} max={unit.maxHp} value={hp} onChange={e => setHp(Number(e.target.value))} />
-                            </div>
+    <!-- SIDEBAR (DRAWER ON MOBILE) -->
+    <aside id="sidebar"
+      class="fixed inset-y-0 left-0 z-40 w-72 bg-gray-900/95 border-r border-green-900/50 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none md:relative">
+      <div class="p-4 border-b border-green-900/50 flex justify-between items-center bg-black/20">
+        <div>
+          <h2 class="text-2xl font-bold text-green-500 tracking-tighter">LOGIOPS</h2>
+          <div class="text-[10px] text-green-700">LOGISTICS OPERATIONS COMMAND</div>
+        </div>
+        <button onclick="toggleSidebar()" class="md:hidden text-green-500 p-2"><i
+            class="fas fa-times text-xl"></i></button>
+      </div>
 
-                            <div>
-                                <div className="flex justify-between text-xs mb-2">
-                                    <span className={fuel < unit.maxFuel ? "text-blue-400" : "text-mil-green"}>CARBURANT: {Math.round(fuel)}/{unit.maxFuel}</span>
-                                    <span className="text-gray-400">Coût: {fuelCost} L</span>
-                                </div>
-                                <input type="range" min={unit.fuel} max={unit.maxFuel} value={fuel} onChange={e => setFuel(Number(e.target.value))} />
-                            </div>
-                        </div>
+      <!-- User Card -->
+      <div class="p-4 bg-green-900/10 border-b border-green-900/30">
+        <div class="text-[10px] text-gray-500 uppercase mb-1">Session Active</div>
+        <div id="user-identity" class="font-bold text-xl text-white tracking-wide">--</div>
+        <div id="user-badge" class="inline-block px-2 py-0.5 bg-green-700 text-black text-xs font-bold rounded mt-2">--
+        </div>
+      </div>
 
-                        <div className="mt-8 grid grid-cols-2 gap-4">
-                            <div className="border border-gray-700 p-2 text-center">
-                                <div className="text-[10px] text-gray-500">TOTAL PARTS</div>
-                                <div className="text-mil-green font-bold">{partsCost}</div>
-                            </div>
-                            <div className="border border-gray-700 p-2 text-center">
-                                <div className="text-[10px] text-gray-500">TOTAL FUEL</div>
-                                <div className="text-blue-400 font-bold">{fuelCost}</div>
-                            </div>
-                        </div>
+      <!-- Active Mission List -->
+      <div class="flex-1 p-4 overflow-y-auto -webkit-overflow-scrolling-touch">
+        <div class="text-xs text-gray-500 mb-3 uppercase border-b border-gray-800 pb-1 font-bold">Missions en cours
+        </div>
+        <div id="mission-list" class="space-y-3 pb-20">
+          <!-- Missions render here -->
+        </div>
+      </div>
 
-                        <button 
-                            disabled={!isFull}
-                            onClick={() => onFinish(hp, fuel, partsCost, fuelCost)}
-                            className={`w-full mt-6 py-3 font-bold text-black transition-all ${isFull ? 'bg-mil-green hover:bg-white' : 'bg-gray-700 cursor-not-allowed'}`}>
-                            {isFull ? "VALIDER SORTIE ATELIER" : "RÉPARATIONS INCOMPLÈTES"}
-                        </button>
-                    </div>
-                </div>
-            );
-        };
+      <!-- Controls (Bottom Sidebar) -->
+      <div class="mt-auto border-t border-green-900/50 bg-black/40">
+        <div id="sl-controls" class="p-4 hidden space-y-2">
+          <button onclick="createMission()"
+            class="btn-tac w-full py-3 text-sm font-bold rounded flex items-center justify-center gap-2"><i
+              class="fas fa-plus-circle"></i> CRÉER MISSION</button>
+          <button onclick="toggleModal('roster-modal')"
+            class="btn-tac w-full py-3 text-sm font-bold rounded flex items-center justify-center gap-2"><i
+              class="fas fa-users"></i> GÉRER ROSTER</button>
+        </div>
+        <div id="log-controls" class="p-4 hidden">
+          <button onclick="requestRTB()"
+            class="btn-tac w-full py-3 text-sm border-orange-500 text-orange-500 active:bg-orange-500 active:text-black font-bold rounded flex items-center justify-center gap-2"><i
+              class="fas fa-home"></i> DEMANDER RTB</button>
+        </div>
+      </div>
+    </aside>
 
-        // --- UNIT CARD ---
-        const UnitCard = ({ unit, user, onUpdate, onMaintRequest, onDelete, activeMission }) => {
-            const [expanded, setExpanded] = React.useState(false);
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col bg-black/80 relative min-w-0">
 
-            const handleCrew = (slotName) => {
-                const currentOccupant = unit.crew[slotName];
-                let newCrew = { ...unit.crew };
-                if (currentOccupant === user.pseudo) newCrew[slotName] = null;
-                else if (!currentOccupant) newCrew[slotName] = user.pseudo;
-                onUpdate(unit.id, { crew: newCrew });
-            };
+      <!-- HEADER / STATS BAR -->
+      <header
+        class="h-16 md:h-16 border-b border-green-900/50 flex items-center px-2 md:px-4 justify-between bg-gray-900/80 backdrop-blur z-20 shadow-md gap-2">
 
-            // Workflow RTB Avancé
-            const renderStatusAction = () => {
-                if (unit.status === 'operational') {
-                    if (user.role === 'SL') return <button onClick={() => onUpdate(unit.id, { status: 'mission' })} className="bg-blue-900/40 text-blue-300 w-full py-2 border border-blue-800">DÉPART MISSION</button>;
-                    return <div className="text-center text-mil-green text-xs py-2 border border-mil-green/20">PRÊT AU DÉPART</div>;
-                }
-                if (unit.status === 'mission') {
-                    return <button onClick={() => onUpdate(unit.id, { status: 'rtb_req' })} className="bg-yellow-900/40 text-yellow-300 w-full py-2 border border-yellow-800 animate-pulse">DEMANDE RTB</button>;
-                }
-                if (unit.status === 'rtb_req') {
-                    if (user.role === 'SL') return <button onClick={() => onUpdate(unit.id, { status: 'transit' })} className="bg-mil-green text-black w-full py-2 font-bold">VALIDER RETOUR (ACK)</button>;
-                    return <div className="text-center text-yellow-500 text-xs py-2 border border-yellow-500/20 bg-yellow-900/10">ATTENTE ACCORD SL</div>;
-                }
-                if (unit.status === 'transit') {
-                    return <button onClick={() => onUpdate(unit.id, { status: 'maintenance' })} className="bg-orange-900/40 text-orange-300 w-full py-2 border border-orange-800">ARRIVÉE ATELIER</button>;
-                }
-                if (unit.status === 'maintenance') {
-                    if (user.role === 'LOGI') return <button onClick={onMaintRequest} className="bg-mil-dim text-white w-full py-2 border border-mil-green flex items-center justify-center gap-2"><Icons.Wrench /> OUVRIR ATELIER</button>;
-                    return <div className="text-center text-orange-500 text-xs py-2 border border-orange-500/20 bg-orange-900/10">MAINTENANCE EN COURS</div>;
-                }
-                return null;
-            };
+        <!-- Burger Menu -->
+        <button onclick="toggleSidebar()" class="md:hidden p-3 text-green-500 active:text-white rounded">
+          <i class="fas fa-bars text-xl"></i>
+        </button>
 
-            const statusColors = {
-                operational: 'border-mil-green text-mil-green',
-                mission: 'border-blue-500 text-blue-400',
-                rtb_req: 'border-yellow-500 text-yellow-500',
-                transit: 'border-yellow-200 text-yellow-200',
-                maintenance: 'border-orange-500 text-orange-500',
-            };
+        <div id="header-sl-name"
+          class="hidden md:block font-mono text-green-600 text-xs border border-green-900 px-2 py-1 rounded whitespace-nowrap">
+          CMD: --</div>
 
-            return (
-                <div className={`mb-3 bg-mil-panel border-l-4 p-3 shadow-lg transition-all ${statusColors[unit.status] || 'border-gray-500'}`}>
-                    <div className="flex justify-between items-start mb-2" onClick={() => setExpanded(!expanded)}>
-                        <div className="flex-1">
-                            <h3 className="font-bold text-lg leading-none">{unit.name}</h3>
-                            <div className="text-xs opacity-70 mt-1 flex gap-2">
-                                <span>HP: {Math.round(unit.hp)}</span>
-                                <span>FUEL: {Math.round(unit.fuel)}</span>
-                                <span className="uppercase font-bold">[{unit.status}]</span>
-                            </div>
-                            {activeMission && unit.status === 'mission' && (
-                                <div className="text-[10px] text-blue-300 mt-1 border border-blue-900 bg-blue-900/20 px-1 w-fit">OP: {activeMission.title}</div>
-                            )}
-                        </div>
-                        {user.role === 'SL' && expanded && (
-                             <button onClick={(e) => { e.stopPropagation(); onDelete(unit.id); }} className="text-red-500 border border-red-500/30 px-2 text-xs">SUPPR</button>
-                        )}
-                    </div>
+        <!-- KPI SCROLLABLE CONTAINER -->
+        <div class="flex-1 overflow-x-auto no-scrollbar mx-2 mask-gradient">
+          <div class="flex gap-4 md:gap-8 text-sm font-mono min-w-max px-2 items-center h-full py-1">
+            <div class="flex flex-col items-center">
+              <span class="text-[9px] text-gray-500 uppercase">Supply</span>
+              <span id="supply-count" class="text-xl font-bold text-white text-glow">0</span>
+            </div>
+            <div class="w-px bg-green-900/50 h-6"></div>
+            <div class="flex flex-col items-center">
+              <span class="text-[9px] text-gray-500 uppercase">Total</span>
+              <span class="text-lg font-bold text-green-400"><span id="stat-total-veh">0</span></span>
+            </div>
+            <div class="flex flex-col items-center">
+              <span class="text-[9px] text-gray-500 uppercase">Ops</span>
+              <span id="stat-ops" class="text-lg font-bold text-green-500">0</span>
+            </div>
+            <div class="flex flex-col items-center">
+              <span class="text-[9px] text-gray-500 uppercase">Mission</span>
+              <span id="stat-mission" class="text-lg font-bold text-blue-500">0</span>
+            </div>
+            <div class="flex flex-col items-center">
+              <span class="text-[9px] text-gray-500 uppercase">Repair</span>
+              <span id="stat-repair" class="text-lg font-bold text-orange-500">0</span>
+            </div>
+            <div class="flex flex-col items-center">
+              <span class="text-[9px] text-gray-500 uppercase">Détruits</span>
+              <span id="stat-destroyed" class="text-lg font-bold text-red-600">0</span>
+            </div>
+          </div>
+        </div>
 
-                    <div className="grid grid-cols-3 gap-2 mt-3">
-                        {Object.entries(unit.crew).map(([slot, occupant]) => (
-                            <button key={slot} 
-                                onClick={() => handleCrew(slot)}
-                                disabled={occupant && occupant !== user.pseudo}
-                                className={`flex flex-col items-center justify-center p-2 text-xs rounded border 
-                                    ${occupant === user.pseudo ? 'border-red-500 bg-red-900/20 text-red-500' : 
-                                      occupant ? 'border-gray-700 bg-gray-900 text-gray-500' : 
-                                      'border-mil-green bg-mil-green/10 text-mil-green'}`}>
-                                <span className="opacity-70 text-[10px] uppercase mb-1">{slot}</span>
-                                <span className="font-bold truncate w-full text-center">{occupant || "LIBRE"}</span>
-                            </button>
-                        ))}
-                    </div>
+        <div>
+          <button onclick="toggleModal('garage-modal')"
+            class="btn-tac px-3 py-2 font-bold text-xs md:text-sm bg-green-900/20 rounded whitespace-nowrap flex items-center gap-2">
+            <i class="fas fa-warehouse"></i> <span class="hidden sm:inline">GARAGE</span>
+          </button>
+        </div>
+      </header>
 
-                    {expanded && (
-                        <div className="mt-4 pt-3 border-t border-white/10 space-y-2">
-                            {renderStatusAction()}
-                            {user.role === 'SL' && unit.status !== 'destroyed' && (
-                                <button onClick={() => onDelete(unit.id, true)} className="w-full text-red-500 text-xs border border-red-900 py-1 bg-red-900/10">SIGNALER DÉTRUIT</button>
-                            )}
-                        </div>
-                    )}
-                </div>
-            );
-        };
+      <!-- DASHBOARD GRID -->
+      <div
+        class="flex-1 p-2 md:p-4 overflow-y-auto -webkit-overflow-scrolling-touch bg-gradient-to-b from-transparent to-black/50">
+        <div id="vehicle-grid"
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 pb-4">
+          <!-- Vehicle Cards Generated Here -->
+          <div class="col-span-full text-center text-gray-600 mt-20 animate-pulse flex flex-col items-center">
+            <i class="fas fa-satellite-dish text-4xl mb-4 opacity-50"></i>
+            <span>INITIALISATION DU RÉSEAU...</span>
+          </div>
+        </div>
+      </div>
 
-        // --- DASHBOARD ---
-        const Dashboard = ({ data, user, save }) => {
-            const [maintUnit, setMaintUnit] = React.useState(null);
-            
-            const handleMaintenance = (hp, fuel, pCost, fCost) => {
-                const source = data.supplySources[0]; // Simplifié: Main base par défaut
-                const newSource = { ...source, resources: { ...source.resources, parts: source.resources.parts - pCost, fuel: source.resources.fuel - fCost } };
-                
-                const updatedUnits = data.units.map(u => u.id === maintUnit.id ? { ...u, hp, fuel, status: 'operational' } : u);
-                const updatedSources = [newSource, ...data.supplySources.slice(1)];
-                
-                save({ units: updatedUnits, supplySources: updatedSources, logs: [{id: Date.now(), time: new Date().toLocaleTimeString(), msg: `MAINTENANCE ${maintUnit.name}: -${pCost} Parts, -${fCost} Fuel`, author: user.pseudo, type: 'MAINT'}, ...data.logs] });
-                setMaintUnit(null);
-            };
+      <!-- LOGS / NOTIFICATIONS FOOTER -->
+      <div
+        class="h-1/3 md:h-48 border-t border-green-900/50 bg-gray-900/95 flex text-xs font-mono shadow-[0_-5px_15px_rgba(0,0,0,0.5)] z-20">
+        <!-- Notifications Live Feed -->
+        <div class="w-2/5 md:w-1/3 border-r border-green-900/50 flex flex-col">
+          <div
+            class="bg-black/40 p-2 text-green-400 font-bold flex justify-between items-center border-b border-green-900/30">
+            <span><i class="fas fa-satellite-dish mr-1"></i> LIVE</span>
+            <span class="animate-pulse text-[10px] text-red-500">● REC</span>
+          </div>
+          <div id="notif-feed" class="flex-1 overflow-y-auto p-0 no-scrollbar -webkit-overflow-scrolling-touch">
+            <!-- Live items -->
+          </div>
+        </div>
 
-            const handleDelete = (id, isDestroyed = false) => {
-                const unit = data.units.find(u => u.id === id);
-                if (isDestroyed && unit) {
-                    save({ 
-                        units: data.units.filter(u => u.id !== id),
-                        destroyedHistory: [{...unit, destroyedAt: new Date().toISOString(), by: user.pseudo}, ...data.destroyedHistory],
-                        logs: [{id: Date.now(), time: new Date().toLocaleTimeString(), msg: `VÉHICULE DÉTRUIT: ${unit.name}`, author: user.pseudo, type: 'LOSS'}, ...data.logs]
-                    });
-                } else {
-                    save({ units: data.units.filter(u => u.id !== id) });
-                }
-            };
+        <!-- Vacation Log (Table) -->
+        <div class="flex-1 flex flex-col min-w-0">
+          <div
+            class="bg-black/40 p-2 text-green-400 font-bold flex justify-between items-center border-b border-green-900/30">
+            <span class="truncate"><i class="fas fa-clipboard-list mr-1"></i> LOGS</span>
+            <div class="flex gap-2">
+              <button onclick="clearLogs()"
+                class="hover:text-white px-2 py-1 rounded bg-red-900/20 text-[10px]">CLR</button>
+            </div>
+          </div>
+          <div class="flex-1 overflow-y-auto -webkit-overflow-scrolling-touch">
+            <table class="w-full text-left border-collapse">
+              <tbody id="vacation-log-body" class="bg-black/20">
+                <!-- Log rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
 
-            // Bannières Missions Actives
-            const activeMissions = data.missions.filter(m => m.status === 'active');
+  <!-- MODAL: GARAGE -->
+  <div id="garage-modal" class="modal-bg fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="hud-panel w-full max-w-md p-6 relative rounded shadow-2xl">
+      <button onclick="toggleModal('garage-modal')"
+        class="absolute top-3 right-3 text-green-500 p-2 active:text-white"><i
+          class="fas fa-times text-xl"></i></button>
+      <h3 class="text-xl font-bold text-green-500 mb-4 border-b border-green-900 pb-2 flex items-center gap-2"><i
+          class="fas fa-warehouse"></i> GARAGE CENTRAL</h3>
 
-            return (
-                <div className="pb-20 p-3">
-                    {activeMissions.length > 0 && (
-                        <div className="mb-4 space-y-2">
-                            {activeMissions.map(m => (
-                                <div key={m.id} className="bg-blue-900/20 border border-blue-500 p-3 flex justify-between items-center shadow-[0_0_10px_rgba(0,168,255,0.2)]">
-                                    <div>
-                                        <div className="text-[10px] text-blue-300 uppercase tracking-widest">OPÉRATION EN COURS</div>
-                                        <div className="font-bold text-blue-100">{m.title}</div>
-                                    </div>
-                                    {user.role === 'SL' && (
-                                        <button onClick={() => save({ missions: data.missions.map(xm => xm.id === m.id ? {...xm, status: 'debrief'} : xm) })} className="text-xs bg-blue-900 text-blue-200 px-2 py-1">FIN OP</button>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">TYPE DE VÉHICULE</label>
+          <div class="relative">
+            <select id="new-veh-type"
+              class="w-full bg-black border border-green-700 p-3 text-white appearance-none rounded">
+              <option value="LOGI">CAMION LOGISTIQUE (300s)</option>
+              <option value="JEEP">JEEP LEGÈRE (100s)</option>
+              <option value="TRANSPORT">CAMION TRANSPORT (200s)</option>
+              <option value="BLINDE">BLINDÉ LÉGER (600s)</option>
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-green-500">
+              <i class="fas fa-chevron-down text-xs"></i>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">NOM DE CODE</label>
+          <input id="new-veh-name" type="text"
+            class="w-full bg-black border border-green-700 p-3 text-white uppercase rounded" placeholder="EX: ALPHA-1">
+        </div>
 
-                    {data.units.map(u => (
-                        <UnitCard 
-                            key={u.id} 
-                            unit={u} 
-                            user={user}
-                            activeMission={activeMissions.find(m => m.assignedUnits.includes(u.id))}
-                            onUpdate={(id, up) => save({ units: data.units.map(unit => unit.id === id ? { ...unit, ...up } : unit) })}
-                            onDelete={handleDelete}
-                            onMaintRequest={() => setMaintUnit(u)}
-                        />
-                    ))}
+        <div class="pt-4 border-t border-green-900/50 mt-4 bg-green-900/10 p-3 rounded">
+          <p class="text-[10px] text-gray-500 mb-2 font-bold uppercase">Ravitaillement Rapide</p>
+          <div class="grid grid-cols-2 gap-3">
+            <button onclick="addSupply(500)"
+              class="border border-green-800 p-2 text-xs active:bg-green-900 rounded font-bold">+500 SUPPLY</button>
+            <button onclick="addSupply(1000)"
+              class="border border-green-800 p-2 text-xs active:bg-green-900 rounded font-bold">+1000 SUPPLY</button>
+          </div>
+        </div>
 
-                    {maintUnit && (
-                        <MaintenanceModal 
-                            unit={maintUnit} 
-                            onClose={() => setMaintUnit(null)} 
-                            onFinish={handleMaintenance} 
-                        />
-                    )}
-                </div>
-            );
-        };
+        <button onclick="createVehicle()" class="btn-tac w-full py-4 mt-2 font-bold rounded shadow-lg">SORTIR DU
+          GARAGE</button>
+      </div>
+    </div>
+  </div>
 
-        // --- MISSION CONTROL (SL) ---
-        const MissionControl = ({ data, save }) => {
-            const [title, setTitle] = React.useState('');
-            const [selectedUnits, setSelectedUnits] = React.useState([]);
+  <!-- MODAL: ROSTER -->
+  <div id="roster-modal" class="modal-bg fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="hud-panel w-full max-w-md p-6 relative rounded shadow-2xl h-[80vh] flex flex-col">
+      <button onclick="toggleModal('roster-modal')"
+        class="absolute top-3 right-3 text-green-500 p-2 active:text-white"><i
+          class="fas fa-times text-xl"></i></button>
+      <h3 class="text-xl font-bold text-green-500 mb-4 border-b border-green-900 pb-2 flex items-center gap-2"><i
+          class="fas fa-users-cog"></i> GESTION PERSONNEL</h3>
 
-            const toggleUnit = (id) => {
-                if (selectedUnits.includes(id)) setSelectedUnits(selectedUnits.filter(x => x !== id));
-                else setSelectedUnits([...selectedUnits, id]);
-            };
+      <div class="flex-1 flex flex-col min-h-0">
+        <div class="flex justify-between text-xs text-gray-400 mb-2 items-center">
+          <span>ENREGISTRÉS: <span id="stat-log-count" class="text-white font-bold">0</span></span>
+          <button onclick="addToRoster()"
+            class="text-green-900 bg-green-500 hover:bg-green-400 px-3 py-2 rounded font-bold shadow-lg shadow-green-500/20 active:translate-y-0.5 transition-all"><i
+              class="fas fa-plus mr-1"></i> AJOUTER</button>
+        </div>
+        <div id="sl-roster-list"
+          class="flex-1 bg-black/50 border border-green-900 p-2 overflow-y-auto space-y-1 rounded -webkit-overflow-scrolling-touch">
+          <!-- List -->
+        </div>
+      </div>
+    </div>
+  </div>
 
-            const createMission = () => {
-                if (!title) return;
-                const newMission = { id: Date.now(), title, status: 'active', assignedUnits: selectedUnits };
-                const updatedUnits = data.units.map(u => selectedUnits.includes(u.id) ? { ...u, status: 'mission' } : u);
-                save({ missions: [...data.missions, newMission], units: updatedUnits });
-                setTitle(''); setSelectedUnits([]);
-            };
-
-            return (
-                <div className="p-4 pt-20">
-                    <h2 className="text-xl text-mil-green mb-4 border-b border-mil-green pb-2">CRÉATION OPÉRATION</h2>
-                    <input className="w-full bg-black border border-mil-green/50 text-white p-3 mb-4" 
-                        placeholder="NOM DE L'OP..." value={title} onChange={e => setTitle(e.target.value.toUpperCase())} />
-                    
-                    <div className="mb-4">
-                        <div className="text-xs text-gray-500 mb-2">UNITÉS ASSIGNÉES</div>
-                        <div className="grid grid-cols-2 gap-2">
-                            {data.units.filter(u => u.status === 'operational').map(u => (
-                                <div key={u.id} onClick={() => toggleUnit(u.id)}
-                                     className={`p-2 border text-xs cursor-pointer ${selectedUnits.includes(u.id) ? 'bg-blue-900/30 border-blue-500 text-blue-300' : 'border-gray-700 text-gray-500'}`}>
-                                    {u.name}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    
-                    <button onClick={createMission} className="w-full bg-blue-600 text-white font-bold py-3">LANCER OPÉRATION</button>
-                    
-                    <div className="mt-8">
-                        <h3 className="text-mil-green mb-2">HISTORIQUE OP</h3>
-                        {data.missions.map(m => (
-                            <div key={m.id} className="border-b border-gray-800 py-2 text-xs flex justify-between">
-                                <span>{m.title}</span>
-                                <span className={m.status === 'active' ? 'text-blue-400' : 'text-gray-500'}>{m.status}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-        };
-
-        // --- APP SHELL ---
-        const App = () => {
-            const [user, setUser] = React.useState(null);
-            const [data, setData] = React.useState(null);
-            const [view, setView] = React.useState('dashboard'); 
-            const [menuOpen, setMenuOpen] = React.useState(false);
-            const [sitrepOpen, setSitrepOpen] = React.useState(false);
-            const [sitrepMsg, setSitrepMsg] = React.useState('');
-
-            React.useEffect(() => Storage.subscribe(setData), []);
-
-            if (!user) return <Login onJoin={setUser} />;
-            if (!data) return <div className="flex h-screen items-center justify-center text-mil-green animate-pulse">UPLINKING...</div>;
-
-            const save = (payload) => Storage.save(payload);
-
-            const sendSitrep = () => {
-                if(!sitrepMsg) return;
-                const newSitrep = { id: Date.now(), msg: sitrepMsg, author: user.pseudo, time: new Date().toLocaleTimeString(), ack: false };
-                save({ sitreps: [newSitrep, ...data.sitreps], logs: [{id: Date.now(), time: new Date().toLocaleTimeString(), msg: `SITREP: ${sitrepMsg}`, author: user.pseudo, type: 'COMBAT'}, ...data.logs] });
-                setSitrepMsg(''); setSitrepOpen(false);
-            };
-
-            const ackSitrep = (id) => {
-                const updated = data.sitreps.map(s => s.id === id ? { ...s, ack: true, ackBy: user.pseudo } : s);
-                save({ sitreps: updated });
-            };
-
-            const buyVehicle = (tpl) => {
-                const source = data.supplySources[0];
-                if (source.resources.parts < (tpl.cost?.parts || 0)) { alert("Pas assez de ressources"); return; }
-                
-                const newSource = { ...source, resources: { ...source.resources, parts: source.resources.parts - (tpl.cost?.parts || 0) } };
-                const newUnit = { 
-                    id: Date.now().toString(), name: tpl.name, type: tpl.type, status: 'operational', 
-                    hp: tpl.hp, maxHp: tpl.hp, fuel: tpl.fuel, maxFuel: tpl.fuel, 
-                    crew: tpl.slots.reduce((acc, s) => ({...acc, [s]: null}), {}) 
-                };
-                
-                save({ units: [...data.units, newUnit], supplySources: [newSource, ...data.supplySources.slice(1)] });
-                setView('dashboard'); setMenuOpen(false);
-            };
-
-            // Notification Sitrep Non-ACK
-            const activeSitreps = data.sitreps.filter(s => !s.ack);
-            
-            return (
-                <div className="h-screen w-full relative bg-mil-black flex flex-col">
-                    <div className="scanline"></div>
-                    <div className="crt-overlay"></div>
-
-                    {/* HEADER */}
-                    <header className="h-14 bg-mil-dark border-b border-mil-green/50 flex items-center justify-between px-4 z-40 fixed w-full top-0 shadow-lg">
-                        <div className="flex items-center gap-3">
-                            <button onClick={() => setMenuOpen(!menuOpen)} className="text-mil-green"><Icons.Menu /></button>
-                            <h1 className="font-bold text-mil-green tracking-wider text-lg">LOGIOPS <span className="text-[10px] text-gray-500">V2.5</span></h1>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <button onClick={() => setSitrepOpen(true)} className="bg-red-900/20 border border-red-500 text-red-500 px-2 py-1 text-xs font-bold animate-pulse">SITREP</button>
-                            <div className="text-right text-xs hidden md:block">
-                                <div className="text-mil-green font-bold">{user.rank} {user.pseudo}</div>
-                            </div>
-                        </div>
-                    </header>
-
-                    {/* MENU */}
-                    {menuOpen && (
-                        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm pt-20 px-6 animate-fadeIn">
-                            <button onClick={() => setMenuOpen(false)} className="absolute top-4 right-4 text-mil-green"><Icons.X /></button>
-                            <nav className="flex flex-col gap-4 text-lg">
-                                <button onClick={() => { setView('dashboard'); setMenuOpen(false); }} className="p-4 border border-mil-green text-mil-green">DASHBOARD</button>
-                                {user.role === 'SL' && (
-                                    <button onClick={() => { setView('mission'); setMenuOpen(false); }} className="p-4 border border-blue-500 text-blue-300">GESTION OPÉRATIONS</button>
-                                )}
-                                <button onClick={() => { setView('jmo'); setMenuOpen(false); }} className="p-4 border border-gray-700 text-gray-400">JMO / LOGS</button>
-                                
-                                {user.role === 'SL' && (
-                                    <div className="mt-8 border-t border-gray-800 pt-4">
-                                        <div className="text-xs text-mil-green mb-2 uppercase">Garage</div>
-                                        <div className="grid gap-2">
-                                            {CATALOG.map(v => (
-                                                <div key={v.id} onClick={() => buyVehicle(v)} className="flex justify-between items-center bg-mil-panel p-3 border border-gray-700 active:bg-mil-green/20">
-                                                    <span>{v.name}</span>
-                                                    <span className="text-xs text-gray-500">{v.cost?.parts || 0} Pts</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </nav>
-                        </div>
-                    )}
-
-                    {/* MAIN */}
-                    <main className="flex-1 overflow-y-auto mt-14 bg-mil-black relative z-10">
-                        {view === 'dashboard' && <Dashboard data={data} user={user} save={save} />}
-                        {view === 'mission' && <MissionControl data={data} save={save} />}
-                        {view === 'jmo' && (
-                            <div className="p-4 pt-6 space-y-2">
-                                {data.logs.map(log => (
-                                    <div key={log.id} className={`border-b border-gray-800 pb-2 text-xs ${log.type === 'LOSS' ? 'text-red-500' : 'text-gray-400'}`}>
-                                        <span className="opacity-50">[{log.time}]</span> <span className="font-bold">{log.author}:</span> {log.msg}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </main>
-
-                    {/* ALERTE SITREP */}
-                    {activeSitreps.length > 0 && (
-                        <div className="fixed bottom-4 left-4 right-4 bg-red-600/90 text-white p-4 shadow-2xl z-50 border-2 border-red-400 animate-bounce">
-                            <div className="font-bold text-lg mb-1">⚠️ SITREP EN COURS</div>
-                            <div className="text-sm mb-3">{activeSitreps[0].msg} <span className="text-xs opacity-75">({activeSitreps[0].author})</span></div>
-                            {user.role === 'SL' && (
-                                <button onClick={() => ackSitrep(activeSitreps[0].id)} className="w-full bg-white text-red-600 font-bold py-2">ACCUSER RÉCEPTION (ACK)</button>
-                            )}
-                        </div>
-                    )}
-
-                    {/* MODAL SITREP INPUT */}
-                    {sitrepOpen && (
-                        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6">
-                            <div className="w-full max-w-lg bg-mil-panel border-2 border-red-500 p-4 shadow-red-glow">
-                                <h2 className="text-red-500 font-bold text-xl mb-4">ENVOI SITREP PRIORITAIRE</h2>
-                                <textarea className="w-full bg-black border border-red-500/50 text-white p-3 h-32 focus:outline-none focus:border-red-500" 
-                                    placeholder="MESSAGE..." value={sitrepMsg} onChange={e => setSitrepMsg(e.target.value)}></textarea>
-                                <div className="flex gap-2 mt-4">
-                                    <button onClick={sendSitrep} className="flex-1 bg-red-600 text-white font-bold py-3">ENVOYER</button>
-                                    <button onClick={() => setSitrepOpen(false)} className="flex-1 border border-red-500 text-red-500">ANNULER</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
 </body>
+
 </html>
