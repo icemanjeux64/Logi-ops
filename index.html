@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V18.3 (FULL SPECTRUM)</title>
+    <title>LOGI-OPS V18.4 (FULL SPECTRUM)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -199,6 +199,7 @@
             Skull: <><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/><path d="M12.5 17l-.5-1l-.5 1h1z"/><path d="M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20"/></>,
             MessageSquare: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>,
             XCircle: <><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></>,
+            Radio: <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9m14.2 0c3.9 3.9 3.9 10.3 0 14.2M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5m8.4 0c2.3 2.3 2.3 6.1 0 8.5M12 12h0" />,
         };
 
         const Icon = ({ name, size = 16, className }) => (
@@ -209,7 +210,6 @@
 
         // --- MODALS ---
 
-        // SITREP MODAL (Logisticien)
         const SitrepModal = ({ unit, onClose, onSend }) => {
             const [code, setCode] = useState('green');
             const [location, setLocation] = useState('');
@@ -281,9 +281,8 @@
             </div>
         );
 
-        // NEW: SL RTB ALERT MODAL
         const SLRTBAlert = ({ unit, onValidate }) => (
-            <div className="fixed top-20 right-4 z-[100] w-80 animate-bounce-in">
+            <div className="fixed top-24 right-4 z-[100] w-80 animate-bounce-in">
                 <div className="border-l-4 border-blue-500 bg-blue-900/20 p-4 shadow-2xl bg-black text-white">
                     <div className="flex justify-between items-start mb-2">
                         <h4 className="font-black text-sm uppercase text-blue-500 flex items-center gap-2"><Icon name="Radio"/> DEMANDE RTB</h4>
@@ -337,16 +336,17 @@
         };
 
         // --- UNIT CARD ---
-        const UnitCard = ({ unit, userIdentity, userRankId, isSL, actions }) => {
+        const UnitCard = ({ unit, userIdentity, userRankId, isSL, actions, Icons }) => {
             const minRank = unit.minRank || 0;
             const canDrive = userRankId >= minRank;
             const rankLabel = RANKS.find(r => r.id === minRank)?.short || "REC";
             
-            const driver = unit.responsible !== 'BASE' ? unit.responsible : null;
-            const passengers = unit.crew || [];
+            const driver = unit.responsible !== 'BASE' ? unit.responsible : null; // Object {name, rank} or null
+            const passengers = unit.crew || []; // Array of objects {name, rank}
             const totalSlots = unit.slots || 2;
-            const paxSlots = totalSlots - 1;
-            const freePaxSlots = paxSlots - passengers.length;
+            const occupiedSlots = (driver ? 1 : 0) + passengers.length;
+            const hasSpace = occupiedSlots < totalSlots;
+
             const isDriver = driver?.name === userIdentity;
             const isPax = passengers.some(p => p.name === userIdentity);
             const isOnBoard = isDriver || isPax;
@@ -357,8 +357,21 @@
             else if (unit.status === 'destroyed') { statusColor = "red"; statusText = "DÉTRUIT"; }
             else if (unit.status.includes('mission')) { statusColor = "blue"; statusText = "EN MISSION"; }
 
+            // Custom Visual Bar
+            const renderCrewBar = () => {
+                const bars = [];
+                for(let i=0; i < totalSlots; i++) {
+                    const isOccupied = i < occupiedSlots;
+                    bars.push(
+                        <div key={i} className={`h-2 flex-1 rounded-sm mx-0.5 ${isOccupied ? 'bg-cyan-500 shadow-[0_0_5px_rgba(6,182,212,0.8)]' : 'border border-green-600/50 bg-green-900/20'}`}></div>
+                    );
+                }
+                return <div className="flex w-full mt-1">{bars}</div>;
+            };
+
             return (
                 <div className={`relative border-l-4 border-${statusColor}-600 bg-gray-900/30 p-3 flex flex-col gap-2 border-t border-r border-b border-gray-800 hover:bg-gray-900/50 transition-all rounded`}>
+                    {/* Header */}
                     <div className="flex justify-between items-start">
                         <div className="flex gap-2">
                             <div className={`w-8 h-8 flex items-center justify-center border border-${statusColor}-800 bg-${statusColor}-900/20 text-${statusColor}-500 rounded`}>
@@ -372,47 +385,75 @@
                         <div className={`text-[9px] font-bold px-2 py-0.5 rounded border border-${statusColor}-900 bg-${statusColor}-900/20 text-${statusColor}-500`}>{statusText}</div>
                     </div>
 
+                    {/* Crew Visuals */}
                     {unit.status !== 'destroyed' && (
-                        <div className="bg-black/50 p-2 rounded border border-gray-800 space-y-2">
-                            <div className="flex justify-between items-center text-[10px]">
-                                <span className="text-gray-500 flex items-center gap-1"><Icon name="SteeringWheel"/> PILOTE</span>
-                                {driver ? <span className={`font-bold ${isDriver ? 'text-yellow-400' : 'text-white'}`}>{driver.rank} {driver.name}</span> : <span className="text-gray-600 italic">LIBRE</span>}
+                        <div className="bg-black/50 p-2 rounded border border-gray-800 space-y-1">
+                            <div className="flex justify-between items-end">
+                                <span className="text-[9px] text-gray-500 font-bold uppercase">OCCUPATION ({occupiedSlots}/{totalSlots})</span>
+                                {driver && <span className="text-[9px] text-cyan-400 font-bold">{driver.name} (PIL)</span>}
                             </div>
-                            <div className="flex gap-1 h-1 bg-gray-800 rounded overflow-hidden">
-                                <div style={{width: `${unit.fuel}%`}} className="bg-blue-600"></div>
-                                <div style={{width: `${unit.health}%`}} className="bg-green-600"></div>
-                            </div>
+                            {renderCrewBar()}
                         </div>
                     )}
 
+                    {/* ACTIONS */}
                     <div className="mt-auto space-y-1">
+                        {/* BASE ACTIONS */}
                         {unit.status === 'operational' && !isOnBoard && (
                             <div className="grid grid-cols-2 gap-1">
-                                {!driver && <button onClick={()=>actions.takeDriver(unit)} disabled={!canDrive} className={`py-1.5 border text-[9px] font-bold uppercase ${canDrive ? 'border-green-800 text-green-500 hover:bg-green-900/20' : 'border-red-900/30 text-red-900 cursor-not-allowed'}`}>{canDrive ? 'CONDUIRE' : 'GRADE NOK'}</button>}
-                                {freePaxSlots > 0 && <button onClick={()=>actions.takePax(unit)} className={`py-1.5 border border-blue-800 text-blue-500 text-[9px] font-bold uppercase hover:bg-blue-900/20 ${driver ? 'col-span-2' : 'col-span-1'}`}>MONTER</button>}
+                                {!driver ? (
+                                    <button onClick={actions.onTakeDriver} disabled={!canDrive} className={`py-1.5 border text-[9px] font-bold uppercase flex items-center justify-center gap-1 ${canDrive ? 'border-green-800 text-green-500 hover:bg-green-900/20' : 'border-red-900/30 text-red-900 cursor-not-allowed'}`}>
+                                        <Icon name="SteeringWheel" size={12}/> {canDrive ? 'CONDUIRE' : 'GRADE NOK'}
+                                    </button>
+                                ) : (
+                                    <div className="py-1.5 border border-gray-800 text-gray-600 text-[9px] font-bold uppercase text-center">PILOTE PRIS</div>
+                                )}
+                                
+                                {hasSpace && (
+                                    <button onClick={actions.onTakePax} className={`py-1.5 border border-blue-800 text-blue-500 text-[9px] font-bold uppercase hover:bg-blue-900/20 flex items-center justify-center gap-1 ${driver ? 'col-span-2' : 'col-span-1'}`}>
+                                        <Icon name="Users" size={12}/> MONTER
+                                    </button>
+                                )}
                             </div>
                         )}
-                        {isDriver && unit.status === 'operational' && (
+
+                        {/* ON BOARD ACTIONS (BASE) */}
+                        {unit.status === 'operational' && isDriver && (
                             <div className="grid grid-cols-2 gap-1">
-                                <button onClick={()=>actions.startMission(unit)} className="col-span-2 py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500">DÉPART MISSION</button>
-                                <button onClick={()=>actions.releaseDriver(unit)} className="col-span-2 py-1 border border-red-900 text-red-500 text-[9px]">DESCENDRE</button>
+                                <button onClick={actions.onStartMission} className="col-span-2 py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 uppercase">DÉPART MISSION</button>
+                                <button onClick={actions.onReleaseDriver} className="col-span-2 py-1 border border-red-900 text-red-500 text-[9px] hover:bg-red-900/20 uppercase">DESCENDRE</button>
                             </div>
                         )}
-                        {isPax && unit.status === 'operational' && (
-                            <button onClick={()=>actions.leavePax(unit)} className="w-full py-1.5 border border-red-900 text-red-500 text-[9px] font-bold hover:bg-red-900/20">DESCENDRE</button>
+                        {unit.status === 'operational' && isPax && (
+                            <button onClick={actions.onLeavePax} className="w-full py-1.5 border border-red-900 text-red-500 text-[9px] hover:bg-red-900/20 uppercase font-bold">DESCENDRE</button>
                         )}
-                        {unit.status.includes('mission') && isDriver && (
+
+                        {/* MISSION ACTIONS (EXCLUSIVE) */}
+                        {unit.status === 'mission' && isDriver && (
                             <div className="grid grid-cols-2 gap-1">
-                                <button onClick={()=>actions.openSitrep(unit)} className="py-1 bg-yellow-600 text-black font-bold text-[10px] hover:bg-yellow-500">SITREP</button>
-                                <button onClick={()=>actions.requestRTB(unit)} className="py-1 bg-blue-600 text-black font-bold text-[10px] hover:bg-blue-500">RTB</button>
-                                <button onClick={()=>actions.reportDestroyed(unit)} className="col-span-2 py-1 border border-red-900 text-red-500 text-[9px] mt-1 hover:bg-red-900/20">SIGNALER DESTRUCTION</button>
+                                <button onClick={actions.onSitrep} className="py-1 bg-yellow-900/20 border border-yellow-700 text-yellow-500 font-bold text-[9px]">SITREP</button>
+                                <button onClick={actions.onRequestRTB} className="py-1 bg-blue-900/20 border border-blue-700 text-blue-500 font-bold text-[9px]">RTB</button>
                             </div>
                         )}
-                        {unit.status.includes('mission') && isPax && (
-                            <div className="text-center text-[9px] italic text-gray-500 py-1">PASSAGER - EN MISSION</div>
+                        {unit.status === 'mission' && isDriver && (
+                             <button onClick={actions.onReportDestroyed} className="w-full py-1 border border-red-900 text-red-500 text-[9px] mt-1 hover:bg-red-900/20">SIGNALER DESTRUCTION</button>
                         )}
+
+                        {/* RTB TRANSIT STATE */}
+                        {unit.status === 'mission_rtb_request' && (
+                            <div className="text-center py-1 border border-blue-900/50 bg-blue-900/10 text-blue-400 text-[9px] animate-pulse font-bold">
+                                ATTENTE VALIDATION SL...
+                            </div>
+                        )}
+                        {unit.status === 'mission_rtb_transit' && (
+                            <div className="space-y-1">
+                                <div className="text-center text-[9px] text-blue-300 font-mono border border-blue-500/30 bg-blue-900/20 py-1">RETOUR BASE AUTORISÉ</div>
+                                {isDriver && <button onClick={actions.onConfirmArrival} className="w-full py-1.5 bg-green-600 text-black font-black text-[10px] hover:bg-green-500 uppercase">VALIDER ARRIVÉE</button>}
+                            </div>
+                        )}
+
                         {unit.status === 'damaged' && (
-                            <button onClick={()=>actions.enterMaintenance(unit)} className="w-full py-2 bg-orange-600 text-black font-black text-[10px] hover:bg-orange-500">ENTRER ATELIER</button>
+                            <button onClick={actions.onEnterMaintenance} className="w-full py-2 bg-orange-600 text-black font-black text-[10px] hover:bg-orange-500">ENTRER ATELIER</button>
                         )}
                     </div>
                 </div>
@@ -446,7 +487,7 @@
                 }
             }, [data, userRole]);
 
-            const actions = {
+            const appActions = {
                 addLog: (msg, type='INFO') => save({ logs: [{ id: Date.now(), time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), type, msg }, ...(data.logs||[])].slice(0,50) }),
                 deployUnit: (model) => {
                     const totalSupply = (data.supplySources||[]).reduce((acc,s)=>acc+s.amount,0);
@@ -454,33 +495,33 @@
                     const newSources = [...data.supplySources];
                     if(newSources[0]) newSources[0].amount -= model.cost;
                     save({ units: [{uuid: Date.now().toString(), ...model, status: 'operational', fuel: 100, health: 100, responsible: 'BASE', crew: [], logs: []}, ...(data.units||[])], supplySources: newSources });
-                    actions.addLog(`ACHAT ${model.name}`, 'GARAGE');
+                    appActions.addLog(`ACHAT ${model.name}`, 'GARAGE');
                 },
-                takeDriver: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, responsible: {name:user.name, rank:user.rankShort}} : x) }); actions.addLog(`${user.name} PREND VOLANT ${u.name}`, 'OPS'); },
+                takeDriver: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, responsible: {name:user.name, rank:user.rankShort}} : x) }); appActions.addLog(`${user.name} PREND VOLANT ${u.name}`, 'OPS'); },
                 releaseDriver: (u) => save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, responsible: 'BASE'} : x) }),
                 takePax: (u) => save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, crew: [...(x.crew || []), { name: user.name, rank: user.rankShort }]} : x) }),
                 leavePax: (u) => save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, crew: (x.crew || []).filter(p => p.name !== user.name)} : x) }),
-                startMission: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission'} : x) }); actions.addLog(`DÉPART MISSION ${u.name}`, 'OPS'); },
+                startMission: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission'} : x) }); appActions.addLog(`DÉPART MISSION ${u.name}`, 'OPS'); },
                 openSitrep: (u) => setSitrepModalUnit(u),
                 sendSitrep: (code, loc, det) => {
                     if(!sitrepModalUnit) return;
                     save({ sitreps: [...(data.sitreps||[]), { id: Date.now(), unitName: sitrepModalUnit.name, code, location: loc, details: det, time: new Date().toLocaleTimeString(), acked: false }] });
                     setSitrepModalUnit(null);
-                    actions.addLog(`SITREP ENVOYÉ: ${sitrepModalUnit.name}`, 'RADIO');
+                    appActions.addLog(`SITREP ENVOYÉ: ${sitrepModalUnit.name}`, 'RADIO');
                 },
                 ackSitrep: () => { if(!incomingSitrep) return; save({ sitreps: (data.sitreps||[]).map(s => s.id===incomingSitrep.id ? {...s, acked: true} : s) }); setIncomingSitrep(null); },
-                requestRTB: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission_rtb_request'} : x) }); actions.addLog(`DEMANDE RTB ${u.name}`, 'RADIO'); },
+                requestRTB: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission_rtb_request'} : x) }); appActions.addLog(`DEMANDE RTB ${u.name}`, 'RADIO'); },
                 validateRTB: (u) => setRtbUnit(u),
-                confirmRTB: (f, h) => { if(!rtbUnit) return; const needsMaint = f<100 || h<100; save({ units: (data.units||[]).map(x => x.uuid===rtbUnit.uuid ? {...x, status: needsMaint ? 'damaged' : 'operational', fuel: f, health: h, responsible: needsMaint ? 'BASE' : x.responsible, crew: needsMaint ? [] : x.crew} : x) }); setRtbUnit(null); actions.addLog(`RETOUR BASE ${rtbUnit.name} -> ${needsMaint?'ATELIER':'DISPO'}`, 'OPS'); },
+                confirmRTB: (f, h) => { if(!rtbUnit) return; const needsMaint = f<100 || h<100; save({ units: (data.units||[]).map(x => x.uuid===rtbUnit.uuid ? {...x, status: needsMaint ? 'damaged' : 'operational', fuel: f, health: h, responsible: needsMaint ? 'BASE' : x.responsible, crew: needsMaint ? [] : x.crew} : x) }); setRtbUnit(null); appActions.addLog(`RETOUR BASE ${rtbUnit.name} -> ${needsMaint?'ATELIER':'DISPO'}`, 'OPS'); },
                 enterMaintenance: (u) => setMaintenanceUnit(u),
-                finishMaintenance: () => { if(!maintenanceUnit) return; save({ units: (data.units||[]).map(x => x.uuid===maintenanceUnit.uuid ? {...x, status: 'operational', fuel: 100, health: 100} : x) }); setMaintenanceUnit(null); actions.addLog(`SORTIE ATELIER ${maintenanceUnit.name}`, 'MECA'); },
-                reportDestroyed: (u) => { if(!confirm("CONFIRMER ?")) return; save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'destroyed', responsible: 'BASE', crew: []} : x) }); actions.addLog(`PERTE ${u.name}`, 'ALERTE'); },
+                finishMaintenance: () => { if(!maintenanceUnit) return; save({ units: (data.units||[]).map(x => x.uuid===maintenanceUnit.uuid ? {...x, status: 'operational', fuel: 100, health: 100} : x) }); setMaintenanceUnit(null); appActions.addLog(`SORTIE ATELIER ${maintenanceUnit.name}`, 'MECA'); },
+                reportDestroyed: (u) => { if(!confirm("CONFIRMER ?")) return; save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'destroyed', responsible: 'BASE', crew: []} : x) }); appActions.addLog(`PERTE ${u.name}`, 'ALERTE'); },
                 updateSupply: (id, val) => save({ supplySources: (data.supplySources||[]).map(s => s.id===id ? {...s, amount: val} : s) }),
                 addSupply: (n, a) => save({ supplySources: [...(data.supplySources||[]), {id: Date.now(), name: n, amount: parseInt(a)}] }),
                 deleteSupply: (id) => save({ supplySources: (data.supplySources||[]).filter(s => s.id!==id) }),
                 addSquad: (name) => { if(!name) return; save({ squad: [...(data.squad||[]), {id: Date.now(), name: name.toUpperCase()}] }); },
                 removeSquad: (id) => save({ squad: (data.squad||[]).filter(m => m.id !== id) }),
-                approveRTB: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission_rtb_transit'} : x) }); setPendingRTB(null); actions.addLog(`RTB AUTORISÉ ${u.name}`, 'RADIO'); }
+                approveRTB: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission_rtb_transit'} : x) }); setPendingRTB(null); appActions.addLog(`RTB AUTORISÉ ${u.name}`, 'RADIO'); }
             };
 
             const filteredUnits = (data.units||[]).filter(u => filter === 'ALL' || u.status === filter || (filter === 'mission' && u.status.includes('mission')));
@@ -510,7 +551,7 @@
                     <header className="h-14 border-b border-green-900 bg-black flex items-center justify-between px-4 z-20 shrink-0">
                         <div className="flex items-center gap-3">
                             <button onClick={()=>setMenuOpen(!menuOpen)} className="md:hidden text-green-500"><Icon name="List" size={24}/></button>
-                            <div className="font-black text-lg text-white tracking-widest">LOGI-OPS <span className="text-xs text-green-600 align-top">V18.3</span></div>
+                            <div className="font-black text-lg text-white tracking-widest">LOGI-OPS <span className="text-xs text-green-600 align-top">V18.4</span></div>
                             <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} title={isConnected ? "Connecté Cloud" : "Mode Local"}></div>
                         </div>
                         <button onClick={()=>setShowSupply(true)} className="text-right"><div className="text-[8px] text-green-600 font-bold uppercase">LOGISTIQUE GLOBALE</div><div className="text-xl font-mono text-white font-bold cursor-pointer hover:text-green-400">{totalSupply.toLocaleString()}</div></button>
@@ -536,7 +577,27 @@
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                         {(data.units||[]).length === 0 && <div className="col-span-full text-center text-gray-600 py-10 italic">Aucun véhicule déployé.</div>}
                                         {filteredUnits.map(u => (
-                                            <UnitCard key={u.uuid} unit={u} userIdentity={user.name} userRankId={user.rankId} isSL={userRole==='SL'} actions={actions} Icons={Icons}/>
+                                            <UnitCard 
+                                                key={u.uuid} 
+                                                unit={u} 
+                                                userIdentity={user.name} 
+                                                userRankId={user.rankId} 
+                                                isSL={userRole==='SL'} 
+                                                Icons={Icons}
+                                                actions={{
+                                                    onTakeDriver: () => appActions.takeDriver(u),
+                                                    onReleaseDriver: () => appActions.releaseDriver(u),
+                                                    onTakePax: () => appActions.takePax(u),
+                                                    onLeavePax: () => appActions.leavePax(u),
+                                                    onStartMission: () => appActions.startMission(u),
+                                                    onSitrep: () => appActions.openSitrep(u),
+                                                    onRequestRTB: () => appActions.requestRTB(u),
+                                                    onValidateRTB: () => appActions.validateRTB(u),
+                                                    onConfirmArrival: () => setShowRTBModal(u),
+                                                    onReportDestroyed: () => appActions.reportDestroyed(u),
+                                                    onEnterMaintenance: () => appActions.enterMaintenance(u)
+                                                }}
+                                            />
                                         ))}
                                     </div>
                                 </>
@@ -549,7 +610,7 @@
                                             <div className="flex justify-between"><span className="text-[10px] bg-gray-900 text-gray-400 px-2 py-0.5 rounded">{m.cat}</span><span className="text-green-500 font-bold text-xs">{m.cost} PTS</span></div>
                                             <h3 className="font-bold text-white">{m.name}</h3>
                                             <div className="text-[10px] text-gray-500">{m.type} • {m.slots} PLACES</div>
-                                            <button onClick={()=>actions.deployUnit(m)} className="mt-auto py-2 bg-green-900/20 border border-green-800 text-green-500 text-xs font-bold hover:bg-green-900/40">ACHETER</button>
+                                            <button onClick={()=>appActions.deployUnit(m)} className="mt-auto py-2 bg-green-900/20 border border-green-800 text-green-500 text-xs font-bold hover:bg-green-900/40">ACHETER</button>
                                         </div>
                                     ))}
                                 </div>
@@ -561,14 +622,14 @@
                                     {userRole === 'SL' && (
                                         <div className="flex gap-2 mb-6">
                                             <input id="newMember" type="text" className="flex-1 bg-gray-900 border border-green-800 p-3 text-green-400 font-bold outline-none uppercase" placeholder="NOUVEAU SOLDAT..." />
-                                            <button onClick={()=>{ const el = document.getElementById('newMember'); actions.addSquad(el.value); el.value = ''; }} className="bg-green-600 text-black font-bold px-6">AJOUTER</button>
+                                            <button onClick={()=>{ const el = document.getElementById('newMember'); appActions.addSquad(el.value); el.value = ''; }} className="bg-green-600 text-black font-bold px-6">AJOUTER</button>
                                         </div>
                                     )}
                                     <div className="space-y-2">
                                         {(data.squad||[]).map(m => (
                                             <div key={m.id} className="flex justify-between items-center p-3 border border-green-900/30 bg-green-900/10">
                                                 <span className="text-green-300 font-bold flex items-center gap-3"><Icon name="User"/> {m.name}</span>
-                                                {userRole === 'SL' && <button onClick={()=>actions.removeSquad(m.id)} className="text-red-500 text-xs border border-red-900/30 px-2 py-1 hover:bg-red-900/20">RENVOYER</button>}
+                                                {userRole === 'SL' && <button onClick={()=>appActions.removeSquad(m.id)} className="text-red-500 text-xs border border-red-900/30 px-2 py-1 hover:bg-red-900/20">RENVOYER</button>}
                                             </div>
                                         ))}
                                         {(data.squad||[]).length === 0 && <div className="text-center text-gray-600 py-4 italic">Aucun effectif enregistré.</div>}
@@ -590,12 +651,12 @@
                         </main>
                     </div>
 
-                    {sitrepModalUnit && <SitrepModal unit={sitrepModalUnit} onClose={()=>setSitrepModalUnit(null)} onSend={actions.sendSitrep} />}
-                    {incomingSitrep && <SLSitrepAlert sitrep={incomingSitrep} onAck={actions.ackSitrep} />}
-                    {pendingRTB && <SLRTBAlert unit={pendingRTB} onValidate={()=>actions.approveRTB(pendingRTB)} />}
-                    {rtbUnit && <RTBCheckModal onClose={()=>setRtbUnit(null)} onConfirm={actions.confirmRTB} />}
-                    {maintenanceUnit && <MaintenanceModal unit={maintenanceUnit} onClose={()=>setMaintenanceUnit(null)} onConfirm={actions.finishMaintenance} />}
-                    {showSupply && <SupplyModal sources={data.supplySources||[]} onClose={()=>setShowSupply(false)} onUpdate={actions.updateSupply} onAdd={actions.addSupply} onDelete={actions.deleteSupply} />}
+                    {sitrepModalUnit && <SitrepModal unit={sitrepModalUnit} onClose={()=>setSitrepModalUnit(null)} onSend={appActions.sendSitrep} />}
+                    {incomingSitrep && <SLSitrepAlert sitrep={incomingSitrep} onAck={appActions.ackSitrep} />}
+                    {pendingRTB && <SLRTBAlert unit={pendingRTB} onValidate={()=>appActions.approveRTB(pendingRTB)} />}
+                    {rtbUnit && <RTBCheckModal onClose={()=>setRtbUnit(null)} onConfirm={appActions.confirmRTB} />}
+                    {maintenanceUnit && <MaintenanceModal unit={maintenanceUnit} onClose={()=>setMaintenanceUnit(null)} onConfirm={appActions.finishMaintenance} />}
+                    {showSupply && <SupplyModal sources={data.supplySources||[]} onClose={()=>setShowSupply(false)} onUpdate={appActions.updateSupply} onAdd={appActions.addSupply} onDelete={appActions.deleteSupply} />}
                 </div>
             );
         };
