@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V18.6 (FULL SPECTRUM)</title>
+    <title>LOGI-OPS V18.7 (FULL SPECTRUM)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -78,7 +78,7 @@
         const StorageService = {
             save: (data) => {
                 if (USE_FIREBASE && db) {
-                    getRef().set(data, { merge: true }).catch(err => console.warn("Erreur sauvegarde Cloud (Passage en local possible):", err));
+                    getRef().set(data, { merge: true }).catch(err => console.warn("Erreur sauvegarde Cloud:", err));
                 } else {
                     try {
                         const existing = JSON.parse(localStorage.getItem('logiops_v18') || '{}');
@@ -91,19 +91,13 @@
                     const auth = firebase.auth();
                     if (!auth.currentUser) {
                         try { await auth.signInAnonymously(); } 
-                        catch (e) { 
-                            console.warn("Auth Anonyme ignorée/échouée - Mode Dégradé Local activé", e); 
-                            // En cas d'échec auth (400), on charge le local immédiatement
-                            const local = localStorage.getItem('logiops_v18');
-                            if (local) callback(JSON.parse(local));
-                            return () => {};
-                        }
+                        catch (e) { console.warn("Auth Anonyme ignorée", e); }
                     }
                     return getRef().onSnapshot((doc) => {
                         if (doc.exists) callback(doc.data());
                         else callback(null);
                     }, err => {
-                        console.error("Erreur Lecture (Basculement Local):", err);
+                        console.error("Erreur Lecture:", err);
                         const local = localStorage.getItem('logiops_v18');
                         if (local) callback(JSON.parse(local));
                     });
@@ -480,6 +474,7 @@
             const [showSupply, setShowSupply] = useState(false);
             const [incomingSitrep, setIncomingSitrep] = useState(null);
             const [pendingRTB, setPendingRTB] = useState(null);
+            const [rtbModalUnit, setRtbModalUnit] = useState(null); // Add rtbModalUnit state
 
             useEffect(() => {
                 if (userRole === 'SL' && data.sitreps) {
@@ -527,7 +522,25 @@
                 deleteSupply: (id) => save({ supplySources: (data.supplySources||[]).filter(s => s.id!==id) }),
                 addSquad: (name) => { if(!name) return; save({ squad: [...(data.squad||[]), {id: Date.now(), name: name.toUpperCase()}] }); },
                 removeSquad: (id) => save({ squad: (data.squad||[]).filter(m => m.id !== id) }),
-                approveRTB: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission_rtb_transit'} : x) }); setPendingRTB(null); appActions.addLog(`RTB AUTORISÉ ${u.name}`, 'RADIO'); }
+                approveRTB: (u) => { save({ units: (data.units||[]).map(x => x.uuid===u.uuid ? {...x, status: 'mission_rtb_transit'} : x) }); setPendingRTB(null); appActions.addLog(`RTB AUTORISÉ ${u.name}`, 'RADIO'); },
+                finalizeRTB: (fuel, health) => { // Add finalizeRTB logic
+                    if (!rtbModalUnit) return;
+                    const needsRepair = fuel < 100 || health < 100;
+                    const updated = data.units.map(u => u.uuid === rtbModalUnit.uuid ? { 
+                        ...u, 
+                        status: needsRepair ? 'damaged' : 'operational',
+                        rtbStatus: 'idle', // Or reset mission status 
+                        // If 'mission_rtb_transit' is used as a status, reset to 'operational' or 'damaged'
+                        responsible: needsRepair ? 'BASE' : u.responsible, 
+                        crew: needsRepair ? [] : u.crew,
+                        fuel, health
+                    } : u);
+                    save({ 
+                        units: updated,
+                        logs: [{ id: Date.now(), time: new Date().toLocaleTimeString(), type: 'OPS', msg: `RETOUR BASE ${rtbModalUnit.name} (Statut: ${needsRepair ? 'MAINTENANCE' : 'OK'})` }, ...(data.logs||[])].slice(0,50) 
+                    });
+                    setRtbModalUnit(null);
+                }
             };
 
             const filteredUnits = (data.units||[]).filter(u => filter === 'ALL' || u.status === filter || (filter === 'mission' && u.status.includes('mission')));
