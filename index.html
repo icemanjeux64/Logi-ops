@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGI-OPS V18.5 (FULL SPECTRUM)</title>
+    <title>LOGI-OPS V18.6 (FULL SPECTRUM)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -78,7 +78,7 @@
         const StorageService = {
             save: (data) => {
                 if (USE_FIREBASE && db) {
-                    getRef().set(data, { merge: true }).catch(err => console.warn("Erreur sauvegarde Cloud:", err));
+                    getRef().set(data, { merge: true }).catch(err => console.warn("Erreur sauvegarde Cloud (Passage en local possible):", err));
                 } else {
                     try {
                         const existing = JSON.parse(localStorage.getItem('logiops_v18') || '{}');
@@ -91,13 +91,19 @@
                     const auth = firebase.auth();
                     if (!auth.currentUser) {
                         try { await auth.signInAnonymously(); } 
-                        catch (e) { console.warn("Auth Anonyme ignorée", e); }
+                        catch (e) { 
+                            console.warn("Auth Anonyme ignorée/échouée - Mode Dégradé Local activé", e); 
+                            // En cas d'échec auth (400), on charge le local immédiatement
+                            const local = localStorage.getItem('logiops_v18');
+                            if (local) callback(JSON.parse(local));
+                            return () => {};
+                        }
                     }
                     return getRef().onSnapshot((doc) => {
                         if (doc.exists) callback(doc.data());
                         else callback(null);
                     }, err => {
-                        console.error("Erreur Lecture:", err);
+                        console.error("Erreur Lecture (Basculement Local):", err);
                         const local = localStorage.getItem('logiops_v18');
                         if (local) callback(JSON.parse(local));
                     });
@@ -551,7 +557,7 @@
                     <header className="h-14 border-b border-green-900 bg-black flex items-center justify-between px-4 z-20 shrink-0">
                         <div className="flex items-center gap-3">
                             <button onClick={()=>setMenuOpen(!menuOpen)} className="md:hidden text-green-500"><Icon name="List" size={24}/></button>
-                            <div className="font-black text-lg text-white tracking-widest">LOGI-OPS <span className="text-xs text-green-600 align-top">V18.4</span></div>
+                            <div className="font-black text-lg text-white tracking-widest">LOGI-OPS <span className="text-xs text-green-600 align-top">V18.5</span></div>
                             <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} title={isConnected ? "Connecté Cloud" : "Mode Local"}></div>
                         </div>
                         <button onClick={()=>setShowSupply(true)} className="text-right"><div className="text-[8px] text-green-600 font-bold uppercase">LOGISTIQUE GLOBALE</div><div className="text-xl font-mono text-white font-bold cursor-pointer hover:text-green-400">{totalSupply.toLocaleString()}</div></button>
@@ -593,7 +599,7 @@
                                                     onSitrep: () => appActions.openSitrep(u),
                                                     onRequestRTB: () => appActions.requestRTB(u),
                                                     onValidateRTB: () => appActions.validateRTB(u),
-                                                    onConfirmArrival: () => setShowRTBModal(u),
+                                                    onConfirmArrival: () => setRtbModalUnit(u),
                                                     onReportDestroyed: () => appActions.reportDestroyed(u),
                                                     onEnterMaintenance: () => appActions.enterMaintenance(u)
                                                 }}
@@ -657,6 +663,8 @@
                     {rtbUnit && <RTBCheckModal onClose={()=>setRtbUnit(null)} onConfirm={appActions.confirmRTB} />}
                     {maintenanceUnit && <MaintenanceModal unit={maintenanceUnit} onClose={()=>setMaintenanceUnit(null)} onConfirm={appActions.finishMaintenance} />}
                     {showSupply && <SupplyModal sources={data.supplySources||[]} onClose={()=>setShowSupply(false)} onUpdate={appActions.updateSupply} onAdd={appActions.addSupply} onDelete={appActions.deleteSupply} />}
+                    {/* REPAIRED MODAL TRIGGER */}
+                    {rtbModalUnit && <RTBCheckModal onClose={()=>setRtbModalUnit(null)} onConfirm={appActions.finalizeRTB} />}
                 </div>
             );
         };
