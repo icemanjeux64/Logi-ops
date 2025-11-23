@@ -19,6 +19,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics-compat.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
@@ -37,7 +38,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // --- CONFIGURATION FIREBASE ---
+        // --- CONFIGURATION FIREBASE (TA CONFIGURATION) ---
         const firebaseConfig = {
             apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
             authDomain: "logiops-data.firebaseapp.com",
@@ -50,32 +51,26 @@
 
         let db = null;
         let USE_FIREBASE = false;
-        const isConfigured = firebaseConfig.projectId !== "PROJECT_ID";
-
-        if (typeof __firebase_config !== 'undefined') {
-            try {
-                const envConfig = JSON.parse(__firebase_config);
-                if (!firebase.apps.length) firebase.initializeApp(envConfig);
-                db = firebase.firestore();
-                USE_FIREBASE = true;
-            } catch (e) { console.warn("Erreur init Canvas config", e); }
-        } else if (isConfigured) {
-            try {
-                if (!firebase.apps.length) {
-                    const app = firebase.initializeApp(firebaseConfig);
-                    if (firebase.analytics) { firebase.analytics(); }
+        
+        // Initialisation Robuste
+        try {
+            if (!firebase.apps.length) {
+                const app = firebase.initializeApp(firebaseConfig);
+                if (typeof firebase.analytics === 'function') {
+                    firebase.analytics(); // Initialisation Analytics
                 }
-                db = firebase.firestore();
-                USE_FIREBASE = true;
-            } catch (e) {
-                USE_FIREBASE = false;
             }
-        } else {
+            db = firebase.firestore();
+            USE_FIREBASE = true;
+            console.log("Firebase initialisé avec succès sur :", firebaseConfig.projectId);
+        } catch (e) {
+            console.warn("Erreur Initialisation Firebase (Mode Local activé):", e);
             USE_FIREBASE = false;
         }
 
-        const SESSION_ID = typeof __app_id !== 'undefined' ? __app_id : "operation_actuelle";
+        const SESSION_ID = typeof __app_id !== 'undefined' ? __app_id : "operation_full_spectrum";
         
+        // Fonction helper pour obtenir la référence (avec gestion d'erreur si db null)
         const getRef = () => {
             if (!db) return null;
             return db.collection('artifacts').doc(SESSION_ID)
@@ -86,10 +81,12 @@
         const StorageService = {
             save: (data) => {
                 if (USE_FIREBASE && db) {
+                    // On tente la sauvegarde cloud
                     const auth = firebase.auth();
-                    // Tentative de sauvegarde même si auth anonyme en cours
-                    getRef().set(data, { merge: true }).catch(err => console.warn("Erreur sauvegarde Cloud:", err));
+                    // Note: On ne bloque pas si pas encore auth, la requête sera mise en file d'attente
+                    getRef().set(data, { merge: true }).catch(err => console.warn("Erreur sauvegarde Cloud (Permissions ?):", err));
                 } else {
+                    // Fallback Local
                     try {
                         const existing = JSON.parse(localStorage.getItem('logiops_v18') || '{}');
                         localStorage.setItem('logiops_v18', JSON.stringify({ ...existing, ...data }));
@@ -101,22 +98,34 @@
                     const auth = firebase.auth();
                     if (!auth.currentUser) {
                         try {
-                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await auth.signInWithCustomToken(__initial_auth_token);
-                            else await auth.signInAnonymously();
-                        } catch (e) { console.warn("Auth Anonyme échouée (CORS?):", e); }
+                            // Tentative de connexion anonyme indispensable pour lire/écrire
+                            await auth.signInAnonymously();
+                        } catch (e) { 
+                            console.warn("Auth Anonyme échouée (Probablement CORS ou Config):", e); 
+                            // Si l'auth échoue, on charge le local tout de suite
+                            const local = localStorage.getItem('logiops_v18');
+                            if (local) callback(JSON.parse(local));
+                            return () => {};
+                        }
                     }
+                    
+                    // Si Auth OK (ou en cours), on écoute la DB
                     return getRef().onSnapshot((doc) => {
                         if (doc.exists) {
+                            console.log("Données Cloud reçues");
                             callback(doc.data());
                         } else {
+                            console.log("Aucune donnée Cloud pour cette session (Nouveau ?)");
                             callback(null);
                         }
                     }, err => {
-                        console.error("Erreur Lecture Cloud (Permissions?):", err);
+                        console.error("Erreur Lecture Cloud:", err);
+                        // Fallback Local si erreur de lecture (ex: offline)
                         const local = localStorage.getItem('logiops_v18');
                         if (local) callback(JSON.parse(local));
                     });
                 } else {
+                    // Mode 100% Local
                     const local = localStorage.getItem('logiops_v18');
                     if (local) callback(JSON.parse(local)); else callback(null);
                     return () => {};
@@ -126,7 +135,7 @@
 
         const { useState, useEffect, useMemo } = React;
 
-        // --- HOOK: useData (RESTORED) ---
+        // --- HOOK: useData ---
         const useData = () => {
             const [data, setData] = useState({ 
                 units: [], logs: [], squad: [], sitreps: [], 
@@ -135,13 +144,11 @@
 
             useEffect(() => {
                 let unsubscribe = () => {};
-                
                 const init = async () => {
                     unsubscribe = await StorageService.loadInitial((newData) => {
                         if(newData) setData(prev => ({...prev, ...newData}));
                     });
                 };
-                
                 init();
                 return () => { if(typeof unsubscribe === 'function') unsubscribe(); };
             }, []);
@@ -203,19 +210,16 @@
             Fuel: <path d="M3 22v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8M8 12V7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v5M12 2v3"/>,
             User: <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8"/>,
             Users: <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>,
-            SteeringWheel: <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm-1-7h2v6h-2zm-5-2l2 1l3-5l-2-1zm10 1l2-1l-2-1l-3 5z"/>, // Simplified
+            SteeringWheel: <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm-1-7h2v6h-2zm-5-2l2 1l3-5l-2-1zm10 1l2-1l-2-1l-3 5z"/>, 
             List: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>,
             Activity: <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
             Package: <path d="M16.5 9.4L7.55 4.24M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/>,
-            
-            /* CORRECTION: Ajout des fragments <> ... </> pour les éléments multiples */
             Crosshair: <><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></>,
             Warehouse: <path d="M3 21v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8M12 11v10"/>,
             Layout: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></>,
             Plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
             Trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>,
             Skull: <><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/><path d="M12.5 17l-.5-1l-.5 1h1z"/><path d="M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20"/></>,
-            
             MessageSquare: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         };
 
@@ -530,6 +534,7 @@
                 deployUnit: (model) => {
                     const totalSupply = (data.supplySources||[]).reduce((acc,s)=>acc+s.amount,0);
                     if (totalSupply < model.cost) return alert("Supply insuffisant");
+                    // Deduct from first source for simplicity logic
                     const newSources = [...data.supplySources];
                     if(newSources[0]) newSources[0].amount -= model.cost;
                     
