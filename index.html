@@ -48,6 +48,7 @@
         let userPseudo = null;
         let userGrade = null;
         let currentUserId = null;
+        let lastNotificationTime = 0; // To track new alerts
         
         // Listeners cleanups
         let unsubMissionDetails = null;
@@ -118,8 +119,6 @@
                     // Create if not exists (fail-safe)
                     setDoc(publicDoc('settings', 'global'), { supply: 1000, slSessionId: null, slName: 'AUCUN' }).catch(console.error);
                 }
-            }, (error) => {
-                console.error("Settings listener error:", error);
             });
 
             if (userRole) {
@@ -130,19 +129,25 @@
             }
         }
 
-        async function addLog(message, type = 'INFO') {
+        // Modified addLog to handle Priority
+        async function addLog(message, type = 'INFO', isPriority = false) {
             if (!currentUserId) return;
             try {
+                // We keep logs for historical data if needed, but UI is unified
                 await addDoc(publicPath('logs'), {
                     message: message,
                     type: type,
                     timestamp: serverTimestamp()
                 });
+                
+                // Notifications feed
                 await addDoc(publicPath('notifications'), {
                     message: message,
                     type: type,
                     timestamp: serverTimestamp(),
-                    read: false
+                    read: false,
+                    isPriority: isPriority,
+                    senderName: `${userGrade} ${userPseudo}` // Useful for alert context
                 });
             } catch (e) {
                 console.error("Log error:", e);
@@ -186,6 +191,9 @@
                 userPseudo = pseudo;
                 userGrade = grade;
 
+                // Mark current time to avoid showing alerts from before login
+                lastNotificationTime = Date.now();
+
                 addLog(`PRISE DE SERVICE SL: ${grade} ${pseudo}`, 'CMD');
                 document.getElementById('auth-screen').classList.add('hidden');
                 loadInterface();
@@ -220,8 +228,6 @@
                     btn.onclick = () => loginLOG(doc.id, data.pseudo, data.grade);
                     rosterDiv.appendChild(btn);
                 });
-            }, (error) => {
-                rosterDiv.innerHTML = '<div class="text-red-500 text-center">Erreur chargement roster.</div>';
             });
         };
 
@@ -242,6 +248,7 @@
                 userRole = 'LOG';
                 userPseudo = pseudo;
                 userGrade = grade;
+                lastNotificationTime = Date.now();
 
                 addLog(`CONNEXION LOGISTICIEN: ${grade} ${pseudo}`, 'CONNECT');
                 document.getElementById('auth-screen').classList.add('hidden');
@@ -265,58 +272,75 @@
 
             const slControls = document.getElementById('sl-controls');
             const logControls = document.getElementById('log-controls');
+            const garageBtn = document.getElementById('garage-btn');
 
             if (userRole === 'SL') {
                 setupSLInterface();
                 if(slControls) slControls.classList.remove('hidden');
                 if(logControls) logControls.classList.add('hidden');
+                if(garageBtn) garageBtn.classList.remove('hidden'); // Show Garage for SL
             } else {
                 if(slControls) slControls.classList.add('hidden');
                 if(logControls) logControls.classList.remove('hidden');
+                if(garageBtn) garageBtn.classList.add('hidden'); // Hide Garage for LOG
             }
         }
 
-        // --- NOTIFICATIONS & LOGS ---
+        // --- NOTIFICATIONS, LIVE FEED & ALERTS ---
         function setupNotifications() {
             const feed = document.getElementById('notif-feed');
             const q = publicPath('notifications');
             
+            // We use onSnapshot with docChanges to detect NEW additions for alerts
             onSnapshot(q, (snapshot) => {
+                // 1. Alert Logic (Only for SL)
+                if (userRole === 'SL') {
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === "added") {
+                            const data = change.doc.data();
+                            // Check if priority AND if the timestamp is recent (after login) to avoid re-alerting old stuff
+                            const msgTime = getMillis(data.timestamp);
+                            
+                            if (data.isPriority && msgTime > lastNotificationTime) {
+                                // Trigger Alert Modal
+                                showAlertModal(data.type, data.message, data.senderName);
+                            }
+                        }
+                    });
+                }
+
+                // 2. Feed Logic (Render List)
                 if(!feed) return;
                 feed.innerHTML = '';
                 let docs = snapshot.docs.map(doc => doc.data());
                 docs.sort((a, b) => getMillis(b.timestamp) - getMillis(a.timestamp));
 
-                docs.slice(0, 20).forEach(data => {
+                docs.slice(0, 50).forEach(data => {
                     const div = document.createElement('div');
-                    div.className = "text-xs border-b border-green-900/50 p-2 text-green-300 font-mono break-words";
-                    div.innerHTML = `<span class="text-green-600">[${formatTime(data.timestamp)}]</span> ${data.message}`;
+                    // Styling priority messages differently
+                    const priorityClass = data.isPriority ? "border-l-4 border-l-red-500 bg-red-900/10" : "border-green-900/50";
+                    const textClass = data.isPriority ? "text-red-300" : "text-green-300";
+                    
+                    div.className = `text-xs border-b p-2 font-mono break-words ${priorityClass} ${textClass}`;
+                    div.innerHTML = `<span class="opacity-50">[${formatTime(data.timestamp)}]</span> <span class="font-bold">${data.type}:</span> ${data.message}`;
                     feed.appendChild(div);
                 });
             });
-
-            const logBody = document.getElementById('vacation-log-body');
-            const qLogs = publicPath('logs');
-            
-            if (logBody) {
-                onSnapshot(qLogs, (snapshot) => {
-                    logBody.innerHTML = '';
-                    let docs = snapshot.docs.map(doc => doc.data());
-                    docs.sort((a, b) => getMillis(b.timestamp) - getMillis(a.timestamp));
-
-                    docs.slice(0, 50).forEach(data => {
-                        const row = document.createElement('tr');
-                        row.className = "border-b border-green-900/30 hover:bg-green-900/10";
-                        row.innerHTML = `
-                            <td class="p-2 text-green-600 whitespace-nowrap">${formatTime(data.timestamp)}</td>
-                            <td class="p-2 font-bold text-green-500 whitespace-nowrap">${data.type}</td>
-                            <td class="p-2 text-green-300 break-all">${data.message}</td>
-                        `;
-                        logBody.appendChild(row);
-                    });
-                });
-            }
         }
+
+        window.showAlertModal = (title, message, sender) => {
+            const modal = document.getElementById('alert-modal');
+            document.getElementById('alert-title').innerText = `ALERTE : ${title}`;
+            document.getElementById('alert-message').innerText = message;
+            document.getElementById('alert-sender').innerText = sender || "INCONNU";
+            
+            modal.classList.remove('hidden');
+            // Play sound effect here if needed
+        };
+
+        window.closeAlertModal = () => {
+            document.getElementById('alert-modal').classList.add('hidden');
+        };
 
         // --- VEHICLE MANAGEMENT ---
         function setupVehiclesListener() {
@@ -396,10 +420,10 @@
             });
             div.appendChild(seatsContainer);
 
+            // SL ACTIONS - Only visible to SL
             if (userRole === 'SL') {
                 const actions = document.createElement('div');
                 actions.className = "mt-auto pt-2 border-t border-gray-700 grid grid-cols-2 gap-2 text-xs";
-                
                 const btnClass = "p-3 border rounded font-bold active:bg-opacity-50 touch-manipulation";
 
                 if (data.status !== 'DESTROYED') {
@@ -453,6 +477,8 @@
         // --- SL LOGIC ---
         window.createVehicle = async () => {
             if(!currentUserId) return;
+            if(userRole !== 'SL') return alert("Seul le Squad Leader peut sortir des véhicules.");
+
             const typeEl = document.getElementById('new-veh-type');
             const nameEl = document.getElementById('new-veh-name');
             if(!typeEl || !nameEl) return;
@@ -537,15 +563,13 @@
             }
         };
 
-        // --- NEW MISSION LOGIC ---
+        // --- MISSION LOGIC ---
 
-        // 1. Open the Modal (Creation)
         window.openMissionModal = async () => {
             if(!currentUserId) return;
             toggleModal('mission-modal');
             const vehiclesList = document.getElementById('mission-vehicle-list');
             
-            // Populate Available Vehicles (OPS and no mission)
             vehiclesList.innerHTML = '<div class="text-center animate-pulse text-xs">RECHERCHE DE VÉHICULES...</div>';
             
             const vehSnap = await getDocs(publicPath('vehicles'));
@@ -581,28 +605,23 @@
             }
         };
 
-        // 2. Submit the Mission (Leader optional)
         window.confirmMission = async () => {
             const name = document.getElementById('mission-name').value;
-            // Removed leader select in creation per requirement
 
             if(!name) return alert("Nom de mission requis");
             
-            // Get selected vehicles
             const checkboxes = document.querySelectorAll('.mission-veh-checkbox:checked');
             const selectedVehicles = Array.from(checkboxes).map(cb => cb.value);
 
-            // Create Mission (No leader initially unless volunteered)
             const missionRef = await addDoc(publicPath('missions'), {
                 name: name,
                 status: 'ACTIVE',
                 leaderId: null, 
-                leaderName: null, // Starts empty
+                leaderName: null,
                 createdAt: serverTimestamp(),
                 vehicleCount: selectedVehicles.length
             });
 
-            // Update Vehicles (Batch is cleaner)
             if (selectedVehicles.length > 0) {
                 const batch = writeBatch(db);
                 selectedVehicles.forEach(vehId => {
@@ -619,9 +638,8 @@
             toggleModal('mission-modal');
         };
 
-        // 3. Mission Details View (The "Immersive" Modal)
+        // Mission Details View
         window.openMissionDetails = (missionId) => {
-            // Unsubscribe previous listeners if existing
             if(unsubMissionDetails) unsubMissionDetails();
             if(unsubMissionVehicles) unsubMissionVehicles();
 
@@ -629,9 +647,24 @@
             const titleEl = document.getElementById('detail-mission-name');
             const leaderEl = document.getElementById('detail-mission-leader');
             const vehiclesEl = document.getElementById('detail-mission-vehicles');
+            const actionsEl = document.getElementById('sl-mission-actions');
 
             modal.classList.remove('hidden');
             vehiclesEl.innerHTML = '<div class="text-center animate-pulse mt-4">CHARGEMENT DES DONNÉES...</div>';
+
+            // Show Mission Control Buttons ONLY for SL
+            if (userRole === 'SL') {
+                actionsEl.innerHTML = `
+                    <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-green-900/50">
+                        <button onclick="closeMission('${missionId}', 'COMPLETED')" class="btn-tac bg-green-900/40 hover:bg-green-500 hover:text-black py-3 rounded font-bold">MISSION ACCOMPLIE</button>
+                        <button onclick="closeMission('${missionId}', 'CANCELLED')" class="btn-tac border-red-500 text-red-500 bg-red-900/20 hover:bg-red-500 hover:text-black py-3 rounded font-bold">ANNULER MISSION</button>
+                    </div>
+                `;
+                actionsEl.classList.remove('hidden');
+            } else {
+                actionsEl.innerHTML = '';
+                actionsEl.classList.add('hidden');
+            }
 
             // Listener 1: The Mission Metadata
             unsubMissionDetails = onSnapshot(publicDoc('missions', missionId), (doc) => {
@@ -660,8 +693,7 @@
                 }
             });
 
-            // Listener 2: The Vehicles assigned to this mission
-            // We fetch all vehicles and filter in JS to avoid "index required" errors on filtered queries
+            // Listener 2: The Vehicles
             unsubMissionVehicles = onSnapshot(publicPath('vehicles'), (snap) => {
                 vehiclesEl.innerHTML = '';
                 let count = 0;
@@ -669,10 +701,7 @@
                     const data = doc.data();
                     if(data.missionId === missionId) {
                         count++;
-                        // REUSE the createVehicleCard logic for consistency!
-                        // It already handles seat clicking perfectly.
                         const card = createVehicleCard(doc.id, data);
-                        // Adjust styling slightly if needed, or leave as is
                         vehiclesEl.appendChild(card);
                     }
                 });
@@ -693,7 +722,6 @@
             if(!currentUserId) return;
             if(!confirm("Voulez-vous prendre le commandement de cette mission ?")) return;
             
-            // Identity string
             const myName = `${userGrade} ${userPseudo}`;
             
             await updateDoc(publicDoc('missions', missionId), {
@@ -701,6 +729,45 @@
                 leaderName: myName
             });
             addLog(`${myName} a pris le commandement de la mission.`, 'MISSION');
+        };
+
+        // === CRITICAL: SL MISSION CLOSING LOGIC ===
+        window.closeMission = async (missionId, reason) => {
+            if (userRole !== 'SL') return;
+            const confirmMsg = reason === 'COMPLETED' ? "Confirmer la fin de mission ? (Tous les véhicules repasseront OPS)" : "Annuler la mission ? (Tous les véhicules repasseront OPS)";
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                // 1. Get all vehicles in this mission
+                const vehQuery = query(publicPath('vehicles'), where('missionId', '==', missionId));
+                const vehSnap = await getDocs(vehQuery);
+
+                const batch = writeBatch(db);
+
+                // 2. Archive Mission
+                const missionRef = publicDoc('missions', missionId);
+                batch.update(missionRef, { status: reason === 'COMPLETED' ? 'ARCHIVED' : 'CANCELLED' });
+
+                // 3. Reset all vehicles to OPS and clear missionId
+                vehSnap.forEach(v => {
+                    batch.update(v.ref, {
+                        status: 'OPS',
+                        missionId: null,
+                        // Optionally verify seats, but usually we leave people inside until they get out? 
+                        // Let's leave seats as is, just change status.
+                    });
+                });
+
+                await batch.commit();
+                
+                const logMsg = reason === 'COMPLETED' ? "MISSION ACCOMPLIE - RETOUR BASE EFFECTUÉ" : "MISSION ANNULÉE PAR LE COMMANDEMENT";
+                addLog(logMsg, "MISSION", true); // Priority Alert
+                closeMissionDetails();
+
+            } catch (error) {
+                console.error("Error closing mission:", error);
+                alert("Erreur lors de la clôture de la mission.");
+            }
         };
 
         function setupMissionsListener() {
@@ -714,11 +781,10 @@
                 docs.sort((a, b) => getMillis(b.createdAt) - getMillis(a.createdAt));
 
                 docs.forEach(data => {
-                    if(data.status === 'ARCHIVED') return;
+                    if(data.status === 'ARCHIVED' || data.status === 'CANCELLED') return;
                     
                     const el = document.createElement('div');
                     el.className = "border border-green-500/50 p-3 mb-2 bg-green-900/10 rounded cursor-pointer hover:bg-green-900/30 transition-colors";
-                    // Only show leader if explicitly set
                     const leaderDisplay = data.leaderName 
                         ? `<div class="text-[10px] text-green-400 font-bold"><i class="fas fa-crown text-yellow-500 mr-1"></i>${data.leaderName}</div>` 
                         : `<div class="text-[10px] text-gray-500 italic">CHEF: AUCUN</div>`;
@@ -728,7 +794,7 @@
                     el.onclick = () => openMissionDetails(data.id);
 
                     el.innerHTML = `
-                        <div class="flex justify-between items-start mb-1 pointer-events-none"> <!-- pointer-events-none to let parent click handle it -->
+                        <div class="flex justify-between items-start mb-1 pointer-events-none">
                             <div>
                                 <h3 class="font-bold text-green-400 truncate pr-2 leading-tight">${data.name}</h3>
                                 ${leaderDisplay}
@@ -739,7 +805,7 @@
                             </div>
                         </div>
                         <div class="mt-2 text-[10px] text-green-600 flex justify-end pointer-events-none">
-                             <span>CLIQUER POUR DÉTAILS <i class="fas fa-chevron-right ml-1"></i></span>
+                             <span>DÉTAILS <i class="fas fa-chevron-right ml-1"></i></span>
                         </div>
                     `;
                     container.appendChild(el);
@@ -747,18 +813,13 @@
             });
         }
 
-        window.archiveMission = async (id) => {
-            await updateDoc(publicDoc('missions', id), { status: 'ARCHIVED' });
-            addLog("Mission terminée et archivée", "MISSION");
-        };
-
         window.sendCitrep = async (missionName) => {
             const text = prompt("Message CITREP :");
-            if(text) addLog(`[CITREP ${missionName}] ${text}`, 'RADIO');
+            if(text) addLog(`[CITREP ${missionName}] ${text}`, 'RADIO', true); // Priority
         };
 
         window.requestRTB = () => {
-            addLog(`DEMANDE DE RTB (RETOUR BASE) POUR ${userPseudo}`, 'RADIO');
+            addLog(`DEMANDE DE RTB (RETOUR BASE) POUR ${userPseudo}`, 'RADIO', true); // Priority
         };
 
         // --- UTILS FOR UI ---
@@ -784,128 +845,47 @@
 
     </script>
 
-    <!-- Custom CSS for HUD & Mobile -->
+    <!-- Custom CSS -->
     <style>
-        :root {
-            --neon-green: #22c55e;
-            --bg-dark: #0f172a;
-        }
-        
-        /* Mobile Reset & WebKit Tweaks */
-        html, body {
-            height: 100%;
-            overflow: hidden;
-            background-color: #050505;
-            color: #e2e8f0;
-            font-family: 'Share Tech Mono', monospace;
-            -webkit-tap-highlight-color: transparent;
-            -webkit-text-size-adjust: 100%;
-        }
-
-        /* Prevent rubber-banding on iOS */
-        body {
-            overscroll-behavior: none;
-        }
-        
-        /* Scrollbar styling */
+        :root { --neon-green: #22c55e; --bg-dark: #0f172a; }
+        html, body { height: 100%; overflow: hidden; background-color: #050505; color: #e2e8f0; font-family: 'Share Tech Mono', monospace; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
+        body { overscroll-behavior: none; }
         ::-webkit-scrollbar { width: 4px; height: 4px;}
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #15803d; border-radius: 2px; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @media screen and (max-width: 768px) { input, select, textarea { font-size: 16px !important; } }
+        .hud-panel { background: rgba(10, 20, 10, 0.95); border: 1px solid rgba(34, 197, 94, 0.3); box-shadow: 0 0 15px rgba(34, 197, 94, 0.1), inset 0 0 30px rgba(0, 0, 0, 0.9); position: relative; }
+        .hud-panel::before { content: " "; display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%); background-size: 100% 2px; pointer-events: none; z-index: 0; }
+        .clip-corner { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%); }
+        .text-glow { text-shadow: 0 0 5px rgba(34, 197, 94, 0.8); }
+        .scan-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, transparent, rgba(34, 197, 94, 0.05), transparent); animation: scanline 6s linear infinite; pointer-events: none; z-index: 9999; }
+        @keyframes scanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(100vh); } }
+        .btn-tac { background: rgba(34, 197, 94, 0.1); border: 1px solid var(--neon-green); color: var(--neon-green); transition: all 0.2s; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; touch-action: manipulation; }
+        .btn-tac:active { background: var(--neon-green); color: black; box-shadow: 0 0 15px var(--neon-green); }
+        .modal-bg { background-color: rgba(0,0,0,0.85); backdrop-filter: blur(4px); }
+        .mask-gradient { mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent); }
         
-        /* Hide scrollbar utility */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-
-        /* iOS Input Zoom Fix */
-        @media screen and (max-width: 768px) {
-            input, select, textarea {
-                font-size: 16px !important;
-            }
-        }
-
-        /* HUD Effects */
-        .hud-panel {
-            background: rgba(10, 20, 10, 0.95);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            box-shadow: 0 0 15px rgba(34, 197, 94, 0.1), inset 0 0 30px rgba(0, 0, 0, 0.9);
-            position: relative;
-        }
-        .hud-panel::before {
-            content: " ";
-            display: block;
-            position: absolute;
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
-            background-size: 100% 2px;
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        .clip-corner {
-            clip-path: polygon(
-                0 0, 
-                100% 0, 
-                100% calc(100% - 15px), 
-                calc(100% - 15px) 100%, 
-                0 100%
-            );
-        }
-
-        .text-glow {
-            text-shadow: 0 0 5px rgba(34, 197, 94, 0.8);
-        }
-
-        /* Scanline Animation - Subtle */
-        .scan-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(to bottom, transparent, rgba(34, 197, 94, 0.05), transparent);
-            animation: scanline 6s linear infinite;
-            pointer-events: none;
-            z-index: 9999;
-        }
-        @keyframes scanline {
-            0% { transform: translateY(-100%); }
-            100% { transform: translateY(100vh); }
-        }
-
-        .btn-tac {
-            background: rgba(34, 197, 94, 0.1);
-            border: 1px solid var(--neon-green);
-            color: var(--neon-green);
-            transition: all 0.2s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            cursor: pointer;
-            touch-action: manipulation; /* Faster touch response */
-        }
-        .btn-tac:active {
-            background: var(--neon-green);
-            color: black;
-            box-shadow: 0 0 15px var(--neon-green);
-        }
-        
-        .modal-bg {
-            background-color: rgba(0,0,0,0.85);
-            backdrop-filter: blur(4px);
-        }
-
-        /* Gradient Mask for scrolling containers */
-        .mask-gradient {
-            mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-            -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-        }
+        /* Alert Modal Specifics */
+        .alert-pulse { animation: alertPulse 1s infinite; }
+        @keyframes alertPulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
     </style>
 </head>
 <body class="flex flex-col">
 
     <!-- Scanline Effect -->
     <div class="scan-overlay"></div>
+
+    <!-- ALERT MODAL (SL Only) -->
+    <div id="alert-modal" class="modal-bg fixed inset-0 z-[100] hidden flex items-center justify-center p-4">
+        <div class="hud-panel w-full max-w-md p-6 relative rounded shadow-2xl border-2 border-red-500 alert-pulse bg-black/90">
+            <h3 id="alert-title" class="text-2xl font-bold text-red-500 mb-2 border-b border-red-900 pb-2 flex items-center gap-2"><i class="fas fa-exclamation-triangle"></i> ALERTE PRIORITAIRE</h3>
+            <div id="alert-message" class="text-xl text-white font-mono my-6 text-center break-words">--</div>
+            <div class="text-xs text-red-400 mb-4 text-center">SOURCE: <span id="alert-sender">--</span></div>
+            <button onclick="closeAlertModal()" class="btn-tac w-full py-4 font-bold rounded border-red-500 text-red-500 hover:bg-red-500 hover:text-black">REÇU 5/5</button>
+        </div>
+    </div>
 
     <!-- AUTHENTICATION SCREEN -->
     <div id="auth-screen" class="fixed inset-0 z-[60] bg-black flex items-center justify-center p-4">
@@ -1050,7 +1030,7 @@
                 </div>
 
                 <div>
-                    <button onclick="toggleModal('garage-modal')" class="btn-tac px-3 py-2 font-bold text-xs md:text-sm bg-green-900/20 rounded whitespace-nowrap flex items-center gap-2">
+                    <button id="garage-btn" onclick="toggleModal('garage-modal')" class="btn-tac px-3 py-2 font-bold text-xs md:text-sm bg-green-900/20 rounded whitespace-nowrap flex items-center gap-2">
                         <i class="fas fa-warehouse"></i> <span class="hidden sm:inline">GARAGE</span>
                     </button>
                 </div>
@@ -1067,34 +1047,14 @@
                 </div>
             </div>
 
-            <!-- LOGS / NOTIFICATIONS FOOTER -->
-            <div class="h-1/3 md:h-48 border-t border-green-900/50 bg-gray-900/95 flex text-xs font-mono shadow-[0_-5px_15px_rgba(0,0,0,0.5)] z-20">
-                <!-- Notifications Live Feed -->
-                <div class="w-2/5 md:w-1/3 border-r border-green-900/50 flex flex-col">
-                    <div class="bg-black/40 p-2 text-green-400 font-bold flex justify-between items-center border-b border-green-900/30">
-                        <span><i class="fas fa-satellite-dish mr-1"></i> LIVE</span>
-                        <span class="animate-pulse text-[10px] text-red-500">● REC</span>
-                    </div>
-                    <div id="notif-feed" class="flex-1 overflow-y-auto p-0 no-scrollbar -webkit-overflow-scrolling-touch">
-                        <!-- Live items -->
-                    </div>
+            <!-- UNIFIED LOGS / LIVE FEED FOOTER -->
+            <div class="h-1/3 md:h-56 border-t border-green-900/50 bg-gray-900/95 flex flex-col text-xs font-mono shadow-[0_-5px_15px_rgba(0,0,0,0.5)] z-20">
+                <div class="bg-black/40 p-2 text-green-400 font-bold flex justify-between items-center border-b border-green-900/30">
+                    <span><i class="fas fa-satellite-dish mr-1"></i> JOURNAL OPÉRATIONNEL / LIVE FEED</span>
+                    <span class="animate-pulse text-[10px] text-red-500">● REC</span>
                 </div>
-                
-                <!-- Vacation Log (Table) -->
-                <div class="flex-1 flex flex-col min-w-0">
-                    <div class="bg-black/40 p-2 text-green-400 font-bold flex justify-between items-center border-b border-green-900/30">
-                        <span class="truncate"><i class="fas fa-clipboard-list mr-1"></i> LOGS</span>
-                        <div class="flex gap-2">
-                            <button onclick="clearLogs()" class="hover:text-white px-2 py-1 rounded bg-red-900/20 text-[10px]">CLR</button>
-                        </div>
-                    </div>
-                    <div class="flex-1 overflow-y-auto -webkit-overflow-scrolling-touch">
-                        <table class="w-full text-left border-collapse">
-                            <tbody id="vacation-log-body" class="bg-black/20">
-                                <!-- Log rows -->
-                            </tbody>
-                        </table>
-                    </div>
+                <div id="notif-feed" class="flex-1 overflow-y-auto p-0 no-scrollbar -webkit-overflow-scrolling-touch bg-black/20">
+                    <!-- Unified items -->
                 </div>
             </div>
         </main>
@@ -1169,8 +1129,6 @@
                     <input id="mission-name" type="text" class="w-full bg-black border border-green-700 p-3 text-white uppercase rounded" placeholder="EX: OPERATION OVERLORD">
                 </div>
 
-                <!-- Leader selection removed for creation -->
-
                 <div class="flex-1 flex flex-col min-h-0">
                     <label class="text-xs text-gray-400 block mb-1">AFFECTATION VÉHICULES (DISPONIBLES)</label>
                     <div id="mission-vehicle-list" class="flex-1 bg-black/50 border border-green-900 p-2 overflow-y-auto space-y-2 rounded -webkit-overflow-scrolling-touch">
@@ -1206,7 +1164,10 @@
                 </div>
             </div>
             
-             <!-- Footer actions (RTB, etc) could go here later -->
+            <!-- ACTIONS SL ONLY -->
+            <div id="sl-mission-actions" class="hidden">
+                 <!-- Populated by JS -->
+            </div>
         </div>
     </div>
 
