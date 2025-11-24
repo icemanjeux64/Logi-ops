@@ -1,23 +1,36 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Shield, 
-  Settings, 
   Save, 
   RotateCcw, 
   Activity, 
   Box, 
-  Cross, 
   Flame,
   Minus,
   Plus,
-  HeartPulse
+  HeartPulse,
+  History,
+  LayoutGrid,
+  AlertTriangle,
+  FileText
 } from 'lucide-react';
 
-export default function MilitaryMdtFull() {
+export default function MilitaryMdtTactical() {
+  const [activeTab, setActiveTab] = useState('fleet'); // 'fleet' | 'logs'
   const [supplyStock, setSupplyStock] = useState(6000);
   const [medicActive, setMedicActive] = useState(true);
+  const [logs, setLogs] = useState([]);
   
-  // DONNÉES COMPLÈTES
+  // État pour la Modale de Destruction
+  const [destroyModal, setDestroyModal] = useState({
+    isOpen: false,
+    vehicleId: null,
+    vehicleName: '',
+    maxQty: 0
+  });
+  const [destroyForm, setDestroyForm] = useState({ qty: 1, reason: '' });
+
+  // DONNÉES INITIALES
   const initialFleet = [
     // --- ETAT MAJOR (VIOLET) ---
     { id: 'em1', category: 'Transport EM', type: 'Jeep EM', deployed: 2, cost: 110, status: 'Opérationnel', destroyed: 0, group: 'em' },
@@ -29,252 +42,406 @@ export default function MilitaryMdtFull() {
     { id: 'log3', category: 'Ravitaillement', type: 'Camion Arsenal', deployed: 0, cost: 380, status: 'Pas déployé', destroyed: 0, group: 'logi' },
     { id: 'log4', category: 'Ravitaillement', type: 'Camion Construction', deployed: 1, cost: 260, status: 'Opérationnel', destroyed: 0, group: 'logi' },
     
-    // --- TRANSPORT DE TROUPES (JAUNE) ---
-    { id: 'tra1', category: 'Transport de troupes', type: 'Camion', deployed: 4, cost: 200, status: 'Opérationnel', destroyed: 0, group: 'transport' },
-    { id: 'tra2', category: 'Transport de troupes', type: 'VAB', deployed: 4, cost: 1200, status: 'Opérationnel', destroyed: 0, group: 'transport' },
-    { id: 'tra3', category: 'Transport de troupes', type: 'Stryker (non armé)', deployed: 0, cost: 1000, status: 'Pas déployé', destroyed: 0, group: 'transport' },
+    // --- TRANSPORT (JAUNE) ---
+    { id: 'tra1', category: 'Transport', type: 'Camion Troupes', deployed: 4, cost: 200, status: 'Opérationnel', destroyed: 0, group: 'transport' },
+    { id: 'tra2', category: 'Transport', type: 'VAB', deployed: 4, cost: 1200, status: 'Opérationnel', destroyed: 0, group: 'transport' },
+    { id: 'tra3', category: 'Transport', type: 'Stryker (non armé)', deployed: 0, cost: 1000, status: 'Pas déployé', destroyed: 0, group: 'transport' },
     
-    // --- VÉHICULE BLINDÉ MULTI-RÔLE (ORANGE) ---
-    { id: 'bl1', category: 'Véhicule blindé', type: 'JLTV M1280', deployed: 0, cost: 650, status: 'Pas déployé', destroyed: 0, group: 'blinde' },
-    { id: 'bl2', category: 'Véhicule blindé', type: 'JLTV M1281 - M2HB (12.7)', deployed: 0, cost: 1000, status: 'Pas déployé', destroyed: 0, group: 'blinde' },
-    { id: 'bl3', category: 'Véhicule blindé', type: 'JLTV M1281 - M134 (7.62)', deployed: 0, cost: 2000, status: 'Pas déployé', destroyed: 0, group: 'blinde' },
-    { id: 'bl4', category: 'Véhicule blindé', type: 'JLTV M1278 - M2HB (12.7 télé)', deployed: 1, cost: 1500, status: 'Opérationnel', destroyed: 0, group: 'blinde' },
-    { id: 'bl5', category: 'Véhicule blindé', type: 'JLTV AN-MSY-2 v2 (7.62 télé)', deployed: 0, cost: 2760, status: 'Pas déployé', destroyed: 0, group: 'blinde' },
-    { id: 'bl6', category: 'Véhicule blindé', type: 'JLTV M1278 - M230LF (30mm)', deployed: 0, cost: 2750, status: 'Pas déployé', destroyed: 0, group: 'blinde' },
-    { id: 'bl7', category: 'Véhicule blindé', type: 'JLTV M1278 + Javelin', deployed: 0, cost: 3700, status: 'Pas déployé', destroyed: 0, group: 'blinde' },
-    { id: 'bl8', category: 'Véhicule blindé', type: 'JLTV AN-MSY-2 v1 (Stinger)', deployed: 0, cost: 3700, status: 'Pas déployé', destroyed: 0, group: 'blinde' },
+    // --- BLINDÉS (ORANGE) ---
+    { id: 'bl1', category: 'Blindé Léger', type: 'JLTV M1280', deployed: 0, cost: 650, status: 'Pas déployé', destroyed: 0, group: 'blinde' },
+    { id: 'bl4', category: 'Blindé Armé', type: 'JLTV M1278 (12.7)', deployed: 1, cost: 1500, status: 'Opérationnel', destroyed: 0, group: 'blinde' },
+    { id: 'bl7', category: 'Anti-Char', type: 'JLTV Javelin', deployed: 0, cost: 3700, status: 'Pas déployé', destroyed: 0, group: 'blinde' },
+    { id: 'bl8', category: 'Anti-Aérien', type: 'JLTV Stinger', deployed: 0, cost: 3700, status: 'Pas déployé', destroyed: 0, group: 'blinde' },
 
     // --- COMBAT INFANTERIE (VERT CLAIR) ---
-    { id: 'inf1', category: 'Combat Infanterie', type: 'Stryker M1126 - M2HB', deployed: 2, cost: 2000, status: 'Opérationnel', destroyed: 0, group: 'infanterie' },
-    { id: 'inf2', category: 'Combat Infanterie', type: 'Stryker M1296 (30mm)', deployed: 1, cost: 3000, status: 'Opérationnel', destroyed: 0, group: 'infanterie' },
-    { id: 'inf3', category: 'Combat Infanterie', type: 'Stryker M1128 (105mm)', deployed: 1, cost: 5000, status: 'Opérationnel', destroyed: 0, group: 'infanterie' },
+    { id: 'inf1', category: 'Combat', type: 'Stryker M1126', deployed: 2, cost: 2000, status: 'Opérationnel', destroyed: 0, group: 'infanterie' },
+    { id: 'inf2', category: 'Combat Lourd', type: 'Stryker M1296 (30mm)', deployed: 1, cost: 3000, status: 'Opérationnel', destroyed: 0, group: 'infanterie' },
+    { id: 'inf3', category: 'Combat Lourd', type: 'Stryker M1128 (105mm)', deployed: 1, cost: 5000, status: 'Opérationnel', destroyed: 0, group: 'infanterie' },
 
     // --- SANITAIRE (VERT FONCÉ) ---
-    { id: 'san1', category: 'Véhicule sanitaire', type: 'Stryker EVASAN', deployed: 1, cost: 975, status: 'Opérationnel', destroyed: 0, group: 'sanitaire' },
-    { id: 'san2', category: 'Véhicule sanitaire', type: 'VAB EVASAN', deployed: 0, cost: 975, status: 'Pas déployé', destroyed: 0, group: 'sanitaire' },
-
-    // --- CHARS (VIOLET/ROSE FONCÉ) ---
-    { id: 'char1', category: 'Char de bataille', type: 'Leclerc', deployed: 0, cost: 8000, status: 'Pas déployé', destroyed: 0, group: 'char' },
-    { id: 'char2', category: 'Char de bataille', type: 'Leclerc XLR', deployed: 0, cost: 8500, status: 'Pas déployé', destroyed: 1, group: 'char' },
+    { id: 'san1', category: 'Sanitaire', type: 'Stryker EVASAN', deployed: 1, cost: 975, status: 'Opérationnel', destroyed: 0, group: 'sanitaire' },
+    
+    // --- CHARS (VIOLET FONCÉ) ---
+    { id: 'char1', category: 'Char Lourd', type: 'Leclerc', deployed: 0, cost: 8000, status: 'Pas déployé', destroyed: 0, group: 'char' },
     
     // --- ALAT (BLEU) ---
-    { id: 'air1', category: 'MEDEVAC', type: 'NH90 "Caïman"', deployed: 0, cost: 3000, status: 'Pas déployé', destroyed: 0, group: 'alat' },
-    { id: 'air2', category: 'Appui / Transport', type: 'NH90 "Caïman"', deployed: 0, cost: 3000, status: 'Pas déployé', destroyed: 0, group: 'alat' },
-    { id: 'air3', category: 'Appui / Transport', type: 'Gazelle SA342L (Mistral)', deployed: 0, cost: 2500, status: 'Pas déployé', destroyed: 0, group: 'alat' },
-    { id: 'air4', category: 'Appui / Transport', type: 'Gazelle SA342L Strike (Gatling)', deployed: 0, cost: 3000, status: 'Pas déployé', destroyed: 0, group: 'alat' },
-    { id: 'air5', category: 'Appui / Transport', type: 'Gazelle SA342L Canon (20mm)', deployed: 0, cost: 3500, status: 'Pas déployé', destroyed: 0, group: 'alat' },
-    { id: 'air6', category: 'Appui / Transport', type: 'Gazelle SA342L HAP (Roq. 68)', deployed: 0, cost: 3500, status: 'Pas déployé', destroyed: 1, group: 'alat' },
-    { id: 'air7', category: 'Appui / Transport', type: 'EC665 Tigre', deployed: 0, cost: 7000, status: 'Pas déployé', destroyed: 0, group: 'alat' },
+    { id: 'air1', category: 'Hélico', type: 'NH90 "Caïman"', deployed: 0, cost: 3000, status: 'Pas déployé', destroyed: 0, group: 'alat' },
+    { id: 'air7', category: 'Attaque', type: 'EC665 Tigre', deployed: 0, cost: 7000, status: 'Pas déployé', destroyed: 0, group: 'alat' },
   ];
 
   const [fleet, setFleet] = useState(initialFleet);
 
-  // Calculs
+  // --- LOGIQUE METIER ---
+
+  const addLog = (type, message, details = '') => {
+    const newLog = {
+      id: Date.now(),
+      time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      type, // 'deploy', 'destroy', 'info'
+      message,
+      details
+    };
+    setLogs(prev => [newLog, ...prev]);
+  };
+
+  const updateDeploy = (id, change) => {
+    const vehicle = fleet.find(v => v.id === id);
+    if (!vehicle) return;
+
+    // Empêcher d'aller en dessous de 0
+    if (vehicle.deployed + change < 0) return;
+
+    setFleet(fleet.map(item => {
+      if (item.id === id) {
+        return { ...item, deployed: item.deployed + change };
+      }
+      return item;
+    }));
+
+    // Log automatique du déploiement
+    if (change > 0) {
+      addLog('deploy', `Déploiement: ${vehicle.type}`, `+${change} unité(s) sortie(s) du garage`);
+    } else {
+      addLog('info', `Retour Garage: ${vehicle.type}`, `${Math.abs(change)} unité(s) rentrée(s)`);
+    }
+  };
+
+  const updateStatus = (id, newStatus) => {
+    setFleet(fleet.map(item => item.id === id ? { ...item, status: newStatus } : item));
+  };
+
+  // --- LOGIQUE MODALE DESTRUCTION ---
+
+  const openDestructionModal = (vehicle) => {
+    if (vehicle.deployed <= 0) return; // On ne peut pas détruire ce qui n'est pas déployé
+    setDestroyModal({
+      isOpen: true,
+      vehicleId: vehicle.id,
+      vehicleName: vehicle.type,
+      maxQty: vehicle.deployed
+    });
+    setDestroyForm({ qty: 1, reason: '' });
+  };
+
+  const confirmDestruction = () => {
+    if (!destroyForm.reason.trim()) return; // Raison obligatoire
+
+    const { vehicleId, vehicleName } = destroyModal;
+    const { qty, reason } = destroyForm;
+
+    setFleet(fleet.map(item => {
+      if (item.id === vehicleId) {
+        return {
+          ...item,
+          deployed: item.deployed - qty, // On retire des déployés
+          destroyed: item.destroyed + qty, // On ajoute aux détruits
+          status: item.deployed - qty === 0 ? 'Détruit' : item.status // Si plus rien n'est déployé et qu'on vient de détruire, statut détruit
+        };
+      }
+      return item;
+    }));
+
+    addLog('destroy', `PERTE CONFIRMÉE: ${vehicleName} (x${qty})`, `Circonstances: ${reason}`);
+    
+    setDestroyModal({ ...destroyModal, isOpen: false });
+  };
+
+  // --- CALCULS GLOBAUX ---
   const totalDeployed = useMemo(() => fleet.reduce((acc, item) => acc + item.deployed, 0), [fleet]);
   const totalDestroyed = useMemo(() => fleet.reduce((acc, item) => acc + item.destroyed, 0), [fleet]);
   const totalCost = useMemo(() => fleet.reduce((acc, item) => acc + (item.deployed * item.cost), 0), [fleet]);
 
-  const updateFleet = (id, field, value) => {
-    setFleet(fleet.map(item => item.id === id ? { ...item, [field]: value } : item));
-  };
-
   const groups = [
-    { id: 'em', label: 'Etat Major', color: 'bg-[#9b72cf]', text: 'text-[#9b72cf]', border: 'border-[#9b72cf]' },
-    { id: 'logi', label: 'Logistique', color: 'bg-[#e0aaff]', text: 'text-[#e0aaff]', border: 'border-[#e0aaff]' },
-    { id: 'transport', label: 'Transport de Troupes', color: 'bg-[#ffd60a]', text: 'text-[#ffd60a]', border: 'border-[#ffd60a]' },
-    { id: 'blinde', label: 'Véhicules Blindés (JLTV)', color: 'bg-[#fb8500]', text: 'text-[#fb8500]', border: 'border-[#fb8500]' },
-    { id: 'infanterie', label: 'Combat Infanterie (Stryker)', color: 'bg-[#55a630]', text: 'text-[#55a630]', border: 'border-[#55a630]' },
-    { id: 'sanitaire', label: 'Sanitaire / EVASAN', color: 'bg-[#2b9348]', text: 'text-[#2b9348]', border: 'border-[#2b9348]' },
-    { id: 'char', label: 'Chars de Bataille', color: 'bg-[#7209b7]', text: 'text-[#7209b7]', border: 'border-[#7209b7]' },
-    { id: 'alat', label: 'Aérien (ALAT)', color: 'bg-[#4361ee]', text: 'text-[#4361ee]', border: 'border-[#4361ee]' },
+    { id: 'em', label: 'Etat Major', color: 'bg-[#9b72cf]', text: 'text-[#9b72cf]' },
+    { id: 'logi', label: 'Logistique', color: 'bg-[#e0aaff]', text: 'text-[#e0aaff]' },
+    { id: 'transport', label: 'Transport', color: 'bg-[#ffd60a]', text: 'text-[#ffd60a]' },
+    { id: 'blinde', label: 'Blindés JLTV', color: 'bg-[#fb8500]', text: 'text-[#fb8500]' },
+    { id: 'infanterie', label: 'Stryker', color: 'bg-[#55a630]', text: 'text-[#55a630]' },
+    { id: 'sanitaire', label: 'Sanitaire', color: 'bg-[#2b9348]', text: 'text-[#2b9348]' },
+    { id: 'char', label: 'Chars', color: 'bg-[#7209b7]', text: 'text-[#7209b7]' },
+    { id: 'alat', label: 'ALAT', color: 'bg-[#4361ee]', text: 'text-[#4361ee]' },
   ];
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[#121212] text-slate-200 font-sans overflow-hidden">
+    <div className="flex flex-col h-screen w-full bg-[#0f0f0f] text-slate-200 font-sans overflow-hidden relative">
       
-      {/* HEADER AMÉLIORÉ */}
-      <header className="bg-[#1a1a1a] border-b border-slate-800 p-4 shrink-0 shadow-lg z-20">
+      {/* MODALE DESTRUCTION (Overlay) */}
+      {destroyModal.isOpen && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-[#1a1a1a] border-2 border-red-600 rounded-xl shadow-[0_0_50px_rgba(220,38,38,0.3)] w-full max-w-lg overflow-hidden">
+            <div className="bg-red-600/10 p-4 border-b border-red-600/30 flex items-center gap-3">
+              <div className="p-2 bg-red-600 text-white rounded-lg animate-pulse">
+                 <AlertTriangle size={24} strokeWidth={2.5} />
+              </div>
+              <h3 className="text-xl font-black text-red-500 uppercase tracking-widest">Signalement de perte</h3>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* Infos Véhicule */}
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Véhicule concerné</label>
+                <div className="text-2xl font-bold text-white font-heading">{destroyModal.vehicleName}</div>
+              </div>
+
+              {/* Quantité */}
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Unités perdues (Max: {destroyModal.maxQty})</label>
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => setDestroyForm(prev => ({ ...prev, qty: Math.max(1, prev.qty - 1) }))}
+                    className="w-12 h-12 rounded bg-slate-800 flex items-center justify-center text-white hover:bg-slate-700 font-bold text-xl"
+                  >-</button>
+                  <div className="flex-1 bg-black/50 h-12 flex items-center justify-center border border-slate-700 rounded font-mono text-2xl font-bold text-red-500">
+                    {destroyForm.qty}
+                  </div>
+                  <button 
+                    onClick={() => setDestroyForm(prev => ({ ...prev, qty: Math.min(destroyModal.maxQty, prev.qty + 1) }))}
+                    className="w-12 h-12 rounded bg-slate-800 flex items-center justify-center text-white hover:bg-slate-700 font-bold text-xl"
+                  >+</button>
+                </div>
+              </div>
+
+              {/* Raison (Obligatoire) */}
+              <div>
+                <label className="text-xs font-bold text-red-400 uppercase tracking-wider block mb-2 flex items-center gap-2">
+                  <FileText size={12} />
+                  Circonstances (Obligatoire)
+                </label>
+                <textarea 
+                  value={destroyForm.reason}
+                  onChange={(e) => setDestroyForm(prev => ({ ...prev, reason: e.target.value }))}
+                  placeholder="Ex: IED sur secteur B4, équipage sauf..."
+                  className="w-full bg-black/30 border border-slate-700 focus:border-red-500 rounded-lg p-3 text-sm text-slate-200 h-24 resize-none focus:outline-none focus:ring-1 focus:ring-red-500/50"
+                  autoFocus
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <button 
+                  onClick={() => setDestroyModal({ ...destroyModal, isOpen: false })}
+                  className="py-4 rounded-lg font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                >
+                  ANNULER
+                </button>
+                <button 
+                  onClick={confirmDestruction}
+                  disabled={!destroyForm.reason.trim()}
+                  className={`
+                    py-4 rounded-lg font-bold text-white shadow-lg flex items-center justify-center gap-2 transition-all
+                    ${!destroyForm.reason.trim() 
+                      ? 'bg-slate-700 cursor-not-allowed opacity-50' 
+                      : 'bg-red-600 hover:bg-red-500 active:scale-95 shadow-red-900/20'}
+                  `}
+                >
+                  <Flame size={18} />
+                  CONFIRMER PERTE
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* HEADER */}
+      <header className="bg-[#141414] border-b border-slate-800 p-4 shrink-0 shadow-lg z-20">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          
-          {/* Logo & Titre */}
-          <div className="flex items-center gap-6">
-            <div className="w-16 h-16 bg-blue-900/10 rounded-xl border border-blue-500/20 flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
-               <Shield size={36} className="text-blue-500" strokeWidth={1.5} />
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-blue-900/10 rounded-xl border border-blue-500/20 flex items-center justify-center shrink-0">
+               <Shield size={32} className="text-blue-500" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-white tracking-tight uppercase font-heading">Fiche Logistique</h1>
-              <div className="flex items-center gap-2 text-red-500 animate-pulse font-mono text-sm font-bold mt-1 bg-red-500/10 px-2 py-0.5 rounded w-fit">
-                <Activity size={14} />
-                DEFCON 3 - ACTIF
+              <h1 className="text-2xl font-black text-white tracking-tight uppercase">Logistique FOF</h1>
+              <div className="flex gap-2 mt-1">
+                 <button 
+                  onClick={() => setActiveTab('fleet')}
+                  className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full transition-all ${activeTab === 'fleet' ? 'bg-slate-200 text-black' : 'text-slate-500 hover:text-slate-300'}`}
+                 >
+                   <LayoutGrid size={12} className="inline mr-1 mb-0.5" /> Flotte
+                 </button>
+                 <button 
+                  onClick={() => setActiveTab('logs')}
+                  className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full transition-all ${activeTab === 'logs' ? 'bg-slate-200 text-black' : 'text-slate-500 hover:text-slate-300'}`}
+                 >
+                   <History size={12} className="inline mr-1 mb-0.5" /> Historique (J-LOGS)
+                 </button>
               </div>
             </div>
           </div>
 
-          {/* Stats Centrales */}
-          <div className="flex gap-4 bg-[#0a0a0a] p-2 rounded-xl border border-slate-800 shadow-inner">
-             <div className="px-6 py-1 border-r border-slate-800 text-center">
-                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Total Déployé</div>
-                <span className="text-2xl font-mono font-bold text-blue-400">{totalDeployed}</span>
+          <div className="flex gap-2 bg-[#0a0a0a] p-1.5 rounded-lg border border-slate-800">
+             <div className="px-4 py-1 border-r border-slate-800 text-center">
+                <span className="text-[10px] text-slate-500 font-bold uppercase block">Déployé</span>
+                <span className="text-xl font-mono font-bold text-blue-400">{totalDeployed}</span>
              </div>
-             <div className="px-6 py-1 border-r border-slate-800 text-center">
-                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Total Détruit</div>
-                <span className="text-2xl font-mono font-bold text-red-500">{totalDestroyed}</span>
+             <div className="px-4 py-1 border-r border-slate-800 text-center">
+                <span className="text-[10px] text-slate-500 font-bold uppercase block">Détruit</span>
+                <span className="text-xl font-mono font-bold text-red-500">{totalDestroyed}</span>
              </div>
-             <div className="px-6 py-1 text-center min-w-[120px]">
-                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Coût Total</div>
-                <span className="text-xl font-mono font-bold text-yellow-500">{totalCost} pts</span>
+             <div className="px-4 py-1 text-center">
+                <span className="text-[10px] text-slate-500 font-bold uppercase block">Coût</span>
+                <span className="text-lg font-mono font-bold text-yellow-500">{totalCost}</span>
              </div>
           </div>
 
-          {/* Contrôles Droite : Supply & Medic */}
-          <div className="flex flex-row gap-4 items-stretch">
-             {/* Medic V2 Switch (Déplacé ici) */}
-             <button 
-                onClick={() => setMedicActive(!medicActive)}
-                className={`
-                   flex flex-col items-center justify-center px-4 rounded-xl border transition-all min-w-[100px]
-                   ${medicActive 
-                      ? 'bg-green-950/30 border-green-500/50 text-green-400' 
-                      : 'bg-[#0a0a0a] border-slate-800 text-slate-500 hover:border-slate-600'}
-                `}
-             >
-                <HeartPulse size={20} className={medicActive ? 'animate-pulse' : ''} />
-                <span className="text-[10px] font-bold uppercase mt-1">
-                   {medicActive ? 'Medic ON' : 'Medic OFF'}
-                </span>
+          <div className="flex gap-2">
+             <button onClick={() => setMedicActive(!medicActive)} className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${medicActive ? 'bg-green-600 text-white border-green-400' : 'bg-[#0a0a0a] border-slate-800 text-slate-500'}`}>
+                <HeartPulse size={18} className={medicActive ? 'animate-pulse' : ''} />
+                <span className="text-xs font-bold hidden xl:block">{medicActive ? 'EVASAN ON' : 'EVASAN OFF'}</span>
              </button>
-
-             {/* Supply Control */}
-            <div className="flex flex-col justify-between bg-[#0a0a0a] px-4 py-2 rounded-xl border border-slate-800 min-w-[180px] shadow-sm">
-              <div className="flex items-center gap-2 text-amber-500 font-bold text-[10px] uppercase mb-1">
-                <Box size={14} /> Supply Base
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                 <button onClick={() => setSupplyStock(s => s - 100)} className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 active:scale-95 transition-all font-bold text-lg">-</button>
-                 <span className="font-mono text-xl text-white font-bold">{supplyStock}</span>
-                 <button onClick={() => setSupplyStock(s => s + 100)} className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 active:scale-95 transition-all font-bold text-lg">+</button>
-              </div>
+            <div className="flex items-center gap-2 bg-[#0a0a0a] px-3 py-2 rounded-lg border border-slate-800">
+                 <Box size={16} className="text-amber-500" />
+                 <span className="font-mono text-white font-bold min-w-[3ch] text-center">{supplyStock}</span>
+                 <div className="flex flex-col gap-0.5">
+                   <button onClick={() => setSupplyStock(s => s + 100)} className="h-3 w-4 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-[8px] rounded-t text-white">▲</button>
+                   <button onClick={() => setSupplyStock(s => s - 100)} className="h-3 w-4 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-[8px] rounded-b text-white">▼</button>
+                 </div>
             </div>
           </div>
         </div>
       </header>
 
-      {/* CONTENT - GRID SYSTEM */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-8 bg-[#121212]">
+      {/* CONTENU PRINCIPAL */}
+      <div className="flex-1 overflow-y-auto bg-[#121212] p-6">
         
-        {groups.map(group => {
-          const groupItems = fleet.filter(item => item.group === group.id);
-          if (groupItems.length === 0) return null;
+        {/* VUE FLOTTE */}
+        {activeTab === 'fleet' && (
+          <div className="space-y-8 pb-20">
+            {groups.map(group => {
+              const groupItems = fleet.filter(item => item.group === group.id);
+              if (groupItems.length === 0) return null;
 
-          return (
-            <div key={group.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex items-center gap-3 mb-4 pl-1">
-                <div className={`w-1 h-6 rounded-full ${group.color}`}></div>
-                <h2 className={`text-lg font-bold uppercase tracking-widest ${group.text} opacity-90`}>{group.label}</h2>
-                <div className="h-px bg-slate-800 flex-1 ml-4"></div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-                {groupItems.map(item => (
-                  <div 
-                    key={item.id}
-                    className={`
-                      relative rounded-xl border-2 transition-all duration-200 overflow-hidden group flex flex-col
-                      ${item.deployed > 0 
-                          ? 'bg-[#1a1a1a] border-slate-700 hover:border-slate-500' 
-                          : 'bg-[#151515] border-slate-800 opacity-75 hover:opacity-100'}
-                      ${item.destroyed > 0 ? 'border-red-900/30' : ''}
-                    `}
-                  >
-                    {/* Status Strip */}
-                    <div className={`h-1 w-full ${item.destroyed > 0 ? 'bg-gradient-to-r from-slate-700 via-red-500 to-slate-700' : item.deployed > 0 ? 'bg-blue-500' : 'bg-slate-700'}`}></div>
-
-                    <div className="p-4 flex-1 flex flex-col">
-                      {/* Header Card */}
-                      <div className="flex justify-between items-start mb-4 min-h-[48px]">
-                        <div className="pr-2">
-                          <h3 className="font-bold text-md leading-tight text-slate-100">
-                            {item.type}
-                          </h3>
-                        </div>
-                        <div className="bg-[#0a0a0a] px-2 py-1 rounded text-xs font-mono font-bold text-slate-400 border border-slate-800 whitespace-nowrap">
-                          {item.cost}pts
-                        </div>
-                      </div>
-
-                      {/* Double Counters: Deployed & Destroyed */}
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        {/* DEPLOYED */}
-                        <div className="bg-[#0a0a0a] rounded-lg border border-slate-800 p-1.5 flex flex-col items-center">
-                           <span className="text-[10px] uppercase font-bold text-blue-400 mb-1">Déployés</span>
-                           <div className="flex items-center justify-between w-full">
-                              <button 
-                                onClick={() => updateFleet(item.id, 'deployed', Math.max(0, item.deployed - 1))}
-                                className="w-8 h-8 rounded bg-slate-800/50 flex items-center justify-center text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
-                              ><Minus size={14} strokeWidth={3} /></button>
-                              <span className={`text-xl font-mono font-bold ${item.deployed > 0 ? 'text-white' : 'text-slate-600'}`}>{item.deployed}</span>
-                              <button 
-                                onClick={() => updateFleet(item.id, 'deployed', item.deployed + 1)}
-                                className="w-8 h-8 rounded bg-blue-600/20 flex items-center justify-center text-blue-400 hover:bg-blue-600 hover:text-white transition-colors"
-                              ><Plus size={14} strokeWidth={3} /></button>
-                           </div>
-                        </div>
-
-                        {/* DESTROYED */}
-                        <div className="bg-[#2a1212] rounded-lg border border-red-900/30 p-1.5 flex flex-col items-center">
-                           <span className="text-[10px] uppercase font-bold text-red-400 mb-1 flex items-center gap-1"><Flame size={10} /> Détruits</span>
-                           <div className="flex items-center justify-between w-full">
-                              <button 
-                                onClick={() => updateFleet(item.id, 'destroyed', Math.max(0, item.destroyed - 1))}
-                                className="w-8 h-8 rounded bg-red-900/20 flex items-center justify-center text-red-400 hover:bg-red-900/40 transition-colors"
-                              ><Minus size={14} strokeWidth={3} /></button>
-                              <span className={`text-xl font-mono font-bold ${item.destroyed > 0 ? 'text-red-500' : 'text-slate-600'}`}>{item.destroyed}</span>
-                              <button 
-                                onClick={() => updateFleet(item.id, 'destroyed', item.destroyed + 1)}
-                                className="w-8 h-8 rounded bg-red-900/20 flex items-center justify-center text-red-400 hover:bg-red-900/40 transition-colors"
-                              ><Plus size={14} strokeWidth={3} /></button>
-                           </div>
-                        </div>
-                      </div>
-
-                      {/* Status Selector (Full Width) */}
-                      <div className="mt-auto">
-                        <select 
-                          value={item.status}
-                          onChange={(e) => updateFleet(item.id, 'status', e.target.value)}
-                          className={`
-                            w-full py-2 px-3 rounded-lg text-xs font-bold uppercase tracking-wide appearance-none border cursor-pointer outline-none transition-colors text-center
-                            ${item.status === 'Opérationnel' ? 'bg-emerald-950/30 text-emerald-400 border-emerald-900/50 hover:border-emerald-700' : ''}
-                            ${item.status === 'Pas déployé' ? 'bg-slate-800/50 text-slate-400 border-slate-700 hover:border-slate-600' : ''}
-                            ${item.status === 'Maintenance' ? 'bg-yellow-950/30 text-yellow-400 border-yellow-900/50' : ''}
-                            ${item.status === 'Détruit' ? 'bg-red-950/30 text-red-400 border-red-900/50' : ''}
-                          `}
-                        >
-                          <option value="Opérationnel">Opérationnel</option>
-                          <option value="Pas déployé">Pas déployé</option>
-                          <option value="Maintenance">Maintenance</option>
-                          <option value="Détruit">Détruit (Total)</option>
-                        </select>
-                      </div>
-                      
-                    </div>
+              return (
+                <div key={group.id} className="animate-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex items-center gap-3 mb-4 pl-1">
+                    <div className={`w-1 h-6 rounded-full ${group.color}`}></div>
+                    <h2 className={`text-lg font-bold uppercase tracking-widest ${group.text} opacity-90`}>{group.label}</h2>
+                    <div className="h-px bg-slate-800 flex-1 ml-4 opacity-50"></div>
                   </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
 
-        <div className="h-20"></div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                    {groupItems.map(item => (
+                      <div key={item.id} className={`
+                        relative rounded-xl border-2 transition-all duration-200 overflow-hidden group flex flex-col bg-[#161616]
+                        ${item.deployed > 0 ? 'border-slate-700' : 'border-slate-800 opacity-60 hover:opacity-100'}
+                      `}>
+                        {/* Status Strip */}
+                        <div className={`h-1.5 w-full ${item.status === 'Détruit' ? 'bg-red-500' : item.deployed > 0 ? 'bg-blue-500' : 'bg-slate-600'}`}></div>
+
+                        <div className="p-4 flex-1 flex flex-col">
+                          {/* Header */}
+                          <div className="flex justify-between items-start mb-3">
+                            <h3 className="font-bold text-md leading-tight text-slate-100 pr-2">{item.type}</h3>
+                            <div className="bg-black/40 px-2 py-1 rounded text-[10px] font-mono font-bold text-slate-400 border border-slate-800">
+                              {item.cost}pts
+                            </div>
+                          </div>
+
+                          {/* Stats Row */}
+                          <div className="flex items-center justify-between mb-4 bg-black/20 p-2 rounded-lg border border-slate-800/50">
+                             <div className="text-center">
+                               <div className="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Détruits</div>
+                               <div className={`font-mono font-bold ${item.destroyed > 0 ? 'text-red-500' : 'text-slate-600'}`}>{item.destroyed}</div>
+                             </div>
+                             <div className="h-6 w-px bg-slate-800"></div>
+                             <div className="flex items-center gap-2">
+                                <button 
+                                  onClick={() => updateDeploy(item.id, -1)}
+                                  className="w-8 h-8 rounded bg-slate-800/50 flex items-center justify-center text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
+                                ><Minus size={14} strokeWidth={3} /></button>
+                                <span className={`text-xl font-mono font-bold min-w-[2ch] text-center ${item.deployed > 0 ? 'text-blue-400' : 'text-slate-600'}`}>{item.deployed}</span>
+                                <button 
+                                  onClick={() => updateDeploy(item.id, 1)}
+                                  className="w-8 h-8 rounded bg-slate-800/50 flex items-center justify-center text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
+                                ><Plus size={14} strokeWidth={3} /></button>
+                             </div>
+                          </div>
+
+                          {/* Footer Actions */}
+                          <div className="mt-auto space-y-2">
+                             <select 
+                                value={item.status}
+                                onChange={(e) => updateStatus(item.id, e.target.value)}
+                                className={`
+                                  w-full py-2 px-3 rounded text-[10px] font-bold uppercase tracking-wide appearance-none border cursor-pointer outline-none transition-colors text-center
+                                  ${item.status === 'Opérationnel' ? 'bg-emerald-700 text-white border-emerald-500 hover:bg-emerald-600' : ''}
+                                  ${item.status === 'Pas déployé' ? 'bg-slate-700 text-slate-200 border-slate-500 hover:bg-slate-600' : ''}
+                                  ${item.status === 'Maintenance' ? 'bg-amber-600 text-white border-amber-500 hover:bg-amber-500' : ''}
+                                  ${item.status === 'Détruit' ? 'bg-red-700 text-white border-red-500' : ''}
+                                `}
+                              >
+                                <option value="Opérationnel">Statut: Opérationnel</option>
+                                <option value="Pas déployé">Statut: Pas déployé</option>
+                                <option value="Maintenance">Statut: Maintenance</option>
+                              </select>
+
+                              <button 
+                                onClick={() => openDestructionModal(item)}
+                                disabled={item.deployed <= 0}
+                                className={`
+                                  w-full py-2.5 rounded font-bold uppercase text-xs flex items-center justify-center gap-2 transition-all border
+                                  ${item.deployed > 0 
+                                    ? 'bg-red-950/40 text-red-400 border-red-900/50 hover:bg-red-600 hover:text-white hover:border-red-500' 
+                                    : 'bg-transparent text-slate-700 border-slate-800 cursor-not-allowed'}
+                                `}
+                              >
+                                <AlertTriangle size={14} />
+                                Signaler Perte
+                              </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* VUE HISTORIQUE (LOGS) */}
+        {activeTab === 'logs' && (
+          <div className="max-w-4xl mx-auto space-y-4 pb-20 animate-in fade-in duration-300">
+            <h2 className="text-xl font-bold text-slate-200 mb-6 flex items-center gap-2">
+              <History className="text-blue-500" />
+              Journal des Opérations (J-LOGS)
+            </h2>
+
+            {logs.length === 0 ? (
+              <div className="text-center py-20 text-slate-600 border border-dashed border-slate-800 rounded-xl">
+                Aucune activité enregistrée pour le moment.
+              </div>
+            ) : (
+              logs.map((log) => (
+                <div key={log.id} className="bg-[#161616] border border-slate-800 p-4 rounded-lg flex gap-4 hover:border-slate-700 transition-colors">
+                   <div className="font-mono text-xs text-slate-500 pt-1 w-12 shrink-0">{log.time}</div>
+                   <div className="pt-1">
+                      {log.type === 'destroy' && <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></div>}
+                      {log.type === 'deploy' && <div className="w-2 h-2 rounded-full bg-blue-500"></div>}
+                      {log.type === 'info' && <div className="w-2 h-2 rounded-full bg-slate-500"></div>}
+                   </div>
+                   <div className="flex-1">
+                      <div className={`font-bold text-sm ${log.type === 'destroy' ? 'text-red-400' : 'text-slate-200'}`}>
+                        {log.message}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1 font-mono">
+                        {log.details}
+                      </div>
+                   </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
-       {/* FOOTER ACTIONS */}
-       <div className="h-16 bg-[#1a1a1a] border-t border-slate-800 flex items-center justify-end px-6 shrink-0 z-20 shadow-[0_-5px_20px_rgba(0,0,0,0.3)] gap-3">
-          <button className="flex items-center gap-2 px-6 py-3 bg-[#252525] hover:bg-[#303030] text-slate-300 rounded-lg border border-slate-700 text-sm font-bold transition-all active:scale-95">
-            <RotateCcw size={16} /> RESET
+       {/* FOOTER */}
+       <div className="absolute bottom-0 left-0 w-full h-16 bg-[#141414] border-t border-slate-800 flex items-center justify-end px-6 shadow-2xl gap-3">
+          <button className="flex items-center gap-2 px-6 py-2.5 bg-[#252525] hover:bg-[#303030] text-slate-300 rounded border border-slate-700 text-xs font-bold transition-all active:scale-95 uppercase tracking-wide">
+            <RotateCcw size={14} /> Reset
           </button>
-          <button className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg border border-blue-400 text-sm font-bold transition-all shadow-lg shadow-blue-900/20 active:scale-95">
-            <Save size={16} /> SAUVEGARDER
+          <button className="flex items-center gap-2 px-8 py-2.5 bg-blue-700 hover:bg-blue-600 text-white rounded border border-blue-500 text-xs font-bold transition-all shadow-[0_0_20px_rgba(37,99,235,0.2)] active:scale-95 uppercase tracking-wide">
+            <Save size={14} /> Sauvegarder
           </button>
       </div>
     </div>
