@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT FOF - Tactical v12</title>
+    <title>MDT FOF - Tactical v13</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -92,6 +92,10 @@
 
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Hide arrows in number input */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
 </head>
 <body class="tactical-bg">
@@ -116,12 +120,15 @@
         const Wrench = (p) => <Icon {...p}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></Icon>;
         const MapPin = (p) => <Icon {...p}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></Icon>;
         const Info = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></Icon>;
+        const Clock = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>;
         const UserCheck = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></Icon>;
+        const Users = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>;
         const LogOut = (p) => <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></Icon>;
         const ChevronDown = (p) => <Icon {...p}><polyline points="6 9 12 15 18 9"/></Icon>;
         const ChevronUp = (p) => <Icon {...p}><polyline points="18 15 12 9 6 15"/></Icon>;
         const Trash2 = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Icon>;
         const LayoutDashboard = (p) => <Icon {...p}><rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" /><rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" /></Icon>;
+        const UserPlus = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></Icon>;
 
         // --- DONNEES CATALOGUE ---
         const garageCatalog = [
@@ -169,16 +176,21 @@
             'alat': { label: 'ALAT', color: 'bg-sky-500', text: 'text-sky-400', border: 'border-sky-500/30' },
         };
 
-        function MilitaryMdtV12() {
+        function MilitaryMdtV13() {
             const [activeTab, setActiveTab] = useState('fleet');
             const [fleet, setFleet] = useState([]);
             const [logs, setLogs] = useState([]);
-            const [service, setService] = useState({ active: false, officer: '', grade: '', start: null, end: null, effectif: 4, supply: 6000, medic: true });
+            // Service state doesn't need 'effectif' anymore, calculated from roster
+            const [service, setService] = useState({ active: false, officer: '', grade: '', start: null, end: null, supply: 6000, medic: true });
+            const [roster, setRoster] = useState([]); // New Roster State
             const [user, setUser] = useState(null);
             const [showDashboard, setShowDashboard] = useState(true);
             const [destroyModal, setDestroyModal] = useState({ isOpen: false, vehicleId: null });
             const [destroyReason, setDestroyReason] = useState('');
             const [serviceModal, setServiceModal] = useState({ isOpen: false, officer: '', grade: '' });
+            
+            // Roster Add State
+            const [newPerson, setNewPerson] = useState({ name: '', grade: '2CL' });
 
             // --- FIREBASE ---
             useEffect(() => {
@@ -197,8 +209,9 @@
                         if (data.fleet) setFleet(data.fleet);
                         if (data.logs) setLogs(data.logs);
                         if (data.service) setService(data.service);
+                        if (data.roster) setRoster(data.roster);
                     } else {
-                        window.fb.setDoc(docRef, { fleet: [], logs: [], service: { active: false, effectif: 4, supply: 6000, medic: true } });
+                        window.fb.setDoc(docRef, { fleet: [], logs: [], roster: [], service: { active: false, supply: 6000, medic: true } });
                     }
                 });
                 return () => unsubscribe();
@@ -251,6 +264,19 @@
                 setDestroyReason('');
             };
 
+            // Personnel Logic
+            const addPersonnel = () => {
+                if (!newPerson.name) return;
+                const newRoster = [...roster, { id: Date.now(), ...newPerson }];
+                updateCloud({ roster: newRoster });
+                setNewPerson({ name: '', grade: '2CL' });
+            };
+
+            const removePersonnel = (id) => {
+                const newRoster = roster.filter(p => p.id !== id);
+                updateCloud({ roster: newRoster });
+            };
+
             const handleServiceStart = () => {
                 if (!serviceModal.officer) return;
                 const startTime = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
@@ -281,7 +307,7 @@
             return (
                 <div className="flex flex-col h-screen w-full font-sans overflow-hidden relative text-slate-200">
                     
-                    {/* --- EN-TÊTE GLASSMORPHISM --- */}
+                    {/* --- EN-TÊTE --- */}
                     <header className="glass-panel z-30 flex flex-col shrink-0 border-b border-white/5 relative">
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-900/10 to-transparent pointer-events-none"></div>
                         
@@ -320,10 +346,10 @@
                             </div>
                         </div>
 
-                        {/* DASHBOARD EXPANDABLE (NO 3D - PURE TACTICAL) */}
+                        {/* DASHBOARD EXPANDABLE */}
                         {showDashboard && (
                             <div className="bg-slate-900/50 border-y border-white/5 grid grid-cols-1 md:grid-cols-4 gap-4 p-4 animate-in backdrop-blur-md relative z-10">
-                                {/* COLONNE 1: INFO OFFICIER & HEURE */}
+                                {/* COLONNE 1: INFO OFFICIER */}
                                 <div className="md:col-span-1 space-y-2 flex flex-col justify-center">
                                     <div className="bg-slate-950/80 border border-blue-900/30 rounded p-4 h-full flex flex-col justify-center relative overflow-hidden group">
                                         <div className="absolute right-0 top-0 p-2 opacity-10 text-blue-500"><UserCheck size={64} /></div>
@@ -341,24 +367,24 @@
                                     </div>
                                 </div>
 
-                                {/* COLONNE 2: RESSOURCES */}
+                                {/* COLONNE 2: RESSOURCES (MODIFIÉ) */}
                                 <div className="md:col-span-2 flex flex-col justify-center">
                                     <div className="grid grid-cols-2 gap-2 h-full">
+                                        {/* EFFECTIF (AUTOMATIQUE) */}
                                         <div className="bg-slate-950/50 border border-slate-800 rounded p-3 flex flex-col items-center justify-center hover:bg-slate-900/50 transition-colors">
-                                            <span className="text-[10px] uppercase text-slate-400 font-bold mb-1">Effectif Actif</span>
-                                            <div className="flex items-center gap-4">
-                                                <button onClick={() => updateGlobalState('effectif', Math.max(0, service.effectif - 1))} className="text-slate-500 hover:text-white text-xl px-2">-</button>
-                                                <span className="text-4xl font-mono font-bold text-white tracking-tighter">{service.effectif}</span>
-                                                <button onClick={() => updateGlobalState('effectif', service.effectif + 1)} className="text-slate-500 hover:text-white text-xl px-2">+</button>
-                                            </div>
+                                            <span className="text-[10px] uppercase text-slate-400 font-bold mb-1 flex items-center gap-1"><Users size={10}/> Effectif Actif</span>
+                                            <span className="text-4xl font-mono font-bold text-white tracking-tighter">{roster.length}</span>
                                         </div>
+                                        
+                                        {/* SUPPLY (INPUT) */}
                                         <div className="bg-slate-950/50 border border-slate-800 rounded p-3 flex flex-col items-center justify-center hover:bg-slate-900/50 transition-colors">
-                                            <span className="text-[10px] uppercase text-slate-400 font-bold mb-1">Supply Base</span>
-                                            <div className="flex items-center gap-4">
-                                                <button onClick={() => updateGlobalState('supply', service.supply - 100)} className="text-slate-500 hover:text-white text-xl px-2">-</button>
-                                                <span className="text-3xl font-mono font-bold text-amber-400">{service.supply}</span>
-                                                <button onClick={() => updateGlobalState('supply', service.supply + 100)} className="text-slate-500 hover:text-white text-xl px-2">+</button>
-                                            </div>
+                                            <span className="text-[10px] uppercase text-slate-400 font-bold mb-2 flex items-center gap-1"><Box size={10}/> Supply Base</span>
+                                            <input 
+                                                type="number" 
+                                                value={service.supply} 
+                                                onChange={(e) => updateGlobalState('supply', parseInt(e.target.value) || 0)}
+                                                className="bg-transparent border-b border-amber-500/50 text-3xl font-mono font-bold text-amber-400 text-center w-full outline-none focus:border-amber-400 transition-all p-0"
+                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -371,7 +397,7 @@
                                     </div>
                                 </div>
 
-                                {/* BARRE DE STATS FULL WIDTH (INTEGRATED) */}
+                                {/* BARRE DE STATS */}
                                 <div className="md:col-span-4 border-t border-white/5 pt-2 mt-1">
                                     <div className="grid grid-cols-4 divide-x divide-slate-800 text-center">
                                         <div>
@@ -395,16 +421,16 @@
                             </div>
                         )}
 
-                        {/* NAVIGATION (SEGMENTED CONTROL) */}
+                        {/* NAVIGATION */}
                         <div className="p-2 bg-slate-900/80 backdrop-blur flex justify-center relative z-20">
-                            <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800 w-full max-w-lg">
-                                {['fleet', 'garage', 'logs'].map(tab => (
+                            <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800 w-full max-w-lg overflow-x-auto">
+                                {['fleet', 'garage', 'logs', 'roster'].map(tab => (
                                     <button 
                                         key={tab}
                                         onClick={() => setActiveTab(tab)}
-                                        className={`flex-1 py-2 rounded text-xs font-bold uppercase tracking-wider transition-all font-tech ${activeTab === tab ? 'bg-blue-600 text-white shadow-glow' : 'text-slate-500 hover:text-slate-300'}`}
+                                        className={`flex-1 py-2 px-2 rounded text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all font-tech whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white shadow-glow' : 'text-slate-500 hover:text-slate-300'}`}
                                     >
-                                        {tab === 'fleet' ? 'Unités' : tab === 'garage' ? 'Catalogue' : 'Journal'}
+                                        {tab === 'fleet' ? 'Unités' : tab === 'garage' ? 'Catalogue' : tab === 'roster' ? 'Effectif' : 'Journal'}
                                     </button>
                                 ))}
                             </div>
@@ -538,6 +564,71 @@
                                 ))}
                             </div>
                         )}
+
+                        {/* VUE ROSTER (EFFECTIF) */}
+                        {activeTab === 'roster' && (
+                            <div className="max-w-4xl mx-auto animate-in space-y-6">
+                                {/* AJOUT PERSONNEL */}
+                                <div className="bg-slate-900/60 border border-blue-500/30 rounded p-4 flex flex-col md:flex-row gap-4 items-end">
+                                    <div className="w-full md:flex-1">
+                                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Nom / Matricule</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none uppercase font-mono"
+                                            value={newPerson.name}
+                                            onChange={e => setNewPerson({...newPerson, name: e.target.value})}
+                                            placeholder="Nom"
+                                        />
+                                    </div>
+                                    <div className="w-full md:w-32">
+                                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Grade</label>
+                                        <select 
+                                            className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none"
+                                            value={newPerson.grade}
+                                            onChange={e => setNewPerson({...newPerson, grade: e.target.value})}
+                                        >
+                                            <option value="2CL">2CL</option>
+                                            <option value="1CL">1CL</option>
+                                            <option value="CPL">CPL</option>
+                                            <option value="CCH">CCH</option>
+                                            <option value="SGT">SGT</option>
+                                            <option value="SCH">SCH</option>
+                                            <option value="ADJ">ADJ</option>
+                                            <option value="ADC">ADC</option>
+                                            <option value="ASP">ASP</option>
+                                            <option value="SLT">SLT</option>
+                                            <option value="LTN">LTN</option>
+                                            <option value="CNE">CNE</option>
+                                        </select>
+                                    </div>
+                                    <button onClick={addPersonnel} className="w-full md:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold uppercase text-xs shadow-glow transition-all">
+                                        Ajouter
+                                    </button>
+                                </div>
+
+                                {/* LISTE PERSONNEL */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {roster.map(person => (
+                                        <div key={person.id} className="bg-slate-900/40 border border-slate-800 rounded p-3 flex items-center justify-between group hover:border-slate-600 transition-all">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-slate-400 font-bold text-xs border border-slate-700">
+                                                    {person.grade}
+                                                </div>
+                                                <div className="font-mono text-white font-bold">{person.name}</div>
+                                            </div>
+                                            <button onClick={() => removePersonnel(person.id)} className="text-slate-600 hover:text-red-500 p-2 transition-colors">
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {roster.length === 0 && (
+                                        <div className="col-span-full text-center py-8 text-slate-600 border-2 border-dashed border-slate-800 rounded">
+                                            Aucun personnel enregistré.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* MODALES (SERVICE + DESTRUCTION) - Idem v10 mais styled */}
@@ -609,7 +700,7 @@
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MilitaryMdtV12 />);
+        root.render(<MilitaryMdtV13 />);
     </script>
 </body>
 </html>
