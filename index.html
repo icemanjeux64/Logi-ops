@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT FOF - Tactical v24.2</title>
+    <title>MDT FOF - Tactical v24.3</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -195,10 +195,24 @@
             const [user, setUser] = useState(null);
             const [showDashboard, setShowDashboard] = useState(true);
             
-            // State for expanded vehicles (Collapsible Cards)
+            // Detect Desktop View
+            const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
+
+            useEffect(() => {
+                const handleResize = () => {
+                    setIsDesktop(window.innerWidth >= 768);
+                };
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
+            }, []);
+
+            // State for expanded vehicles (Collapsible Cards on Mobile)
             const [expandedVehicles, setExpandedVehicles] = useState([]);
 
             const toggleVehicleExpansion = (id) => {
+                // Only toggle on mobile
+                if (isDesktop) return; 
+                
                 setExpandedVehicles(prev => 
                     prev.includes(id) ? prev.filter(vId => vId !== id) : [...prev, id]
                 );
@@ -669,7 +683,7 @@
                                                             
                                                             {/* HEADER - CLIQUEZ POUR DEPLIER */}
                                                             <div 
-                                                                className="p-4 pl-6 cursor-pointer hover:bg-white/5 transition-colors"
+                                                                className={`p-4 pl-6 transition-colors ${!isDesktop ? 'cursor-pointer hover:bg-white/5' : ''}`}
                                                                 onClick={() => toggleVehicleExpansion(item.uniqueId)}
                                                             >
                                                                 <div className="flex justify-between items-start mb-2">
@@ -693,14 +707,17 @@
                                                                          <div className="h-1.5 w-12 bg-slate-700 rounded overflow-hidden" title="Intégrité"><div style={{width: `${item.integrity || 100}%`}} className={`h-full ${item.integrity < 50 ? 'bg-red-500' : 'bg-emerald-500'}`}></div></div>
                                                                          <div className="h-1.5 w-12 bg-slate-700 rounded overflow-hidden" title="Essence"><div style={{width: `${item.fuel || 100}%`}} className="h-full bg-yellow-400"></div></div>
                                                                      </div>
-                                                                     <div className={`transition-transform duration-300 ${expandedVehicles.includes(item.uniqueId) ? 'rotate-180 text-blue-400' : 'text-slate-600'}`}>
-                                                                         <ChevronDown size={16} />
-                                                                     </div>
+                                                                     {/* Only show chevron on mobile */}
+                                                                     {!isDesktop && (
+                                                                         <div className={`transition-transform duration-300 ${expandedVehicles.includes(item.uniqueId) ? 'rotate-180 text-blue-400' : 'text-slate-600'}`}>
+                                                                             <ChevronDown size={16} />
+                                                                         </div>
+                                                                     )}
                                                                 </div>
                                                             </div>
 
-                                                            {/* BODY - CONTENU DEPLIABLE */}
-                                                            {expandedVehicles.includes(item.uniqueId) && (
+                                                            {/* BODY - CONTENU DEPLIABLE (Toujours visible sur Desktop) */}
+                                                            {(expandedVehicles.includes(item.uniqueId) || isDesktop) && (
                                                                 <div className="p-4 pl-6 pt-0 border-t border-white/5 bg-slate-950/30 animate-in">
                                                                     {/* SEATS SELECTOR (NEW) */}
                                                                     <div className="mb-4 mt-4 space-y-2 bg-slate-950/50 p-2 rounded border border-slate-800">
@@ -1101,7 +1118,7 @@
                              <div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div>
                              <span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span>
                         </div>
-                        <div>v24.2 Ops Fix</div>
+                        <div>v24.3 Ops Fix</div>
                     </div>
                 </div>
             );
