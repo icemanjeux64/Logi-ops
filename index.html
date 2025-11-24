@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT FOF - Tactical v24.3</title>
+    <title>MDT FOF - LOGISTIQUE v25.1</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -114,6 +114,9 @@
         const Fuel = (p) => <Icon {...p}><line x1="3" y1="22" x2="15" y2="22"/><line x1="4" y1="9" x2="14" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/></Icon>;
         const CheckCircle = (p) => <Icon {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Icon>;
         const Star = (p) => <Icon {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></Icon>;
+        const Radio = (p) => <Icon {...p}><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></Icon>;
+        const Send = (p) => <Icon {...p}><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></Icon>;
+        const X = (p) => <Icon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Icon>;
 
         // --- CONSTANTES ---
         const RANK_OPTIONS = ["Recrue", "2CL", "1CL", "CPL", "CCH", "SGT", "SCH", "ADJ", "ADC", "ASP", "SLT", "LTN", "CNE"];
@@ -185,10 +188,11 @@
             { id: 'cat_air7', type: 'EC665 Tigre', group: 'alat', cost: 7000, seats: ['Pilote', 'Co-Pilote'] },
         ];
 
-        function MilitaryMdtV24() {
+        function MilitaryMdtV25() {
             const [activeTab, setActiveTab] = useState('fleet');
             const [fleet, setFleet] = useState([]);
             const [logs, setLogs] = useState([]);
+            const [chat, setChat] = useState([]); // New Chat State
             const [service, setService] = useState({ active: false, officer: '', grade: '', start: null, end: null, supply: 6000, medic: true, ownerUid: null });
             const [supplyLocations, setSupplyLocations] = useState([]); 
             const [roster, setRoster] = useState([]); 
@@ -230,8 +234,13 @@
             const [returnModal, setReturnModal] = useState({ isOpen: false, vehicleId: null, report: '', fuel: 100, integrity: 100 });
             const [maintenanceModal, setMaintenanceModal] = useState({ isOpen: false, vehicleId: null, fuel: 0, integrity: 0 });
 
+            // CHAT STATES
+            const [chatOpen, setChatOpen] = useState(false);
+            const [chatIdentity, setChatIdentity] = useState(''); // Selected identity for operator
+
             const [newPerson, setNewPerson] = useState({ name: '', grade: 'Recrue' });
             const [newSupply, setNewSupply] = useState({ name: '', amount: 0 });
+            const [newMessage, setNewMessage] = useState('');
             const [showRules, setShowRules] = useState(false);
 
             // --- PERMISSIONS ---
@@ -261,12 +270,13 @@
                         const data = docSnap.data();
                         if (data.fleet) setFleet(data.fleet);
                         if (data.logs) setLogs(data.logs);
+                        if (data.chat) setChat(data.chat); // Sync Chat
                         if (data.service) setService(data.service);
                         if (data.roster) setRoster(data.roster);
                         if (data.supplyLocations) setSupplyLocations(data.supplyLocations);
                     } else {
                         window.fb.setDoc(docRef, { 
-                            fleet: [], logs: [], roster: [], 
+                            fleet: [], logs: [], chat: [], roster: [], 
                             service: { active: false, supply: 6000, medic: true },
                             supplyLocations: [{ id: 'base_main', name: 'Base Principale', amount: 6000 }]
                         });
@@ -281,6 +291,20 @@
                 try { await window.fb.updateDoc(docRef, newData); } catch (e) { console.error(e); }
             };
 
+            // --- CHAT CLEANUP LOGIC (ONLY SL) ---
+            useEffect(() => {
+                if (!isSL || !chat.length) return;
+                const cleanupInterval = setInterval(() => {
+                    const now = Date.now();
+                    // Delete messages older than 5 mins (300000 ms)
+                    const validMessages = chat.filter(m => now - m.timestamp < 300000);
+                    if (validMessages.length !== chat.length) {
+                        updateCloud({ chat: validMessages });
+                    }
+                }, 30000); // Check every 30 sec
+                return () => clearInterval(cleanupInterval);
+            }, [isSL, chat]);
+
             // --- LOGIC ---
             const addLogLocal = (type, message, details = '') => {
                 const newLog = { id: Date.now(), time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), type, message, details };
@@ -289,6 +313,29 @@
             };
             const deleteLog = (logId) => { if(confirm("Supprimer ?")) updateCloud({ logs: logs.filter(l => l.id !== logId) }); };
             
+            const sendChatMessage = () => {
+                if (!newMessage.trim()) return;
+                
+                let senderName = "Inconnu";
+                if (isSL) {
+                    senderName = "Commandement (SL)";
+                } else if (chatIdentity) {
+                    senderName = chatIdentity;
+                } else {
+                    alert("Veuillez sélectionner votre identité dans la liste avant de parler.");
+                    return;
+                }
+
+                const msgData = {
+                    id: Date.now(),
+                    text: newMessage,
+                    sender: senderName,
+                    timestamp: Date.now()
+                };
+                updateCloud({ chat: [...chat, msgData] });
+                setNewMessage('');
+            };
+
             const deployVehicle = (vehicleModel) => {
                 if (!isSL) return;
                 const newId = Date.now();
@@ -776,49 +823,6 @@
                             </div>
                         )}
 
-                        {/* VUE GARAGE */}
-                        {activeTab === 'garage' && (
-                            <div className="space-y-8 animate-in">
-                                {Object.keys(groupsConfig).map(groupKey => {
-                                    const items = getGarageByGroup(groupKey);
-                                    const config = groupsConfig[groupKey];
-                                    if (!items.length) return null;
-
-                                    return (
-                                        <div key={groupKey}>
-                                            <div className="flex items-center gap-3 mb-3 pl-1">
-                                                <h2 className={`text-lg font-bold uppercase tracking-widest font-tech ${config.text}`}>{config.label}</h2>
-                                                <div className={`h-px flex-1 opacity-30 bg-gradient-to-r from-current to-transparent ${config.text}`}></div>
-                                            </div>
-                                            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
-                                                {items.map(item => (
-                                                    <div key={item.id} className={`bg-slate-900/30 border rounded p-3 flex flex-col gap-3 group transition-all ${isSL ? 'border-slate-800 hover:border-blue-500/50 hover:bg-slate-900/60' : 'border-slate-800 opacity-75'}`}>
-                                                        <div className="flex justify-between items-start">
-                                                            <div>
-                                                                <div className="font-bold text-slate-200 text-sm">{item.type}</div>
-                                                                <div className="text-xs font-mono text-slate-500 mt-0.5">{item.cost} pts</div>
-                                                            </div>
-                                                            {item.grade && <span className="text-[9px] font-bold bg-slate-950 px-1.5 py-0.5 rounded text-slate-400 border border-slate-800">{item.grade}</span>}
-                                                        </div>
-                                                        <div className="text-[10px] text-slate-500 font-mono bg-slate-950/50 p-1.5 rounded border border-slate-800/50">
-                                                            Config: {item.seats.join(', ')}
-                                                        </div>
-                                                        <button 
-                                                            onClick={() => deployVehicle(item)} 
-                                                            disabled={!isSL}
-                                                            className={`w-full py-2 rounded text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${isSL ? 'bg-slate-800 group-hover:bg-blue-600 group-hover:text-white text-blue-400 border border-slate-700 group-hover:border-blue-500' : 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed'}`}
-                                                        >
-                                                            {!isSL && <Lock size={10}/>} Déployer
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-
                         {/* VUE LOGS */}
                         {activeTab === 'logs' && (
                             <div className="max-w-3xl mx-auto animate-in space-y-3">
@@ -895,6 +899,85 @@
                             </div>
                         )}
                     </div>
+
+                    {/* FAB CHAT */}
+                    <button
+                        onClick={() => setChatOpen(true)}
+                        className="fixed bottom-10 right-4 z-40 bg-blue-600 text-white p-3 rounded-full shadow-lg border border-blue-400 hover:bg-blue-500 transition-all"
+                        title="Canal Tactique"
+                    >
+                        <Radio size={24} />
+                        {chat.filter(m => Date.now() - m.timestamp < 300000).length > 0 && (
+                            <span className="absolute top-0 right-0 flex h-3 w-3">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-3 w-3 bg-sky-500"></span>
+                            </span>
+                        )}
+                    </button>
+
+                    {/* CHAT MODAL */}
+                    {chatOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur p-4 animate-in">
+                            <div className="bg-slate-900 border border-blue-500/30 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col h-[80vh]">
+                                <div className="bg-blue-900/20 p-4 border-b border-blue-500/20 flex items-center justify-between shrink-0">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-blue-600 rounded text-white shadow-glow"><Radio size={20} /></div>
+                                        <h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Canal Tactique <span className="text-xs text-blue-400 ml-2 border border-blue-500/50 px-1 rounded">TTL 5m</span></h3>
+                                    </div>
+                                    <button onClick={() => setChatOpen(false)} className="text-slate-400 hover:text-white transition-colors"><X size={24} /></button>
+                                </div>
+                                
+                                {/* Messages Area */}
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-950/50">
+                                    {chat.length === 0 || chat.filter(m => Date.now() - m.timestamp < 300000).length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-slate-600 space-y-2">
+                                            <Radio size={32} className="opacity-20"/>
+                                            <span className="italic text-sm">Canal Radio Sécurisé - Silence Radio</span>
+                                            <span className="text-[10px] uppercase">Les messages s'effacent après 5 minutes</span>
+                                        </div>
+                                    ) : (
+                                        chat.filter(m => Date.now() - m.timestamp < 300000).map(msg => (
+                                            <div key={msg.id} className={`flex flex-col p-3 rounded-lg max-w-[85%] animate-in ${msg.sender === "Commandement (SL)" ? 'bg-blue-900/40 border border-blue-500/30 self-end ml-auto' : 'bg-slate-800/60 border border-slate-700 self-start'}`}>
+                                                <div className="flex justify-between items-baseline mb-1 gap-4">
+                                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${msg.sender === "Commandement (SL)" ? 'text-blue-300' : 'text-amber-400'}`}>{msg.sender}</span>
+                                                    <span className="text-[9px] text-slate-500 font-mono">{new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                                </div>
+                                                <div className="text-sm text-slate-200 leading-relaxed">{msg.text}</div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                {/* Input Area */}
+                                <div className="p-3 bg-slate-900 border-t border-slate-800 flex flex-col gap-2">
+                                    {!isSL && (
+                                        <select 
+                                            className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-slate-300 focus:border-blue-500 outline-none"
+                                            value={chatIdentity}
+                                            onChange={(e) => setChatIdentity(e.target.value)}
+                                        >
+                                            <option value="">-- Identité Radio --</option>
+                                            {roster.map(p => (
+                                                <option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>
+                                            ))}
+                                        </select>
+                                    )}
+                                    
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            className="flex-1 bg-slate-950 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none text-sm"
+                                            placeholder={isSL ? "Ordre Commandement..." : "Transmission..."}
+                                            value={newMessage}
+                                            onChange={e => setNewMessage(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
+                                        />
+                                        <button onClick={sendChatMessage} disabled={!isSL && !chatIdentity} className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white p-3 rounded shadow-glow transition-all"><Send size={20}/></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* MODALES (SERVICE + DESTRUCTION) - Idem v10 mais styled */}
                     {serviceModal.isOpen && (
@@ -1118,14 +1201,14 @@
                              <div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div>
                              <span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span>
                         </div>
-                        <div>v24.3 Ops Fix</div>
+                        <div>v25.1 Chat</div>
                     </div>
                 </div>
             );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MilitaryMdtV24 />);
+        root.render(<MilitaryMdtV25 />);
     </script>
 </body>
 </html>
