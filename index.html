@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT FOF - Tactical v25.2</title>
+    <title>MDT FOF - Tactical v25.3</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -139,53 +139,53 @@
             'alat': { label: 'ALAT', color: 'bg-sky-500', text: 'text-sky-400', border: 'border-sky-500/30' },
         };
 
-        // Catalogue Garage - RESTAURATION COMPLETE AVEC GRADES ET SIEGES
+        // Catalogue Garage AVEC CONFIGURATION DES SIÈGES MISE À JOUR
         const garageCatalog = [
-            { id: 'cat_em1', type: 'Jeep EM', group: 'em', grade: '', cost: 110, seats: ['Conducteur', 'Passager'] },
-            { id: 'cat_em2', type: 'QG Mobile', group: 'em', grade: '', cost: 420, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
+            { id: 'cat_em1', type: 'Jeep EM', group: 'em', cost: 110, seats: ['Conducteur', 'Passager'] },
+            { id: 'cat_em2', type: 'QG Mobile', group: 'em', cost: 420, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
             
             // LOGI
-            { id: 'cat_log1', type: 'Camion Réparation', group: 'logi', grade: '', cost: 175, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
-            { id: 'cat_log2', type: 'Camion Citerne', group: 'logi', grade: '', cost: 160, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
-            { id: 'cat_log3', type: 'Camion Arsenal', group: 'logi', grade: '', cost: 380, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
-            { id: 'cat_log4', type: 'Camion Construction', group: 'logi', grade: '', cost: 260, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
+            { id: 'cat_log1', type: 'Camion Réparation', group: 'logi', cost: 175, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
+            { id: 'cat_log2', type: 'Camion Citerne', group: 'logi', cost: 160, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
+            { id: 'cat_log3', type: 'Camion Arsenal', group: 'logi', cost: 380, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
+            { id: 'cat_log4', type: 'Camion Construction', group: 'logi', cost: 260, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
             
             // TRANSPORT
-            { id: 'cat_tra1', type: 'Camion', group: 'transport', grade: '', cost: 200, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
-            { id: 'cat_tra2', type: 'VAB', group: 'transport', grade: '', cost: 1200, seats: ['Conducteur', 'Passager'] },
-            { id: 'cat_tra3', type: 'Stryker (non armé)', group: 'transport', grade: '', cost: 1000, seats: ['Conducteur', 'Passager'] },
-            { id: 'cat_inf1', type: 'Stryker M1126 - M2HB', group: 'transport', grade: '2CL', cost: 2000, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_tra1', type: 'Camion', group: 'transport', cost: 200, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
+            { id: 'cat_tra2', type: 'VAB', group: 'transport', cost: 1200, seats: ['Conducteur', 'Passager'] },
+            { id: 'cat_tra3', type: 'Stryker (non armé)', group: 'transport', cost: 1000, seats: ['Conducteur', 'Passager'] },
+            { id: 'cat_inf1', type: 'Stryker M1126 - M2HB', group: 'transport', cost: 2000, seats: ['Conducteur', 'Tireur'] },
             
             // BLINDE
-            { id: 'cat_bl1', type: 'JLTV M1280 (non-armée)', group: 'blinde', grade: '', cost: 650, seats: ['Conducteur', 'Passager'] },
-            { id: 'cat_bl2', type: 'JLTV M1281 - M2HB (12,7)', group: 'blinde', grade: '', cost: 1000, seats: ['Conducteur', 'Tireur'] },
-            { id: 'cat_bl3', type: 'JLTV M1281 - M134 (7,62)', group: 'blinde', grade: '', cost: 2000, seats: ['Conducteur', 'Tireur'] },
-            { id: 'cat_bl4', type: 'JLTV M1278 - M2HB (télé)', group: 'blinde', grade: '', cost: 1500, seats: ['Conducteur', 'Tireur'] },
-            { id: 'cat_bl5', type: 'JLTV AN-MSY-2 v2 (7,62 télé)', group: 'blinde', grade: '', cost: 2760, seats: ['Conducteur', 'Tireur'] },
-            { id: 'cat_bl6', type: 'JLTV M1278 - M230LF (30mm)', group: 'blinde', grade: '', cost: 2750, seats: ['Conducteur', 'Tireur'] },
-            { id: 'cat_bl7', type: 'JLTV M1278 + Javelin', group: 'blinde', grade: '', cost: 3700, seats: ['Conducteur', 'Tireur'] },
-            { id: 'cat_bl8', type: 'JLTV AN-MSY-2 v1 (Stinger)', group: 'blinde', grade: '', cost: 3700, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_bl1', type: 'JLTV M1280 (non-armée)', group: 'blinde', cost: 650, seats: ['Conducteur', 'Passager'] },
+            { id: 'cat_bl2', type: 'JLTV M1281 - M2HB (12,7)', group: 'blinde', cost: 1000, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_bl3', type: 'JLTV M1281 - M134 (7,62)', group: 'blinde', cost: 2000, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_bl4', type: 'JLTV M1278 - M2HB (télé)', group: 'blinde', cost: 1500, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_bl5', type: 'JLTV AN-MSY-2 v2 (7,62 télé)', group: 'blinde', cost: 2760, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_bl6', type: 'JLTV M1278 - M230LF (30mm)', group: 'blinde', cost: 2750, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_bl7', type: 'JLTV M1278 + Javelin', group: 'blinde', cost: 3700, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_bl8', type: 'JLTV AN-MSY-2 v1 (Stinger)', group: 'blinde', cost: 3700, seats: ['Conducteur', 'Tireur'] },
             
             // INFANTERIE
-            { id: 'cat_inf2', type: 'Stryker M1296 (30mm)', group: 'infanterie', grade: '2CL', cost: 3000, seats: ['Conducteur', 'Tireur', 'Commandant'] },
-            { id: 'cat_inf3', type: 'Stryker M1128 (105mm)', group: 'infanterie', grade: '1CL', cost: 5000, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_inf2', type: 'Stryker M1296 (30mm)', group: 'infanterie', cost: 3000, seats: ['Conducteur', 'Tireur', 'Commandant'] },
+            { id: 'cat_inf3', type: 'Stryker M1128 (105mm)', group: 'infanterie', cost: 5000, seats: ['Conducteur', 'Tireur'] },
             
             // SANITAIRE
-            { id: 'cat_san1', type: 'Stryker EVASAN', group: 'sanitaire', grade: '', cost: 975, seats: ['Conducteur', 'Médecin'] },
-            { id: 'cat_san2', type: 'VAB EVASAN', group: 'sanitaire', grade: '', cost: 975, seats: ['Conducteur', 'Médecin'] },
+            { id: 'cat_san1', type: 'Stryker EVASAN', group: 'sanitaire', cost: 975, seats: ['Conducteur', 'Médecin'] },
+            { id: 'cat_san2', type: 'VAB EVASAN', group: 'sanitaire', cost: 975, seats: ['Conducteur', 'Médecin'] },
             
             // CHAR
-            { id: 'cat_char1', type: 'Leclerc', group: 'char', grade: 'CPL + TC1', cost: 8000, seats: ['Conducteur', 'Tireur', 'Commandant'] },
-            { id: 'cat_char2', type: 'Leclerc XLR', group: 'char', grade: 'CPL + TC1', cost: 8500, seats: ['Conducteur', 'Tireur', 'Commandant'] },
+            { id: 'cat_char1', type: 'Leclerc', group: 'char', cost: 8000, seats: ['Conducteur', 'Tireur', 'Commandant'] },
+            { id: 'cat_char2', type: 'Leclerc XLR', group: 'char', cost: 8500, seats: ['Conducteur', 'Tireur', 'Commandant'] },
             
             // ALAT
-            { id: 'cat_air1', type: 'NH90 "Faucon" MEDEVAC', group: 'alat', grade: 'ALAT', cost: 3000, seats: ['Pilote', 'Co-Pilote', 'Médecin 1', 'Médecin 2'] },
-            { id: 'cat_air2', type: 'NH90 "Faucon" Transport', group: 'alat', grade: 'ALAT', cost: 3000, seats: ['Pilote', 'Co-Pilote'] },
-            { id: 'cat_air3', type: 'Gazelle SA342L (non-armée)', group: 'alat', grade: 'ALAT', cost: 2500, seats: ['Pilote', 'Co-Pilote'] },
-            { id: 'cat_air4', type: 'Gazelle SA342L Strike (M82)', group: 'alat', grade: 'ALAT', cost: 3000, seats: ['Pilote', 'Co-Pilote'] },
-            { id: 'cat_air5', type: 'Gazelle SA342L Canon (20mm)', group: 'alat', grade: 'ALAT', cost: 3500, seats: ['Pilote', 'Co-Pilote'] },
-            { id: 'cat_air6', type: 'Gazelle SA342L HAP (Roq 68)', group: 'alat', grade: 'ALAT', cost: 3500, seats: ['Pilote', 'Co-Pilote'] },
-            { id: 'cat_air7', type: 'EC665 Tigre', group: 'alat', grade: 'ALAT', cost: 7000, seats: ['Pilote', 'Co-Pilote'] },
+            { id: 'cat_air1', type: 'NH90 "Faucon" MEDEVAC', group: 'alat', cost: 3000, seats: ['Pilote', 'Co-Pilote', 'Médecin 1', 'Médecin 2'] },
+            { id: 'cat_air2', type: 'NH90 "Faucon" Transport', group: 'alat', cost: 3000, seats: ['Pilote', 'Co-Pilote'] },
+            { id: 'cat_air3', type: 'Gazelle SA342L (non-armée)', group: 'alat', cost: 2500, seats: ['Pilote', 'Co-Pilote'] },
+            { id: 'cat_air4', type: 'Gazelle SA342L Strike (M82)', group: 'alat', cost: 3000, seats: ['Pilote', 'Co-Pilote'] },
+            { id: 'cat_air5', type: 'Gazelle SA342L Canon (20mm)', group: 'alat', cost: 3500, seats: ['Pilote', 'Co-Pilote'] },
+            { id: 'cat_air6', type: 'Gazelle SA342L HAP (Roq 68)', group: 'alat', cost: 3500, seats: ['Pilote', 'Co-Pilote'] },
+            { id: 'cat_air7', type: 'EC665 Tigre', group: 'alat', cost: 7000, seats: ['Pilote', 'Co-Pilote'] },
         ];
 
         function MilitaryMdtV25() {
@@ -536,7 +536,13 @@
                 updateCloud({ service: { ...service, [key]: value } });
             };
 
-            const getFleetByGroup = (groupKey) => fleet.filter(v => v.group === groupKey);
+            // --- FIXED: Dynamic Group Lookup ---
+            const getFleetByGroup = (groupKey) => fleet.filter(v => {
+                const catalogItem = garageCatalog.find(c => c.id === v.id); 
+                const actualGroup = catalogItem ? catalogItem.group : v.group;
+                return actualGroup === groupKey;
+            });
+
             const getGarageByGroup = (groupKey) => garageCatalog.filter(v => v.group === groupKey);
             const activePersonnelCount = roster.length; 
             const totalSupply = supplyLocations.reduce((acc, loc) => acc + (parseInt(loc.amount) || 0), 0);
@@ -1244,7 +1250,7 @@
                              <div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div>
                              <span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span>
                         </div>
-                        <div>v25.2 Final</div>
+                        <div>v25.3 Ops Fix</div>
                     </div>
                 </div>
             );
