@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT FOF - Tactical v16</title>
+    <title>MDT FOF - Tactical v17</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -128,8 +128,9 @@
         const Trash2 = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Icon>;
         const LayoutDashboard = (p) => <Icon {...p}><rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" /><rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" /></Icon>;
         const UserPlus = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></Icon>;
+        const CheckCircle = (p) => <Icon {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Icon>;
 
-        // --- CATALOGUE ---
+        // --- CATALOGUE --- (Mêmes données)
         const garageCatalog = [
             { id: 'cat_em1', type: 'Jeep EM', group: 'em', grade: '', cost: 110 },
             { id: 'cat_em2', type: 'QG Mobile', group: 'em', grade: '', cost: 420 },
@@ -175,7 +176,7 @@
             'alat': { label: 'ALAT', color: 'bg-sky-500', text: 'text-sky-400', border: 'border-sky-500/30' },
         };
 
-        function MilitaryMdtV16() {
+        function MilitaryMdtV17() {
             const [activeTab, setActiveTab] = useState('fleet');
             const [fleet, setFleet] = useState([]);
             const [logs, setLogs] = useState([]);
@@ -187,7 +188,7 @@
             // Modal Destruction States
             const [destroyModal, setDestroyModal] = useState({ isOpen: false, vehicleId: null });
             const [destroyReason, setDestroyReason] = useState('');
-            const [destroyReporter, setDestroyReporter] = useState(''); // Nouveau state pour le déclarant
+            const [destroyReporter, setDestroyReporter] = useState(''); 
 
             const [serviceModal, setServiceModal] = useState({ isOpen: false, officer: '', grade: '' });
             const [newPerson, setNewPerson] = useState({ name: '', grade: '2CL' });
@@ -264,7 +265,6 @@
                 if (newStatus === 'Maintenance') addLogLocal('info', `MAINTENANCE: ${v.callsign}`);
             };
 
-            // LOGGUE L'AFFECTATION
             const updateVehicleCrew = (uniqueId, crewName) => {
                 const vehicle = fleet.find(v => v.uniqueId === uniqueId);
                 const newFleet = fleet.map(item => item.uniqueId === uniqueId ? { ...item, crew: crewName } : item);
@@ -274,54 +274,77 @@
                 }
             };
 
-            // DESTRUCTION AVEC DECLARANT
             const confirmDestruction = () => {
                 if (!destroyReporter) { alert("Veuillez sélectionner le personnel déclarant."); return; }
                 const v = fleet.find(item => item.uniqueId === destroyModal.vehicleId);
                 if (!v) return;
-                
                 updateCloud({ fleet: fleet.filter(item => item.uniqueId !== destroyModal.vehicleId) });
-                
-                // Log enrichi
                 addLogLocal('destroy', `PERTE TOTALE: ${v.callsign}`, `Déclarant: ${destroyReporter} | Cause: ${destroyReason}`);
-                
                 setDestroyModal({ isOpen: false, vehicleId: null });
                 setDestroyReason('');
                 setDestroyReporter('');
             };
 
-            // PERSONNEL + LOGS
+            // --- GESTION DU PERSONNEL ---
             const addPersonnel = () => {
                 if (!newPerson.name) return;
-                const newRoster = [...roster, { id: Date.now(), ...newPerson }];
+                // Par défaut, onDuty est false
+                const newRoster = [...roster, { id: Date.now(), ...newPerson, onDuty: false, dutyStart: null }];
                 updateCloud({ roster: newRoster });
-                addLogLocal('info', `ARRIVÉE EFFECTIF`, `${newPerson.grade} ${newPerson.name}`);
+                addLogLocal('info', `NOUVEL EFFECTIF`, `${newPerson.grade} ${newPerson.name}`);
                 setNewPerson({ name: '', grade: '2CL' });
             };
             const removePersonnel = (id) => {
                 const person = roster.find(p => p.id === id);
                 const newRoster = roster.filter(p => p.id !== id);
                 updateCloud({ roster: newRoster });
-                if (person) addLogLocal('info', `DÉPART EFFECTIF`, `${person.grade} ${person.name}`);
+                if (person) addLogLocal('info', `RETRAIT EFFECTIF`, `${person.grade} ${person.name}`);
+            };
+            
+            // --- PRISE DE POSTE INDIVIDUELLE ---
+            const toggleDuty = (id) => {
+                const person = roster.find(p => p.id === id);
+                if(!person) return;
+
+                const isStarting = !person.onDuty;
+                const time = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
+
+                const newRoster = roster.map(p => {
+                    if(p.id === id) {
+                        return { ...p, onDuty: isStarting, dutyStart: isStarting ? time : null };
+                    }
+                    return p;
+                });
+                
+                updateCloud({ roster: newRoster });
+                
+                if(isStarting) {
+                    addLogLocal('info', `PRISE DE POSTE`, `${person.grade} ${person.name}`);
+                } else {
+                    addLogLocal('info', `FIN DE POSTE`, `${person.grade} ${person.name}`);
+                }
             };
 
-            // Service
+            // Service SL (Global)
             const handleServiceStart = () => {
                 if (!serviceModal.officer) return;
                 const startTime = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
                 updateCloud({ service: { ...service, active: true, officer: serviceModal.officer, grade: serviceModal.grade, start: startTime, end: null } });
-                addLogLocal('info', `PRISE DE SERVICE`, `${serviceModal.grade} ${serviceModal.officer}`);
+                addLogLocal('info', `SUPERVISION (SL)`, `Prise de commandement: ${serviceModal.grade} ${serviceModal.officer}`);
                 setServiceModal({ isOpen: false, officer: '', grade: '' });
             };
             const handleServiceEnd = () => {
                 const endTime = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
                 updateCloud({ service: { ...service, active: false, officer: '', grade: '', start: null, end: endTime } });
-                addLogLocal('info', `FIN DE SERVICE`, `${service.grade} ${service.officer}`);
+                addLogLocal('info', `FIN SUPERVISION`, `Fin de service SL. (Fin: ${endTime})`);
             };
             const updateGlobalState = (key, value) => updateCloud({ service: { ...service, [key]: value } });
 
             const getFleetByGroup = (groupKey) => fleet.filter(v => v.group === groupKey);
             const getGarageByGroup = (groupKey) => garageCatalog.filter(v => v.group === groupKey);
+            // Effectif actif count based on roster status
+            const activePersonnelCount = roster.filter(p => p.onDuty).length;
+            
             const stats = useMemo(() => ({
                 deployed: fleet.length,
                 mission: fleet.filter(v => v.status === 'En Mission').length,
@@ -355,9 +378,9 @@
                             </div>
                             
                             <div className="flex items-center gap-3">
-                                {/* Bouton Règles (Mobile) */}
-                                <button onClick={() => setShowRules(!showRules)} className="md:hidden p-2 text-slate-400 hover:text-white bg-slate-800/50 rounded border border-slate-700/50 transition-all hover:bg-slate-700">
-                                    <Info size={18} />
+                                {/* Bouton Règles (Visible Desktop) */}
+                                <button onClick={() => setShowRules(!showRules)} className="p-2 text-slate-400 hover:text-white bg-slate-800/50 rounded border border-slate-700/50 transition-all hover:bg-slate-700 flex items-center gap-2" title="Règlement">
+                                    <Info size={18} /> <span className="hidden md:inline text-xs font-bold uppercase">Règlement</span>
                                 </button>
 
                                 <button onClick={() => setShowDashboard(!showDashboard)} className="p-2 text-slate-400 hover:text-white bg-slate-800/50 rounded border border-slate-700/50 transition-all hover:bg-slate-700">
@@ -366,11 +389,11 @@
 
                                 {!service.active ? (
                                     <button onClick={() => setServiceModal({ isOpen: true, officer: '', grade: '' })} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm shadow-glow transition-all flex items-center gap-2">
-                                        <UserCheck size={16} /> <span className="hidden md:inline">Prise de Service</span>
+                                        <UserCheck size={16} /> <span className="hidden md:inline">Superviseur (SL)</span>
                                     </button>
                                 ) : (
                                     <button onClick={handleServiceEnd} className="bg-red-900/30 hover:bg-red-900/50 border border-red-500/30 text-red-400 px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm transition-all flex items-center gap-2">
-                                        <LogOut size={16} /> <span className="hidden md:inline">Fin de Service</span>
+                                        <LogOut size={16} /> <span className="hidden md:inline">Fin Service SL</span>
                                     </button>
                                 )}
                             </div>
@@ -407,9 +430,9 @@
                                 <div className="md:col-span-1 space-y-2 flex flex-col justify-center">
                                     <div className="bg-slate-950/80 border border-blue-900/30 rounded p-4 h-full flex flex-col justify-center relative overflow-hidden group">
                                         <div className="absolute right-0 top-0 p-2 opacity-10 text-blue-500"><UserCheck size={64} /></div>
-                                        <span className="text-[10px] uppercase text-slate-500 font-bold mb-1">Commandement Logistique</span>
+                                        <span className="text-[10px] uppercase text-slate-500 font-bold mb-1">Supervision (SL Logis)</span>
                                         <div className="font-tech text-2xl font-bold text-white truncate">
-                                            {service.active ? service.officer : 'NON ASSIGNÉ'}
+                                            {service.active ? service.officer : 'AUCUN SL'}
                                         </div>
                                         <div className="text-sm font-mono text-blue-400">
                                             {service.active ? service.grade : '--'}
@@ -424,8 +447,9 @@
                                 <div className="md:col-span-2 flex flex-col justify-center">
                                     <div className="grid grid-cols-2 gap-2 h-full">
                                         <div className="bg-slate-950/50 border border-slate-800 rounded p-3 flex flex-col items-center justify-center hover:bg-slate-900/50 transition-colors">
-                                            <span className="text-[10px] uppercase text-slate-400 font-bold mb-1 flex items-center gap-1"><Users size={10}/> Effectif Actif</span>
-                                            <span className="text-4xl font-mono font-bold text-white tracking-tighter">{roster.length}</span>
+                                            <span className="text-[10px] uppercase text-slate-400 font-bold mb-1 flex items-center gap-1"><Users size={10}/> Logisticiens Actifs</span>
+                                            <span className="text-4xl font-mono font-bold text-white tracking-tighter">{activePersonnelCount}</span>
+                                            <span className="text-[9px] text-slate-500">SUR {roster.length} INSCRITS</span>
                                         </div>
                                         <div className="bg-slate-950/50 border border-slate-800 rounded p-3 flex flex-col items-center justify-center hover:bg-slate-900/50 transition-colors">
                                             <span className="text-[10px] uppercase text-slate-400 font-bold mb-2 flex items-center gap-1"><Box size={10}/> Supply Base</span>
@@ -521,7 +545,7 @@
                                                                         onChange={(e) => updateVehicleCrew(item.uniqueId, e.target.value)}
                                                                     >
                                                                         <option value="">-- Non assigné --</option>
-                                                                        {roster.map(p => (
+                                                                        {roster.filter(p => p.onDuty).map(p => (
                                                                             <option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>
                                                                         ))}
                                                                     </select>
@@ -626,12 +650,30 @@
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                     {roster.map(person => (
-                                        <div key={person.id} className="bg-slate-900/40 border border-slate-800 rounded p-3 flex items-center justify-between group hover:border-slate-600 transition-all">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-slate-400 font-bold text-xs border border-slate-700">{person.grade}</div>
-                                                <div className="font-mono text-white font-bold">{person.name}</div>
+                                        <div key={person.id} className={`border rounded p-3 flex flex-col gap-2 transition-all ${person.onDuty ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-slate-900/40 border-slate-800'}`}>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 rounded flex items-center justify-center text-xs font-bold border ${person.onDuty ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                                                        {person.grade}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-mono text-white font-bold">{person.name}</div>
+                                                        <div className="text-[10px] text-slate-500">{person.onDuty ? `EN SERVICE DEPUIS ${person.dutyStart}` : 'HORS SERVICE'}</div>
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => removePersonnel(person.id)} className="text-slate-600 hover:text-red-500 p-2 transition-colors"><Trash2 size={16} /></button>
                                             </div>
-                                            <button onClick={() => removePersonnel(person.id)} className="text-slate-600 hover:text-red-500 p-2 transition-colors"><Trash2 size={16} /></button>
+                                            {/* BOUTON PRISE DE POSTE INDIVIDUEL */}
+                                            <button 
+                                                onClick={() => toggleDuty(person.id)} 
+                                                className={`w-full py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all ${
+                                                    person.onDuty 
+                                                    ? 'bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-500/30' 
+                                                    : 'bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-400 border border-emerald-500/30'
+                                                }`}
+                                            >
+                                                {person.onDuty ? 'FIN DE POSTE' : 'PRISE DE POSTE'}
+                                            </button>
                                         </div>
                                     ))}
                                     {roster.length === 0 && <div className="col-span-full text-center py-8 text-slate-600 border-2 border-dashed border-slate-800 rounded">Aucun personnel enregistré.</div>}
@@ -673,7 +715,7 @@
                                             onChange={(e) => setDestroyReporter(e.target.value)}
                                         >
                                             <option value="">-- Sélectionner Personnel --</option>
-                                            {roster.map(p => (
+                                            {roster.filter(p => p.onDuty).map(p => (
                                                 <option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>
                                             ))}
                                         </select>
@@ -689,14 +731,14 @@
                     {/* FOOTER STATUS */}
                     <div className="absolute bottom-0 left-0 w-full bg-slate-950/80 backdrop-blur border-t border-white/5 p-2 flex justify-between items-center gap-2 z-30 text-[10px] font-mono text-slate-500">
                         <div className="flex items-center gap-2"><div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div><span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span></div>
-                        <div>v16.0 Tactical</div>
+                        <div>v17.0 Tactical</div>
                     </div>
                 </div>
             );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MilitaryMdtV16 />);
+        root.render(<MilitaryMdtV17 />);
     </script>
 </body>
 </html>
