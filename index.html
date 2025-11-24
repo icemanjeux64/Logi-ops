@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT FOF - Tactical v23</title>
+    <title>MDT FOF - Tactical v24</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -113,9 +113,17 @@
         const RefreshCw = (p) => <Icon {...p}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></Icon>;
         const Fuel = (p) => <Icon {...p}><line x1="3" y1="22" x2="15" y2="22"/><line x1="4" y1="9" x2="14" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/></Icon>;
         const CheckCircle = (p) => <Icon {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Icon>;
+        const Star = (p) => <Icon {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></Icon>;
 
         // --- CONSTANTES ---
         const RANK_OPTIONS = ["Recrue", "2CL", "1CL", "CPL", "CCH", "SGT", "SCH", "ADJ", "ADC", "ASP", "SLT", "LTN", "CNE"];
+        
+        // Abréviations pour l'affichage visuel
+        const RANK_SHORT = {
+            "Recrue": "REC", "2CL": "2CL", "1CL": "1CL", "CPL": "CPL", "CCH": "CCH", 
+            "SGT": "SGT", "SCH": "SCH", "ADJ": "ADJ", "ADC": "ADC", "ASP": "ASP", 
+            "SLT": "SLT", "LTN": "LTN", "CNE": "CNE"
+        };
 
         const groupsConfig = {
             'em': { label: 'Commandement', color: 'bg-blue-500', text: 'text-blue-400', border: 'border-blue-500/30' },
@@ -128,42 +136,56 @@
             'alat': { label: 'ALAT', color: 'bg-sky-500', text: 'text-sky-400', border: 'border-sky-500/30' },
         };
 
-        // Catalogue Garage (Données fixes pour l'affichage)
+        // Catalogue Garage AVEC CONFIGURATION DES SIÈGES MISE À JOUR
         const garageCatalog = [
-            { id: 'cat_em1', type: 'Jeep EM', group: 'em', grade: '', cost: 110 },
-            { id: 'cat_em2', type: 'QG Mobile', group: 'em', grade: '', cost: 420 },
-            { id: 'cat_log1', type: 'Camion Réparation', group: 'logi', grade: '', cost: 175 },
-            { id: 'cat_log2', type: 'Camion Citerne', group: 'logi', grade: '', cost: 160 },
-            { id: 'cat_log3', type: 'Camion Arsenal', group: 'logi', grade: '', cost: 380 },
-            { id: 'cat_log4', type: 'Camion Construction', group: 'logi', grade: '', cost: 260 },
-            { id: 'cat_tra1', type: 'Camion', group: 'transport', grade: '', cost: 200 },
-            { id: 'cat_tra2', type: 'VAB', group: 'transport', grade: '', cost: 1200 },
-            { id: 'cat_tra3', type: 'Stryker (non armé)', group: 'transport', grade: '', cost: 1000 },
-            { id: 'cat_bl1', type: 'JLTV M1280 (non-armée)', group: 'blinde', grade: '', cost: 650 },
-            { id: 'cat_bl2', type: 'JLTV M1281 - M2HB (12,7)', group: 'blinde', grade: '', cost: 1000 },
-            { id: 'cat_bl3', type: 'JLTV M1281 - M134 (7,62)', group: 'blinde', grade: '', cost: 2000 },
-            { id: 'cat_bl4', type: 'JLTV M1278 - M2HB (télé)', group: 'blinde', grade: '', cost: 1500 },
-            { id: 'cat_bl5', type: 'JLTV AN-MSY-2 v2 (7,62 télé)', group: 'blinde', grade: '', cost: 2760 },
-            { id: 'cat_bl6', type: 'JLTV M1278 - M230LF (30mm)', group: 'blinde', grade: '', cost: 2750 },
-            { id: 'cat_bl7', type: 'JLTV M1278 + Javelin', group: 'blinde', grade: '', cost: 3700 },
-            { id: 'cat_bl8', type: 'JLTV AN-MSY-2 v1 (Stinger)', group: 'blinde', grade: '', cost: 3700 },
-            { id: 'cat_inf1', type: 'Stryker M1126 - M2HB', group: 'infanterie', grade: '2CL', cost: 2000 },
-            { id: 'cat_inf2', type: 'Stryker M1296 (30mm)', group: 'infanterie', grade: '2CL', cost: 3000 },
-            { id: 'cat_inf3', type: 'Stryker M1128 (105mm)', group: 'infanterie', grade: '1CL', cost: 5000 },
-            { id: 'cat_san1', type: 'Stryker EVASAN', group: 'sanitaire', grade: '', cost: 975 },
-            { id: 'cat_san2', type: 'VAB EVASAN', group: 'sanitaire', grade: '', cost: 975 },
-            { id: 'cat_char1', type: 'Leclerc', group: 'char', grade: 'CPL + TC1', cost: 8000 },
-            { id: 'cat_char2', type: 'Leclerc XLR', group: 'char', grade: 'CPL + TC1', cost: 8500 },
-            { id: 'cat_air1', type: 'NH90 "Faucon" MEDEVAC', group: 'alat', grade: 'ALAT', cost: 3000 },
-            { id: 'cat_air2', type: 'NH90 "Faucon" Transport', group: 'alat', grade: 'ALAT', cost: 3000 },
-            { id: 'cat_air3', type: 'Gazelle SA342L (non-armée)', group: 'alat', grade: 'ALAT', cost: 2500 },
-            { id: 'cat_air4', type: 'Gazelle SA342L Strike (M82)', group: 'alat', grade: 'ALAT', cost: 3000 },
-            { id: 'cat_air5', type: 'Gazelle SA342L Canon (20mm)', group: 'alat', grade: 'ALAT', cost: 3500 },
-            { id: 'cat_air6', type: 'Gazelle SA342L HAP (Roq 68)', group: 'alat', grade: 'ALAT', cost: 3500 },
-            { id: 'cat_air7', type: 'EC665 Tigre', group: 'alat', grade: 'ALAT', cost: 7000 },
+            { id: 'cat_em1', type: 'Jeep EM', group: 'em', cost: 110, seats: ['Conducteur', 'Passager'] },
+            { id: 'cat_em2', type: 'QG Mobile', group: 'em', cost: 420, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
+            
+            // LOGI
+            { id: 'cat_log1', type: 'Camion Réparation', group: 'logi', cost: 175, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
+            { id: 'cat_log2', type: 'Camion Citerne', group: 'logi', cost: 160, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
+            { id: 'cat_log3', type: 'Camion Arsenal', group: 'logi', cost: 380, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
+            { id: 'cat_log4', type: 'Camion Construction', group: 'logi', cost: 260, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
+            
+            // TRANSPORT
+            { id: 'cat_tra1', type: 'Camion', group: 'transport', cost: 200, seats: ['Conducteur', 'Passager 1', 'Passager 2'] },
+            { id: 'cat_tra2', type: 'VAB', group: 'transport', cost: 1200, seats: ['Conducteur', 'Passager'] },
+            { id: 'cat_tra3', type: 'Stryker (non armé)', group: 'transport', cost: 1000, seats: ['Conducteur', 'Passager'] },
+            
+            // BLINDE
+            { id: 'cat_bl1', type: 'JLTV M1280 (non-armée)', group: 'blinde', cost: 650, seats: ['Conducteur', 'Passager'] },
+            { id: 'cat_bl2', type: 'JLTV M1281 - M2HB (12,7)', group: 'blinde', cost: 1000, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_bl3', type: 'JLTV M1281 - M134 (7,62)', group: 'blinde', cost: 2000, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_bl4', type: 'JLTV M1278 - M2HB (télé)', group: 'blinde', cost: 1500, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_bl5', type: 'JLTV AN-MSY-2 v2 (7,62 télé)', group: 'blinde', cost: 2760, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_bl6', type: 'JLTV M1278 - M230LF (30mm)', group: 'blinde', cost: 2750, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_bl7', type: 'JLTV M1278 + Javelin', group: 'blinde', cost: 3700, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_bl8', type: 'JLTV AN-MSY-2 v1 (Stinger)', group: 'blinde', cost: 3700, seats: ['Conducteur', 'Tireur'] },
+            
+            // INFANTERIE
+            { id: 'cat_inf1', type: 'Stryker M1126 - M2HB', group: 'infanterie', cost: 2000, seats: ['Conducteur', 'Tireur'] },
+            { id: 'cat_inf2', type: 'Stryker M1296 (30mm)', group: 'infanterie', cost: 3000, seats: ['Conducteur', 'Tireur', 'Commandant'] },
+            { id: 'cat_inf3', type: 'Stryker M1128 (105mm)', group: 'infanterie', cost: 5000, seats: ['Conducteur', 'Tireur'] },
+            
+            // SANITAIRE
+            { id: 'cat_san1', type: 'Stryker EVASAN', group: 'sanitaire', cost: 975, seats: ['Conducteur', 'Médecin'] },
+            { id: 'cat_san2', type: 'VAB EVASAN', group: 'sanitaire', cost: 975, seats: ['Conducteur', 'Médecin'] },
+            
+            // CHAR
+            { id: 'cat_char1', type: 'Leclerc', group: 'char', cost: 8000, seats: ['Conducteur', 'Tireur', 'Commandant'] },
+            { id: 'cat_char2', type: 'Leclerc XLR', group: 'char', cost: 8500, seats: ['Conducteur', 'Tireur', 'Commandant'] },
+            
+            // ALAT
+            { id: 'cat_air1', type: 'NH90 "Faucon" MEDEVAC', group: 'alat', cost: 3000, seats: ['Pilote', 'Co-Pilote', 'Médecin 1', 'Médecin 2'] },
+            { id: 'cat_air2', type: 'NH90 "Faucon" Transport', group: 'alat', cost: 3000, seats: ['Pilote', 'Co-Pilote'] },
+            { id: 'cat_air3', type: 'Gazelle SA342L (non-armée)', group: 'alat', cost: 2500, seats: ['Pilote', 'Co-Pilote'] },
+            { id: 'cat_air4', type: 'Gazelle SA342L Strike (M82)', group: 'alat', cost: 3000, seats: ['Pilote', 'Co-Pilote'] },
+            { id: 'cat_air5', type: 'Gazelle SA342L Canon (20mm)', group: 'alat', cost: 3500, seats: ['Pilote', 'Co-Pilote'] },
+            { id: 'cat_air6', type: 'Gazelle SA342L HAP (Roq 68)', group: 'alat', cost: 3500, seats: ['Pilote', 'Co-Pilote'] },
+            { id: 'cat_air7', type: 'EC665 Tigre', group: 'alat', cost: 7000, seats: ['Pilote', 'Co-Pilote'] },
         ];
 
-        function MilitaryMdtV23() {
+        function MilitaryMdtV24() {
             const [activeTab, setActiveTab] = useState('fleet');
             const [fleet, setFleet] = useState([]);
             const [logs, setLogs] = useState([]);
@@ -219,11 +241,6 @@
                         if (data.service) setService(data.service);
                         if (data.roster) setRoster(data.roster);
                         if (data.supplyLocations) setSupplyLocations(data.supplyLocations);
-                        else if (data.service?.supply) {
-                             const initialSupply = data.service.supply;
-                             const defaultLoc = [{ id: 'base_main', name: 'Base Principale', amount: initialSupply }];
-                             setSupplyLocations(defaultLoc);
-                        }
                     } else {
                         window.fb.setDoc(docRef, { 
                             fleet: [], logs: [], roster: [], 
@@ -261,7 +278,8 @@
                     callsign: matricule, 
                     status: 'Opérationnel', 
                     statusSince: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}),
-                    crew: '',
+                    crew: {}, // Change: Crew is now an object keyed by seat name
+                    seats: vehicleModel.seats || ['Conducteur', 'Passager'], // Fallback if missing
                     fuel: 100, 
                     integrity: 100, 
                     missionDetails: '', 
@@ -271,7 +289,57 @@
                 addLogLocal('deploy', `DÉPLOIEMENT: ${newVehicle.type}`, `Matricule: ${matricule}`);
             };
 
-            // Intercept Status Updates for Modals
+            // Gestion des sièges
+            const updateSeat = (vehicleId, seatName, personName) => {
+                const vehicle = fleet.find(v => v.uniqueId === vehicleId);
+                if(!vehicle) return;
+                
+                const newCrew = { ...vehicle.crew, [seatName]: personName };
+                // If personName is empty string, we are clearing the seat
+                if (personName === "") delete newCrew[seatName];
+                
+                updateVehicleData(vehicleId, { crew: newCrew });
+                
+                if (personName) {
+                    addLogLocal('info', `AFFECTATION: ${vehicle.callsign}`, `${personName} -> ${seatName}`);
+                }
+            };
+
+            // Responsable Logic - UPDATE: Dynamic logic based on available seats
+            const getVehicleBoss = (vehicle) => {
+                if (!vehicle.crew) return "N/A";
+                // ALAT: Pilote est chef
+                if (vehicle.group === 'alat') return vehicle.crew['Pilote'] || "N/A";
+                
+                // TERRE Priorities based on your list
+                // 1. Commandant (if exists)
+                // 2. Chef de Bord (if exists)
+                // 3. Tireur (for armed vehicles without Commandant/CdB)
+                // 4. Médecin (for EVASAN)
+                // 5. Passager 1 (for trucks)
+                // 6. Passager (for standard vehicles)
+                // 7. Conducteur (Last resort)
+                return vehicle.crew['Commandant'] || 
+                       vehicle.crew['Chef de Bord'] || 
+                       vehicle.crew['Passager 1'] || 
+                       vehicle.crew['Passager'] || 
+                       vehicle.crew['Tireur'] || 
+                       vehicle.crew['Médecin'] ||
+                       vehicle.crew['Conducteur'] || "N/A";
+            };
+
+            const isSeatBoss = (vehicle, seatName) => {
+                if (vehicle.group === 'alat') return seatName === 'Pilote';
+                
+                // Hierarchy of command for terrestrial vehicles
+                const priority = ['Commandant', 'Chef de Bord', 'Passager 1', 'Passager', 'Tireur', 'Médecin', 'Conducteur'];
+                
+                // Find the highest ranking seat present in this vehicle's configuration
+                const bossSeat = priority.find(s => vehicle.seats.includes(s));
+                return seatName === bossSeat;
+            };
+
+            // Intercept Status Updates
             const handleStatusChangeAttempt = (vehicleId, targetStatus) => {
                 const vehicle = fleet.find(v => v.uniqueId === vehicleId);
                 if (!vehicle) return;
@@ -309,8 +377,9 @@
             const confirmMissionStart = () => {
                 const { vehicleId, details } = missionModal;
                 const vehicle = fleet.find(v => v.uniqueId === vehicleId);
+                const boss = getVehicleBoss(vehicle);
                 updateVehicleData(vehicleId, { status: 'En Mission', missionDetails: details });
-                addLogLocal('mission', `DÉPART MISSION: ${vehicle.callsign}`, `Obj: ${details} | Resp: ${vehicle.crew || 'N/A'}`);
+                addLogLocal('mission', `DÉPART MISSION: ${vehicle.callsign}`, `Obj: ${details} | Resp: ${boss}`);
                 setMissionModal({ isOpen: false, vehicleId: null, details: '' });
             };
 
@@ -337,12 +406,6 @@
                 setMaintenanceModal({ isOpen: false, vehicleId: null, fuel: 0, integrity: 0 });
             };
 
-            const updateVehicleCrew = (uniqueId, crewName) => {
-                const vehicle = fleet.find(v => v.uniqueId === uniqueId);
-                updateVehicleData(uniqueId, { crew: crewName });
-                if (vehicle && crewName) addLogLocal('info', `AFFECTATION: ${vehicle.callsign}`, `Assigné à: ${crewName}`);
-            };
-
             const confirmDestruction = () => {
                 if (!destroyReporter) { alert("Veuillez sélectionner le personnel déclarant."); return; }
                 const v = fleet.find(item => item.uniqueId === destroyModal.vehicleId);
@@ -359,20 +422,24 @@
                 if (!newPerson.name) return;
                 const newRoster = [...roster, { id: Date.now(), ...newPerson }];
                 updateCloud({ roster: newRoster });
-                addLogLocal('info', `ARRIVÉE EFFECTIF`, `${newPerson.grade} ${newPerson.name}`);
+                addLogLocal('info', `ARRIVÉE EFFECTIF`, `${newPerson.grade} ${newPerson.name} - Prise de service`);
                 setNewPerson({ name: '', grade: 'Recrue' });
             };
             const removePersonnel = (id) => {
                 const person = roster.find(p => p.id === id);
                 const newRoster = roster.filter(p => p.id !== id);
                 updateCloud({ roster: newRoster });
-                if (person) addLogLocal('info', `DÉPART EFFECTIF`, `${person.grade} ${person.name}`);
+                if (person) addLogLocal('info', `FIN DE SERVICE`, `${person.grade} ${person.name}`);
             };
             
             // Supply
-            const addSupplyLocation = () => { if(isSL && newSupply.name) { updateCloud({ supplyLocations: [...supplyLocations, { id: Date.now(), ...newSupply }] }); setNewSupply({ name: '', amount: 0 }); }};
+            const addSupplyLocation = () => { 
+                if(isSL && newSupply.name && newSupply.amount) { 
+                    updateCloud({ supplyLocations: [...supplyLocations, { id: Date.now(), name: newSupply.name, amount: parseInt(newSupply.amount) }] }); 
+                    setNewSupply({ name: '', amount: 0 }); 
+                }
+            };
             const removeSupplyLocation = (id) => { if(isSL) updateCloud({ supplyLocations: supplyLocations.filter(l => l.id !== id) }); };
-            const updateSupplyAmount = (id, amount) => { if(isSL) updateCloud({ supplyLocations: supplyLocations.map(l => l.id === id ? { ...l, amount } : l) }); };
 
             const handleServiceStart = () => {
                 if (!serviceModal.officer) return;
@@ -400,7 +467,7 @@
 
             const getFleetByGroup = (groupKey) => fleet.filter(v => v.group === groupKey);
             const getGarageByGroup = (groupKey) => garageCatalog.filter(v => v.group === groupKey);
-            const activePersonnelCount = roster.length; // Simplified: All roster is considered "active/present"
+            const activePersonnelCount = roster.length; 
             const totalSupply = supplyLocations.reduce((acc, loc) => acc + (parseInt(loc.amount) || 0), 0);
             
             const stats = useMemo(() => ({
@@ -595,6 +662,9 @@
                                                                     <div>
                                                                         <div className="font-mono text-xs font-bold text-slate-400 mb-1">ID: {item.callsign}</div>
                                                                         <div className="font-tech text-lg font-bold text-white leading-tight">{item.type}</div>
+                                                                        <div className="text-[10px] font-bold text-blue-400 uppercase mt-0.5 flex items-center gap-1">
+                                                                            <Star size={10}/> Resp: <span className="text-white">{getVehicleBoss(item)}</span>
+                                                                        </div>
                                                                         {/* NEW HUD */}
                                                                         <div className="flex gap-1 mt-2">
                                                                              <div className="h-1 w-12 bg-slate-700 rounded overflow-hidden" title="Intégrité"><div style={{width: `${item.integrity || 100}%`}} className={`h-full ${item.integrity < 50 ? 'bg-red-500' : 'bg-emerald-500'}`}></div></div>
@@ -608,19 +678,29 @@
                                                                     }`}>{item.status}</div>
                                                                 </div>
 
-                                                                {/* CREW SELECTOR */}
-                                                                <div className="mb-4">
-                                                                    <label className="text-[9px] uppercase font-bold text-slate-500 mb-1 block tracking-wide">Responsable / Équipage</label>
-                                                                    <select 
-                                                                        className="w-full bg-slate-950 border border-slate-700 text-xs text-white rounded p-1.5 focus:border-blue-500 outline-none font-mono"
-                                                                        value={item.crew || ''}
-                                                                        onChange={(e) => updateVehicleCrew(item.uniqueId, e.target.value)}
-                                                                    >
-                                                                        <option value="">-- Non assigné --</option>
-                                                                        {roster.map(p => (
-                                                                            <option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>
-                                                                        ))}
-                                                                    </select>
+                                                                {/* SEATS SELECTOR (NEW) */}
+                                                                <div className="mb-4 space-y-2 bg-slate-950/50 p-2 rounded border border-slate-800">
+                                                                    {item.seats.map((seatName, idx) => {
+                                                                        const isBoss = isSeatBoss(item, seatName);
+                                                                        return (
+                                                                            <div key={idx}>
+                                                                                <label className={`text-[9px] uppercase font-bold mb-0.5 block tracking-wide flex items-center justify-between ${isBoss ? 'text-amber-400' : 'text-slate-500'}`}>
+                                                                                    <span>{seatName}</span>
+                                                                                    {isBoss && <Star size={8} />}
+                                                                                </label>
+                                                                                <select 
+                                                                                    className={`w-full bg-slate-900 border text-[10px] text-white rounded p-1 focus:border-blue-500 outline-none font-mono ${isBoss ? 'border-amber-500/30' : 'border-slate-700'}`}
+                                                                                    value={item.crew?.[seatName] || ''}
+                                                                                    onChange={(e) => updateSeat(item.uniqueId, seatName, e.target.value)}
+                                                                                >
+                                                                                    <option value="">-- Libre --</option>
+                                                                                    {roster.map(p => (
+                                                                                        <option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>
+                                                                                    ))}
+                                                                                </select>
+                                                                            </div>
+                                                                        );
+                                                                    })}
                                                                 </div>
 
                                                                 <div className="mt-auto space-y-2">
@@ -676,6 +756,9 @@
                                                                 <div className="text-xs font-mono text-slate-500 mt-0.5">{item.cost} pts</div>
                                                             </div>
                                                             {item.grade && <span className="text-[9px] font-bold bg-slate-950 px-1.5 py-0.5 rounded text-slate-400 border border-slate-800">{item.grade}</span>}
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-500 font-mono bg-slate-950/50 p-1.5 rounded border border-slate-800/50">
+                                                            Config: {item.seats.join(', ')}
                                                         </div>
                                                         <button 
                                                             onClick={() => deployVehicle(item)} 
@@ -747,13 +830,16 @@
                                     {roster.map(person => (
                                         <div key={person.id} className="bg-slate-900/40 border border-slate-800 rounded p-3 flex items-center justify-between group hover:border-slate-600 transition-all">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-slate-400 font-bold text-xs border border-slate-700">
-                                                    {person.grade}
+                                                <div className="w-9 h-9 rounded bg-slate-800 flex items-center justify-center text-slate-400 font-bold text-xs border border-slate-700 font-tech">
+                                                    {RANK_SHORT[person.grade] || person.grade.substring(0,3).toUpperCase()}
                                                 </div>
-                                                <div className="font-mono text-white font-bold">{person.name}</div>
+                                                <div>
+                                                    <div className="font-mono text-white font-bold">{person.name}</div>
+                                                    <div className="text-[9px] text-emerald-500 font-bold uppercase flex items-center gap-1"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Opérationnel</div>
+                                                </div>
                                             </div>
-                                            <button onClick={() => removePersonnel(person.id)} className="text-slate-600 hover:text-red-500 p-2 transition-colors">
-                                                <Trash2 size={16} />
+                                            <button onClick={() => removePersonnel(person.id)} className="text-xs font-bold text-slate-500 hover:text-red-400 border border-transparent hover:border-red-500/30 bg-slate-950 hover:bg-red-950/30 px-2 py-1.5 rounded transition-all uppercase">
+                                                Fin Service
                                             </button>
                                         </div>
                                     ))}
@@ -906,6 +992,53 @@
                             </div>
                         </div>
                     )}
+                    
+                    {/* SUPPLY MODAL - ADDED MISSING COMPONENT */}
+                    {supplyModal.isOpen && (
+                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur p-4 animate-in">
+                            <div className="bg-slate-900 border border-amber-500/30 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+                                <div className="bg-amber-600/10 p-4 border-b border-amber-500/20 flex items-center gap-3 shrink-0">
+                                    <div className="p-2 bg-amber-600 rounded text-black shadow-glow"><Box size={20} /></div>
+                                    <h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Gestion Logistique (Supply)</h3>
+                                </div>
+                                <div className="p-6 overflow-y-auto flex-1">
+                                    {/* List */}
+                                    <div className="space-y-2 mb-6">
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Points de ravitaillement actifs</h4>
+                                        {supplyLocations.map(loc => (
+                                            <div key={loc.id} className="flex justify-between items-center bg-slate-950 p-3 rounded border border-slate-800">
+                                                <div>
+                                                    <div className="text-white font-bold">{loc.name}</div>
+                                                    <div className="text-xs text-amber-500 font-mono">{loc.amount} pts</div>
+                                                </div>
+                                                <button onClick={() => removeSupplyLocation(loc.id)} className="text-slate-600 hover:text-red-500 transition-colors p-2"><Trash2 size={16}/></button>
+                                            </div>
+                                        ))}
+                                        {supplyLocations.length === 0 && <div className="text-center text-slate-600 italic py-4">Aucun point de ravitaillement.</div>}
+                                    </div>
+
+                                    {/* Add Form */}
+                                    <div className="bg-slate-950/50 p-4 rounded border border-slate-800">
+                                        <h4 className="text-xs font-bold text-blue-400 uppercase mb-3">Nouveau Point</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                                <label className="text-[10px] text-slate-500 font-bold block mb-1">NOM ZONE / FOB</label>
+                                                <input type="text" className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none" value={newSupply.name} onChange={e => setNewSupply({...newSupply, name: e.target.value})} placeholder="Ex: FOB Alpha" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-slate-500 font-bold block mb-1">QUANTITÉ INITIALE</label>
+                                                <input type="number" className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none" value={newSupply.amount} onChange={e => setNewSupply({...newSupply, amount: e.target.value})} />
+                                            </div>
+                                        </div>
+                                        <button onClick={addSupplyLocation} className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold uppercase text-xs shadow-glow transition-all">AJOUTER ZONE</button>
+                                    </div>
+                                </div>
+                                <div className="p-4 border-t border-slate-800 bg-slate-900 shrink-0">
+                                    <button onClick={() => setSupplyModal({isOpen: false})} className="w-full py-3 bg-slate-800 text-slate-400 rounded text-xs font-bold hover:bg-slate-700">FERMER</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {destroyModal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur p-4 animate-in">
@@ -923,7 +1056,7 @@
                                             onChange={(e) => setDestroyReporter(e.target.value)}
                                         >
                                             <option value="">-- Sélectionner Personnel --</option>
-                                            {roster.filter(p => p.onDuty).map(p => (
+                                            {roster.map(p => (
                                                 <option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>
                                             ))}
                                         </select>
@@ -942,14 +1075,14 @@
                              <div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div>
                              <span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span>
                         </div>
-                        <div>v23.0 Ops Fix</div>
+                        <div>v24.0 Crew Ops</div>
                     </div>
                 </div>
             );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MilitaryMdtV23 />);
+        root.render(<MilitaryMdtV24 />);
     </script>
 </body>
 </html>
