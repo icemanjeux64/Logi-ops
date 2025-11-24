@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT FOF - Tactical v19</title>
+    <title>MDT FOF - Tactical v20</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -128,6 +128,7 @@
         const Trash2 = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Icon>;
         const Edit2 = (p) => <Icon {...p}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></Icon>;
         const Lock = (p) => <Icon {...p}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Icon>;
+        const RefreshCw = (p) => <Icon {...p}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></Icon>;
 
         // --- CATALOGUE ---
         const garageCatalog = [
@@ -175,7 +176,7 @@
             'alat': { label: 'ALAT', color: 'bg-sky-500', text: 'text-sky-400', border: 'border-sky-500/30' },
         };
 
-        function MilitaryMdtV19() {
+        function MilitaryMdtV20() {
             const [activeTab, setActiveTab] = useState('fleet');
             const [fleet, setFleet] = useState([]);
             const [logs, setLogs] = useState([]);
@@ -274,8 +275,6 @@
                 if (!v) return;
                 if (newStatus === 'Détruit') { setDestroyModal({ isOpen: true, vehicleId: uniqueId }); return; }
                 if (newStatus === 'Garage') {
-                    // Everyone can return to garage? Let's say yes for fluidity, or restrict to SL.
-                    // Restriction: Only SL can put back to garage
                     if (!isSL) { alert("Seul le SL peut rentrer un véhicule au garage."); return; }
                     updateCloud({ fleet: fleet.filter(item => item.uniqueId !== uniqueId) });
                     addLogLocal('info', `RETOUR PARC: ${v.callsign}`, `Retour opérationnel.`);
@@ -307,7 +306,7 @@
                 setDestroyReporter('');
             };
 
-            // Personnel (Allowed for everyone)
+            // Personnel
             const addPersonnel = () => {
                 if (!newPerson.name) return;
                 const newRoster = [...roster, { id: Date.now(), ...newPerson, onDuty: false, dutyStart: null }];
@@ -331,7 +330,7 @@
                 addLogLocal('info', isStarting ? `PRISE DE POSTE` : `FIN DE POSTE`, `${person.grade} ${person.name}`);
             };
 
-            // Supply (Restricted to SL)
+            // Supply
             const addSupplyLocation = () => {
                 if (!isSL) return;
                 if (!newSupply.name) return;
@@ -362,13 +361,14 @@
                         grade: serviceModal.grade, 
                         start: startTime, 
                         end: null,
-                        ownerUid: user.uid // THE KEY: Lock the session to this user
+                        ownerUid: user.uid
                     } 
                 });
                 addLogLocal('info', `SUPERVISION (SL)`, `Prise de commandement: ${serviceModal.grade} ${serviceModal.officer}`);
                 setServiceModal({ isOpen: false, officer: '', grade: '' });
             };
             const handleServiceEnd = () => {
+                // Only SL can end, OR recovery mode
                 if (!isSL) return;
                 const endTime = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
                 updateCloud({ 
@@ -379,14 +379,29 @@
                         grade: '', 
                         start: null, 
                         end: endTime,
-                        ownerUid: null // Release lock
+                        ownerUid: null
                     } 
                 });
                 addLogLocal('info', `FIN SUPERVISION`, `Fin de service SL. (Fin: ${endTime})`);
             };
+
+            // FORCE RECOVERY (OVERWRITE SL)
+            const handleForceRecovery = () => {
+                if (!confirm("ATTENTION: Vous allez forcer la reprise du commandement (SL Logis). Êtes-vous sûr ? (Utiliser uniquement en cas de perte de session/crash)")) return;
+                
+                const newOwnerUid = user.uid;
+                // On garde les infos de l'officier actuel mais on change le propriétaire technique
+                updateCloud({ 
+                    service: { 
+                        ...service, 
+                        ownerUid: newOwnerUid 
+                    } 
+                });
+                addLogLocal('alert', `REPRISE DE MAIN`, `Changement de propriétaire de session forcé.`);
+            };
+
             const updateGlobalState = (key, value) => {
-                if (!isSL && key !== 'medic') return; // Medic allowed for all? Usually yes for emergency. Let's say yes.
-                // Actually, let's restrict Effectif counters manual adjustment too, since it's auto-calculated or managed by SL
+                if (!isSL && key !== 'medic') return;
                 if (key === 'effectif' && !isSL) return;
                 updateCloud({ service: { ...service, [key]: value } });
             };
@@ -415,7 +430,6 @@
                         
                         <div className="flex items-center justify-between px-4 py-3 relative z-10">
                             <div className="flex items-center gap-3">
-                                {/* LOGO */}
                                 <img src="Logo.png" alt="Logo FOF" className="h-10 w-auto object-contain drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
                                 <div className="hidden w-10 h-10 bg-gradient-to-br from-slate-800 to-slate-900 rounded border border-slate-700 items-center justify-center relative"><Shield size={20} className="text-blue-400" /></div>
 
@@ -439,18 +453,20 @@
 
                                 {!service.active ? (
                                     <button onClick={() => setServiceModal({ isOpen: true, officer: '', grade: '' })} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm shadow-glow transition-all flex items-center gap-2">
-                                        <UserCheck size={16} /> <span className="hidden md:inline">Superviseur (SL)</span>
+                                        <UserCheck size={16} /> <span className="hidden md:inline">Prise de Service</span>
                                     </button>
                                 ) : (
-                                    // BOUTON FIN DE SERVICE : Seulement pour le SL
+                                    // MODE SERVICE ACTIF
                                     isSL ? (
+                                        // Bouton FIN (SL)
                                         <button onClick={handleServiceEnd} className="bg-red-900/30 hover:bg-red-900/50 border border-red-500/30 text-red-400 px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm transition-all flex items-center gap-2">
                                             <LogOut size={16} /> <span className="hidden md:inline">Fin Service SL</span>
                                         </button>
                                     ) : (
-                                        <div className="px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm bg-slate-800 text-slate-500 border border-slate-700 flex items-center gap-2 cursor-not-allowed" title="Seul le SL peut clore la session">
-                                            <Lock size={14} /> <span>Opérateur</span>
-                                        </div>
+                                        // Bouton REPRISE (Non-SL)
+                                        <button onClick={handleForceRecovery} className="bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-amber-400 px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm transition-all flex items-center gap-2 animate-pulse border-dashed">
+                                            <RefreshCw size={16} /> <span className="hidden md:inline">⚠️ Reprendre SL</span>
+                                        </button>
                                     )
                                 )}
                             </div>
@@ -843,7 +859,9 @@
                                             onChange={(e) => setDestroyReporter(e.target.value)}
                                         >
                                             <option value="">-- Sélectionner Personnel --</option>
-                                            {roster.filter(p => p.onDuty).map(p => (<option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>))}
+                                            {roster.filter(p => p.onDuty).map(p => (
+                                                <option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>
+                                            ))}
                                         </select>
                                     </div>
 
@@ -857,14 +875,14 @@
                     {/* FOOTER STATUS */}
                     <div className="absolute bottom-0 left-0 w-full bg-slate-950/80 backdrop-blur border-t border-white/5 p-2 flex justify-between items-center gap-2 z-30 text-[10px] font-mono text-slate-500">
                         <div className="flex items-center gap-2"><div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div><span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span></div>
-                        <div>v19.0 Security</div>
+                        <div>v20.0 Recovery Fix</div>
                     </div>
                 </div>
             );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MilitaryMdtV19 />);
+        root.render(<MilitaryMdtV20 />);
     </script>
 </body>
 </html>
