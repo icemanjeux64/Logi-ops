@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT FOF - Tactical v14</title>
+    <title>MDT FOF - Tactical v15</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -119,7 +119,6 @@
         const Wrench = (p) => <Icon {...p}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></Icon>;
         const MapPin = (p) => <Icon {...p}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></Icon>;
         const Info = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></Icon>;
-        const Clock = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>;
         const UserCheck = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></Icon>;
         const Users = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>;
         const LogOut = (p) => <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></Icon>;
@@ -175,7 +174,7 @@
             'alat': { label: 'ALAT', color: 'bg-sky-500', text: 'text-sky-400', border: 'border-sky-500/30' },
         };
 
-        function MilitaryMdtV14() {
+        function MilitaryMdtV15() {
             const [activeTab, setActiveTab] = useState('fleet');
             const [fleet, setFleet] = useState([]);
             const [logs, setLogs] = useState([]);
@@ -183,10 +182,13 @@
             const [roster, setRoster] = useState([]); 
             const [user, setUser] = useState(null);
             const [showDashboard, setShowDashboard] = useState(true);
+            
+            // Modal Destruction States
             const [destroyModal, setDestroyModal] = useState({ isOpen: false, vehicleId: null });
             const [destroyReason, setDestroyReason] = useState('');
+            const [destroyReporter, setDestroyReporter] = useState(''); // Nouveau state pour le déclarant
+
             const [serviceModal, setServiceModal] = useState({ isOpen: false, officer: '', grade: '' });
-            
             const [newPerson, setNewPerson] = useState({ name: '', grade: '2CL' });
 
             // --- FIREBASE ---
@@ -239,7 +241,7 @@
                     callsign: matricule, 
                     status: 'Opérationnel', 
                     statusSince: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}),
-                    crew: '' // New crew field
+                    crew: '' 
                 };
                 updateCloud({ fleet: [...fleet, newVehicle] });
                 addLogLocal('deploy', `DÉPLOIEMENT: ${newVehicle.type}`, `Matricule: ${matricule}`);
@@ -260,30 +262,45 @@
                 if (newStatus === 'Maintenance') addLogLocal('info', `MAINTENANCE: ${v.callsign}`);
             };
 
+            // LOGGUE L'AFFECTATION
             const updateVehicleCrew = (uniqueId, crewName) => {
+                const vehicle = fleet.find(v => v.uniqueId === uniqueId);
                 const newFleet = fleet.map(item => item.uniqueId === uniqueId ? { ...item, crew: crewName } : item);
                 updateCloud({ fleet: newFleet });
+                if (vehicle && crewName) {
+                    addLogLocal('info', `AFFECTATION: ${vehicle.callsign}`, `Assigné à: ${crewName}`);
+                }
             };
 
+            // DESTRUCTION AVEC DECLARANT
             const confirmDestruction = () => {
+                if (!destroyReporter) { alert("Veuillez sélectionner le personnel déclarant."); return; }
                 const v = fleet.find(item => item.uniqueId === destroyModal.vehicleId);
                 if (!v) return;
+                
                 updateCloud({ fleet: fleet.filter(item => item.uniqueId !== destroyModal.vehicleId) });
-                addLogLocal('destroy', `PERTE TOTALE: ${v.callsign}`, `Rapport: ${destroyReason}`);
+                
+                // Log enrichi
+                addLogLocal('destroy', `PERTE TOTALE: ${v.callsign}`, `Déclarant: ${destroyReporter} | Cause: ${destroyReason}`);
+                
                 setDestroyModal({ isOpen: false, vehicleId: null });
                 setDestroyReason('');
+                setDestroyReporter('');
             };
 
-            // Personnel
+            // PERSONNEL + LOGS
             const addPersonnel = () => {
                 if (!newPerson.name) return;
                 const newRoster = [...roster, { id: Date.now(), ...newPerson }];
                 updateCloud({ roster: newRoster });
+                addLogLocal('info', `ARRIVÉE EFFECTIF`, `${newPerson.grade} ${newPerson.name}`);
                 setNewPerson({ name: '', grade: '2CL' });
             };
             const removePersonnel = (id) => {
+                const person = roster.find(p => p.id === id);
                 const newRoster = roster.filter(p => p.id !== id);
                 updateCloud({ roster: newRoster });
+                if (person) addLogLocal('info', `DÉPART EFFECTIF`, `${person.grade} ${person.name}`);
             };
 
             // Service
@@ -322,21 +339,9 @@
                         
                         <div className="flex items-center justify-between px-4 py-3 relative z-10">
                             <div className="flex items-center gap-3">
-                                {/* LOGO PERSONNALISÉ */}
-                                <img 
-                                    src="Logo.png" 
-                                    alt="Logo FOF" 
-                                    className="h-10 w-auto object-contain drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]"
-                                    onError={(e) => {
-                                        // Fallback si l'image n'est pas trouvée : on affiche l'ancien bouclier
-                                        e.target.style.display = 'none';
-                                        e.target.nextSibling.style.display = 'flex';
-                                    }}
-                                />
-                                {/* Fallback caché par défaut */}
-                                <div className="hidden w-10 h-10 bg-gradient-to-br from-slate-800 to-slate-900 rounded border border-slate-700 items-center justify-center relative">
-                                   <Shield size={20} className="text-blue-400" />
-                                </div>
+                                {/* LOGO */}
+                                <img src="Logo.png" alt="Logo FOF" className="h-10 w-auto object-contain drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                                <div className="hidden w-10 h-10 bg-gradient-to-br from-slate-800 to-slate-900 rounded border border-slate-700 items-center justify-center relative"><Shield size={20} className="text-blue-400" /></div>
 
                                 <div>
                                     <h1 className="text-2xl font-bold text-white font-tech uppercase leading-none tracking-wide">Logistique <span className="text-blue-500">FOF</span></h1>
@@ -472,9 +477,7 @@
                                                                         item.status === 'Opérationnel' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
                                                                         item.status === 'En Mission' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 animate-pulse' :
                                                                         'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                                                                    }`}>
-                                                                        {item.status}
-                                                                    </div>
+                                                                    }`}>{item.status}</div>
                                                                 </div>
 
                                                                 {/* CREW SELECTOR */}
@@ -628,6 +631,22 @@
                                 <div className="bg-red-600/10 p-4 border-b border-red-500/20 flex items-center gap-3"><div className="p-2 bg-red-600 rounded text-white shadow-glow-red"><AlertTriangle size={20} /></div><h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Perte Véhicule</h3></div>
                                 <div className="p-6 space-y-4">
                                     <div className="bg-red-950/30 p-3 rounded border border-red-500/20 flex justify-between items-center"><span className="text-red-400 font-mono text-sm">{fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.callsign}</span><span className="text-slate-400 text-xs">{fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.type}</span></div>
+                                    
+                                    {/* SELECTEUR DECLARANT */}
+                                    <div>
+                                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1 tracking-widest">Déclarant (Obligatoire)</label>
+                                        <select 
+                                            className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none font-mono"
+                                            value={destroyReporter}
+                                            onChange={(e) => setDestroyReporter(e.target.value)}
+                                        >
+                                            <option value="">-- Sélectionner Personnel --</option>
+                                            {roster.map(p => (
+                                                <option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
                                     <textarea value={destroyReason} onChange={(e) => setDestroyReason(e.target.value)} className="w-full bg-slate-950 border border-slate-700 p-3 text-sm text-white focus:border-red-500 focus:outline-none rounded h-24 resize-none" placeholder="Rapport de destruction requis..." />
                                     <div className="flex gap-3 pt-2"><button onClick={() => setDestroyModal({isOpen: false, vehicleId: null})} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded text-xs font-bold hover:bg-slate-700">ANNULER</button><button onClick={confirmDestruction} disabled={!destroyReason.trim()} className="flex-1 py-3 bg-red-600 text-white hover:bg-red-500 disabled:opacity-50 rounded text-xs font-bold uppercase shadow-glow-red">CONFIRMER</button></div>
                                 </div>
@@ -638,14 +657,14 @@
                     {/* FOOTER STATUS */}
                     <div className="absolute bottom-0 left-0 w-full bg-slate-950/80 backdrop-blur border-t border-white/5 p-2 flex justify-between items-center gap-2 z-30 text-[10px] font-mono text-slate-500">
                         <div className="flex items-center gap-2"><div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div><span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span></div>
-                        <div>v14.0 Tactical</div>
+                        <div>v15.0 Tactical</div>
                     </div>
                 </div>
             );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MilitaryMdtV14 />);
+        root.render(<MilitaryMdtV15 />);
     </script>
 </body>
 </html>
