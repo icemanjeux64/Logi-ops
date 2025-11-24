@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT FOF - Tactical v24.1</title>
+    <title>MDT FOF - Tactical v24.2</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -194,6 +194,15 @@
             const [roster, setRoster] = useState([]); 
             const [user, setUser] = useState(null);
             const [showDashboard, setShowDashboard] = useState(true);
+            
+            // State for expanded vehicles (Collapsible Cards)
+            const [expandedVehicles, setExpandedVehicles] = useState([]);
+
+            const toggleVehicleExpansion = (id) => {
+                setExpandedVehicles(prev => 
+                    prev.includes(id) ? prev.filter(vId => vId !== id) : [...prev, id]
+                );
+            };
             
             // Modal States
             const [destroyModal, setDestroyModal] = useState({ isOpen: false, vehicleId: null });
@@ -658,72 +667,88 @@
                                                         <div key={item.uniqueId} className="bg-slate-900/40 border border-white/5 rounded-lg overflow-hidden hover:border-white/10 transition-all relative group backdrop-blur-sm flex flex-col">
                                                             <div className={`absolute top-0 left-0 w-1 h-full ${item.status === 'En Mission' ? 'bg-blue-500 shadow-glow' : item.status === 'Maintenance' ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
                                                             
-                                                            <div className="p-4 pl-6 flex flex-col h-full">
-                                                                <div className="flex justify-between items-start mb-4">
-                                                                    <div>
-                                                                        <div className="font-mono text-xs font-bold text-slate-400 mb-1">ID: {item.callsign}</div>
-                                                                        <div className="font-tech text-lg font-bold text-white leading-tight">{item.type}</div>
-                                                                        <div className="text-[10px] font-bold text-blue-400 uppercase mt-0.5 flex items-center gap-1">
-                                                                            <Star size={10}/> Resp: <span className="text-white">{getVehicleBoss(item)}</span>
-                                                                        </div>
-                                                                        {/* NEW HUD */}
-                                                                        <div className="flex gap-1 mt-2">
-                                                                             <div className="h-1 w-12 bg-slate-700 rounded overflow-hidden" title="Intégrité"><div style={{width: `${item.integrity || 100}%`}} className={`h-full ${item.integrity < 50 ? 'bg-red-500' : 'bg-emerald-500'}`}></div></div>
-                                                                             <div className="h-1 w-12 bg-slate-700 rounded overflow-hidden" title="Essence"><div style={{width: `${item.fuel || 100}%`}} className="h-full bg-yellow-400"></div></div>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-wider border ${
+                                                            {/* HEADER - CLIQUEZ POUR DEPLIER */}
+                                                            <div 
+                                                                className="p-4 pl-6 cursor-pointer hover:bg-white/5 transition-colors"
+                                                                onClick={() => toggleVehicleExpansion(item.uniqueId)}
+                                                            >
+                                                                <div className="flex justify-between items-start mb-2">
+                                                                    <div className="font-mono text-xs font-bold text-slate-400">ID: {item.callsign}</div>
+                                                                    <div className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${
                                                                         item.status === 'Opérationnel' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
                                                                         item.status === 'En Mission' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 animate-pulse' :
                                                                         'bg-amber-500/10 text-amber-400 border-amber-500/30'
                                                                     }`}>{item.status}</div>
                                                                 </div>
-
-                                                                {/* SEATS SELECTOR (NEW) */}
-                                                                <div className="mb-4 space-y-2 bg-slate-950/50 p-2 rounded border border-slate-800">
-                                                                    {getSafeSeats(item).map((seatName, idx) => {
-                                                                        const isBoss = isSeatBoss(item, seatName);
-                                                                        return (
-                                                                            <div key={idx}>
-                                                                                <label className={`text-[9px] uppercase font-bold mb-0.5 block tracking-wide flex items-center justify-between ${isBoss ? 'text-amber-400' : 'text-slate-500'}`}>
-                                                                                    <span>{seatName}</span>
-                                                                                    {isBoss && <Star size={8} />}
-                                                                                </label>
-                                                                                <select 
-                                                                                    className={`w-full bg-slate-900 border text-[10px] text-white rounded p-1 focus:border-blue-500 outline-none font-mono ${isBoss ? 'border-amber-500/30' : 'border-slate-700'}`}
-                                                                                    value={item.crew?.[seatName] || ''}
-                                                                                    onChange={(e) => updateSeat(item.uniqueId, seatName, e.target.value)}
-                                                                                >
-                                                                                    <option value="">-- Libre --</option>
-                                                                                    {roster.map(p => (
-                                                                                        <option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>
-                                                                                    ))}
-                                                                                </select>
-                                                                            </div>
-                                                                        );
-                                                                    })}
+                                                                
+                                                                <div className="font-tech text-lg font-bold text-white leading-tight mb-1">{item.type}</div>
+                                                                
+                                                                <div className="text-[10px] font-bold text-blue-400 uppercase flex items-center gap-1 mb-2">
+                                                                    <Star size={10}/> Resp: <span className="text-white">{getVehicleBoss(item)}</span>
                                                                 </div>
 
-                                                                <div className="mt-auto space-y-2">
-                                                                    {item.status === 'En Mission' ? (
-                                                                        <button onClick={() => handleStatusChangeAttempt(item.uniqueId, 'Opérationnel')} className="w-full h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded uppercase shadow-glow border border-emerald-400 transition-all">RETOUR MISSION</button>
-                                                                    ) : (
-                                                                        <button onClick={() => handleStatusChangeAttempt(item.uniqueId, 'En Mission')} className="w-full h-10 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded uppercase shadow-glow border border-blue-400 transition-all">PARTIR EN MISSION</button>
-                                                                    )}
-
-                                                                    {/* MAINTENANCE BUTTON - Opens Modal if already in maint, or sets maint if operational */}
-                                                                    <button onClick={() => handleStatusChangeAttempt(item.uniqueId, item.status === 'Maintenance' ? 'Opérationnel' : 'Maintenance')} className={`w-full py-2 font-bold text-[10px] rounded uppercase border transition-all ${item.status === 'Maintenance' ? 'bg-amber-600 text-white border-amber-400 animate-pulse' : 'bg-slate-800 text-amber-500 border-slate-600 hover:bg-slate-700'}`}>
-                                                                        {item.status === 'Maintenance' ? 'RÉPARER (ATELIER)' : 'MAINTENANCE'}
-                                                                    </button>
-                                                                    
-                                                                    <div className="grid grid-cols-2 gap-2">
-                                                                        <button onClick={() => handleStatusChangeAttempt(item.uniqueId, 'Garage')} disabled={!isSL} className={`border py-2 rounded text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1 ${isSL ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-600' : 'bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed'}`} title={isSL ? "Rentrer au Garage" : "Réservé SL"}>
-                                                                            {isSL ? <RotateCcw size={14}/> : <Lock size={12}/>} GARAGE
-                                                                        </button>
-                                                                        <button onClick={() => handleStatusChangeAttempt(item.uniqueId, 'Détruit')} className="bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 py-2 rounded text-[10px] font-bold uppercase transition-all" title="Signaler Destruction">DÉTRUIRE</button>
-                                                                    </div>
+                                                                {/* NEW HUD */}
+                                                                <div className="flex gap-1 items-center justify-between">
+                                                                     <div className="flex gap-1">
+                                                                         <div className="h-1.5 w-12 bg-slate-700 rounded overflow-hidden" title="Intégrité"><div style={{width: `${item.integrity || 100}%`}} className={`h-full ${item.integrity < 50 ? 'bg-red-500' : 'bg-emerald-500'}`}></div></div>
+                                                                         <div className="h-1.5 w-12 bg-slate-700 rounded overflow-hidden" title="Essence"><div style={{width: `${item.fuel || 100}%`}} className="h-full bg-yellow-400"></div></div>
+                                                                     </div>
+                                                                     <div className={`transition-transform duration-300 ${expandedVehicles.includes(item.uniqueId) ? 'rotate-180 text-blue-400' : 'text-slate-600'}`}>
+                                                                         <ChevronDown size={16} />
+                                                                     </div>
                                                                 </div>
                                                             </div>
+
+                                                            {/* BODY - CONTENU DEPLIABLE */}
+                                                            {expandedVehicles.includes(item.uniqueId) && (
+                                                                <div className="p-4 pl-6 pt-0 border-t border-white/5 bg-slate-950/30 animate-in">
+                                                                    {/* SEATS SELECTOR (NEW) */}
+                                                                    <div className="mb-4 mt-4 space-y-2 bg-slate-950/50 p-2 rounded border border-slate-800">
+                                                                        {getSafeSeats(item).map((seatName, idx) => {
+                                                                            const isBoss = isSeatBoss(item, seatName);
+                                                                            return (
+                                                                                <div key={idx}>
+                                                                                    <label className={`text-[9px] uppercase font-bold mb-0.5 block tracking-wide flex items-center justify-between ${isBoss ? 'text-amber-400' : 'text-slate-500'}`}>
+                                                                                        <span>{seatName}</span>
+                                                                                        {isBoss && <Star size={8} />}
+                                                                                    </label>
+                                                                                    <select 
+                                                                                        className={`w-full bg-slate-900 border text-[10px] text-white rounded p-1 focus:border-blue-500 outline-none font-mono ${isBoss ? 'border-amber-500/30' : 'border-slate-700'}`}
+                                                                                        value={item.crew?.[seatName] || ''}
+                                                                                        onChange={(e) => updateSeat(item.uniqueId, seatName, e.target.value)}
+                                                                                        onClick={(e) => e.stopPropagation()} // Prevent closing card when clicking select
+                                                                                    >
+                                                                                        <option value="">-- Libre --</option>
+                                                                                        {roster.map(p => (
+                                                                                            <option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>
+                                                                                        ))}
+                                                                                    </select>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+
+                                                                    <div className="mt-auto space-y-2">
+                                                                        {item.status === 'En Mission' ? (
+                                                                            <button onClick={() => handleStatusChangeAttempt(item.uniqueId, 'Opérationnel')} className="w-full h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded uppercase shadow-glow border border-emerald-400 transition-all">RETOUR MISSION</button>
+                                                                        ) : (
+                                                                            <button onClick={() => handleStatusChangeAttempt(item.uniqueId, 'En Mission')} className="w-full h-10 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded uppercase shadow-glow border border-blue-400 transition-all">PARTIR EN MISSION</button>
+                                                                        )}
+
+                                                                        {/* MAINTENANCE BUTTON - Opens Modal if already in maint, or sets maint if operational */}
+                                                                        <button onClick={() => handleStatusChangeAttempt(item.uniqueId, item.status === 'Maintenance' ? 'Opérationnel' : 'Maintenance')} className={`w-full py-2 font-bold text-[10px] rounded uppercase border transition-all ${item.status === 'Maintenance' ? 'bg-amber-600 text-white border-amber-400 animate-pulse' : 'bg-slate-800 text-amber-500 border-slate-600 hover:bg-slate-700'}`}>
+                                                                            {item.status === 'Maintenance' ? 'RÉPARER (ATELIER)' : 'MAINTENANCE'}
+                                                                        </button>
+                                                                        
+                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                            <button onClick={() => handleStatusChangeAttempt(item.uniqueId, 'Garage')} disabled={!isSL} className={`border py-2 rounded text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1 ${isSL ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-600' : 'bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed'}`} title={isSL ? "Rentrer au Garage" : "Réservé SL"}>
+                                                                                {isSL ? <RotateCcw size={14}/> : <Lock size={12}/>} GARAGE
+                                                                            </button>
+                                                                            <button onClick={() => handleStatusChangeAttempt(item.uniqueId, 'Détruit')} className="bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 py-2 rounded text-[10px] font-bold uppercase transition-all" title="Signaler Destruction">DÉTRUIRE</button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     ))}
                                                 </div>
@@ -1076,7 +1101,7 @@
                              <div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div>
                              <span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span>
                         </div>
-                        <div>v24.1 Ops Fix</div>
+                        <div>v24.2 Ops Fix</div>
                     </div>
                 </div>
             );
