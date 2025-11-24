@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT FOF - Tactical v24</title>
+    <title>MDT FOF - Tactical v24.1</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -305,6 +305,13 @@
                 }
             };
 
+            // Helper for backward compatibility
+            const getSafeSeats = (vehicle) => {
+                if (vehicle.seats) return vehicle.seats;
+                const model = garageCatalog.find(c => c.type === vehicle.type);
+                return model ? model.seats : ['Conducteur', 'Passager'];
+            };
+
             // Responsable Logic - UPDATE: Dynamic logic based on available seats
             const getVehicleBoss = (vehicle) => {
                 if (!vehicle.crew) return "N/A";
@@ -312,13 +319,6 @@
                 if (vehicle.group === 'alat') return vehicle.crew['Pilote'] || "N/A";
                 
                 // TERRE Priorities based on your list
-                // 1. Commandant (if exists)
-                // 2. Chef de Bord (if exists)
-                // 3. Tireur (for armed vehicles without Commandant/CdB)
-                // 4. Médecin (for EVASAN)
-                // 5. Passager 1 (for trucks)
-                // 6. Passager (for standard vehicles)
-                // 7. Conducteur (Last resort)
                 return vehicle.crew['Commandant'] || 
                        vehicle.crew['Chef de Bord'] || 
                        vehicle.crew['Passager 1'] || 
@@ -334,8 +334,9 @@
                 // Hierarchy of command for terrestrial vehicles
                 const priority = ['Commandant', 'Chef de Bord', 'Passager 1', 'Passager', 'Tireur', 'Médecin', 'Conducteur'];
                 
-                // Find the highest ranking seat present in this vehicle's configuration
-                const bossSeat = priority.find(s => vehicle.seats.includes(s));
+                // Safe seats access via helper
+                const seats = getSafeSeats(vehicle);
+                const bossSeat = priority.find(s => seats.includes(s));
                 return seatName === bossSeat;
             };
 
@@ -680,7 +681,7 @@
 
                                                                 {/* SEATS SELECTOR (NEW) */}
                                                                 <div className="mb-4 space-y-2 bg-slate-950/50 p-2 rounded border border-slate-800">
-                                                                    {item.seats.map((seatName, idx) => {
+                                                                    {getSafeSeats(item).map((seatName, idx) => {
                                                                         const isBoss = isSeatBoss(item, seatName);
                                                                         return (
                                                                             <div key={idx}>
@@ -1075,7 +1076,7 @@
                              <div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div>
                              <span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span>
                         </div>
-                        <div>v24.0 Crew Ops</div>
+                        <div>v24.1 Ops Fix</div>
                     </div>
                 </div>
             );
