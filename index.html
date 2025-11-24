@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT FOF - Tactical v13</title>
+    <title>MDT FOF - Tactical v14</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -93,7 +93,6 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* Hide arrows in number input */
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
@@ -176,20 +175,18 @@
             'alat': { label: 'ALAT', color: 'bg-sky-500', text: 'text-sky-400', border: 'border-sky-500/30' },
         };
 
-        function MilitaryMdtV13() {
+        function MilitaryMdtV14() {
             const [activeTab, setActiveTab] = useState('fleet');
             const [fleet, setFleet] = useState([]);
             const [logs, setLogs] = useState([]);
-            // Service state doesn't need 'effectif' anymore, calculated from roster
             const [service, setService] = useState({ active: false, officer: '', grade: '', start: null, end: null, supply: 6000, medic: true });
-            const [roster, setRoster] = useState([]); // New Roster State
+            const [roster, setRoster] = useState([]); 
             const [user, setUser] = useState(null);
             const [showDashboard, setShowDashboard] = useState(true);
             const [destroyModal, setDestroyModal] = useState({ isOpen: false, vehicleId: null });
             const [destroyReason, setDestroyReason] = useState('');
             const [serviceModal, setServiceModal] = useState({ isOpen: false, officer: '', grade: '' });
             
-            // Roster Add State
             const [newPerson, setNewPerson] = useState({ name: '', grade: '2CL' });
 
             // --- FIREBASE ---
@@ -236,7 +233,14 @@
                 const prefix = vehicleModel.type.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '');
                 const num = fleet.length + 1; 
                 const matricule = `${prefix}-${num.toString().padStart(3, '0')}`;
-                const newVehicle = { uniqueId: newId, ...vehicleModel, callsign: matricule, status: 'Opérationnel', statusSince: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) };
+                const newVehicle = { 
+                    uniqueId: newId, 
+                    ...vehicleModel, 
+                    callsign: matricule, 
+                    status: 'Opérationnel', 
+                    statusSince: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}),
+                    crew: '' // New crew field
+                };
                 updateCloud({ fleet: [...fleet, newVehicle] });
                 addLogLocal('deploy', `DÉPLOIEMENT: ${newVehicle.type}`, `Matricule: ${matricule}`);
             };
@@ -251,8 +255,14 @@
                     return;
                 }
                 updateCloud({ fleet: fleet.map(item => item.uniqueId === uniqueId ? { ...item, status: newStatus } : item) });
-                if (newStatus === 'En Mission') addLogLocal('mission', `DÉPART MISSION: ${v.callsign}`);
+                if (newStatus === 'En Mission') addLogLocal('mission', `DÉPART MISSION: ${v.callsign}`, `Resp: ${v.crew || 'N/A'}`);
+                if (newStatus === 'Opérationnel' && v.status === 'En Mission') addLogLocal('info', `RETOUR MISSION: ${v.callsign}`, `Resp: ${v.crew || 'N/A'}`);
                 if (newStatus === 'Maintenance') addLogLocal('info', `MAINTENANCE: ${v.callsign}`);
+            };
+
+            const updateVehicleCrew = (uniqueId, crewName) => {
+                const newFleet = fleet.map(item => item.uniqueId === uniqueId ? { ...item, crew: crewName } : item);
+                updateCloud({ fleet: newFleet });
             };
 
             const confirmDestruction = () => {
@@ -264,19 +274,19 @@
                 setDestroyReason('');
             };
 
-            // Personnel Logic
+            // Personnel
             const addPersonnel = () => {
                 if (!newPerson.name) return;
                 const newRoster = [...roster, { id: Date.now(), ...newPerson }];
                 updateCloud({ roster: newRoster });
                 setNewPerson({ name: '', grade: '2CL' });
             };
-
             const removePersonnel = (id) => {
                 const newRoster = roster.filter(p => p.id !== id);
                 updateCloud({ roster: newRoster });
             };
 
+            // Service
             const handleServiceStart = () => {
                 if (!serviceModal.officer) return;
                 const startTime = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
@@ -284,14 +294,13 @@
                 addLogLocal('info', `PRISE DE SERVICE`, `${serviceModal.grade} ${serviceModal.officer}`);
                 setServiceModal({ isOpen: false, officer: '', grade: '' });
             };
-
             const handleServiceEnd = () => {
                 const endTime = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
                 updateCloud({ service: { ...service, active: false, officer: '', grade: '', start: null, end: endTime } });
                 addLogLocal('info', `FIN DE SERVICE`, `${service.grade} ${service.officer}`);
             };
-
             const updateGlobalState = (key, value) => updateCloud({ service: { ...service, [key]: value } });
+
             const getFleetByGroup = (groupKey) => fleet.filter(v => v.group === groupKey);
             const getGarageByGroup = (groupKey) => garageCatalog.filter(v => v.group === groupKey);
             const stats = useMemo(() => ({
@@ -307,19 +316,28 @@
             return (
                 <div className="flex flex-col h-screen w-full font-sans overflow-hidden relative text-slate-200">
                     
-                    {/* --- EN-TÊTE --- */}
+                    {/* HEADER */}
                     <header className="glass-panel z-30 flex flex-col shrink-0 border-b border-white/5 relative">
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-900/10 to-transparent pointer-events-none"></div>
                         
-                        {/* TOP BAR */}
                         <div className="flex items-center justify-between px-4 py-3 relative z-10">
                             <div className="flex items-center gap-3">
-                                <div className="relative">
-                                    <div className="absolute inset-0 bg-blue-500 blur opacity-20"></div>
-                                    <div className="w-10 h-10 bg-gradient-to-br from-slate-800 to-slate-900 rounded border border-slate-700 flex items-center justify-center relative">
-                                       <Shield size={20} className="text-blue-400" />
-                                    </div>
+                                {/* LOGO PERSONNALISÉ */}
+                                <img 
+                                    src="Logo.png" 
+                                    alt="Logo FOF" 
+                                    className="h-10 w-auto object-contain drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                                    onError={(e) => {
+                                        // Fallback si l'image n'est pas trouvée : on affiche l'ancien bouclier
+                                        e.target.style.display = 'none';
+                                        e.target.nextSibling.style.display = 'flex';
+                                    }}
+                                />
+                                {/* Fallback caché par défaut */}
+                                <div className="hidden w-10 h-10 bg-gradient-to-br from-slate-800 to-slate-900 rounded border border-slate-700 items-center justify-center relative">
+                                   <Shield size={20} className="text-blue-400" />
                                 </div>
+
                                 <div>
                                     <h1 className="text-2xl font-bold text-white font-tech uppercase leading-none tracking-wide">Logistique <span className="text-blue-500">FOF</span></h1>
                                     <div className="text-[10px] font-mono text-slate-400 flex items-center gap-2 mt-0.5">
@@ -346,10 +364,9 @@
                             </div>
                         </div>
 
-                        {/* DASHBOARD EXPANDABLE */}
+                        {/* DASHBOARD */}
                         {showDashboard && (
                             <div className="bg-slate-900/50 border-y border-white/5 grid grid-cols-1 md:grid-cols-4 gap-4 p-4 animate-in backdrop-blur-md relative z-10">
-                                {/* COLONNE 1: INFO OFFICIER */}
                                 <div className="md:col-span-1 space-y-2 flex flex-col justify-center">
                                     <div className="bg-slate-950/80 border border-blue-900/30 rounded p-4 h-full flex flex-col justify-center relative overflow-hidden group">
                                         <div className="absolute right-0 top-0 p-2 opacity-10 text-blue-500"><UserCheck size={64} /></div>
@@ -367,29 +384,19 @@
                                     </div>
                                 </div>
 
-                                {/* COLONNE 2: RESSOURCES (MODIFIÉ) */}
                                 <div className="md:col-span-2 flex flex-col justify-center">
                                     <div className="grid grid-cols-2 gap-2 h-full">
-                                        {/* EFFECTIF (AUTOMATIQUE) */}
                                         <div className="bg-slate-950/50 border border-slate-800 rounded p-3 flex flex-col items-center justify-center hover:bg-slate-900/50 transition-colors">
                                             <span className="text-[10px] uppercase text-slate-400 font-bold mb-1 flex items-center gap-1"><Users size={10}/> Effectif Actif</span>
                                             <span className="text-4xl font-mono font-bold text-white tracking-tighter">{roster.length}</span>
                                         </div>
-                                        
-                                        {/* SUPPLY (INPUT) */}
                                         <div className="bg-slate-950/50 border border-slate-800 rounded p-3 flex flex-col items-center justify-center hover:bg-slate-900/50 transition-colors">
                                             <span className="text-[10px] uppercase text-slate-400 font-bold mb-2 flex items-center gap-1"><Box size={10}/> Supply Base</span>
-                                            <input 
-                                                type="number" 
-                                                value={service.supply} 
-                                                onChange={(e) => updateGlobalState('supply', parseInt(e.target.value) || 0)}
-                                                className="bg-transparent border-b border-amber-500/50 text-3xl font-mono font-bold text-amber-400 text-center w-full outline-none focus:border-amber-400 transition-all p-0"
-                                            />
+                                            <input type="number" value={service.supply} onChange={(e) => updateGlobalState('supply', parseInt(e.target.value) || 0)} className="bg-transparent border-b border-amber-500/50 text-3xl font-mono font-bold text-amber-400 text-center w-full outline-none focus:border-amber-400 transition-all p-0" />
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* COLONNE 3: MEDIC */}
                                 <div className="md:col-span-1 flex flex-col gap-2 justify-center">
                                     <div onClick={() => updateGlobalState('medic', !service.medic)} className={`h-full cursor-pointer p-3 rounded border flex flex-col items-center justify-center transition-all ${service.medic ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-slate-950/50 border-slate-800'}`}>
                                         <div className={`w-4 h-4 rounded-full mb-2 transition-all ${service.medic ? 'bg-emerald-400 shadow-glow' : 'bg-slate-600'}`}></div>
@@ -397,39 +404,21 @@
                                     </div>
                                 </div>
 
-                                {/* BARRE DE STATS */}
                                 <div className="md:col-span-4 border-t border-white/5 pt-2 mt-1">
                                     <div className="grid grid-cols-4 divide-x divide-slate-800 text-center">
-                                        <div>
-                                            <span className="block text-[9px] font-bold uppercase text-blue-500 mb-0.5">En Mission</span>
-                                            <span className="block text-xl font-mono font-bold text-white leading-none">{stats.mission}</span>
-                                        </div>
-                                        <div>
-                                            <span className="block text-[9px] font-bold uppercase text-emerald-500 mb-0.5">Au Parc</span>
-                                            <span className="block text-xl font-mono font-bold text-white leading-none">{stats.operational}</span>
-                                        </div>
-                                        <div className="bg-amber-900/10">
-                                            <span className="block text-[9px] font-bold uppercase text-amber-500 mb-0.5">Maintenance</span>
-                                            <span className="block text-xl font-mono font-bold text-white leading-none">{stats.maintenance}</span>
-                                        </div>
-                                        <div className="bg-red-900/20">
-                                            <span className="block text-[9px] font-bold uppercase text-red-500 mb-0.5">Pertes</span>
-                                            <span className="block text-xl font-mono font-bold text-white leading-none">{stats.destroyed}</span>
-                                        </div>
+                                        <div><span className="block text-[9px] font-bold uppercase text-blue-500 mb-0.5">En Mission</span><span className="block text-xl font-mono font-bold text-white leading-none">{stats.mission}</span></div>
+                                        <div><span className="block text-[9px] font-bold uppercase text-emerald-500 mb-0.5">Au Parc</span><span className="block text-xl font-mono font-bold text-white leading-none">{stats.operational}</span></div>
+                                        <div className="bg-amber-900/10"><span className="block text-[9px] font-bold uppercase text-amber-500 mb-0.5">Maintenance</span><span className="block text-xl font-mono font-bold text-white leading-none">{stats.maintenance}</span></div>
+                                        <div className="bg-red-900/20"><span className="block text-[9px] font-bold uppercase text-red-500 mb-0.5">Pertes</span><span className="block text-xl font-mono font-bold text-white leading-none">{stats.destroyed}</span></div>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* NAVIGATION */}
                         <div className="p-2 bg-slate-900/80 backdrop-blur flex justify-center relative z-20">
                             <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800 w-full max-w-lg overflow-x-auto">
                                 {['fleet', 'garage', 'logs', 'roster'].map(tab => (
-                                    <button 
-                                        key={tab}
-                                        onClick={() => setActiveTab(tab)}
-                                        className={`flex-1 py-2 px-2 rounded text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all font-tech whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white shadow-glow' : 'text-slate-500 hover:text-slate-300'}`}
-                                    >
+                                    <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 py-2 px-2 rounded text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all font-tech whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white shadow-glow' : 'text-slate-500 hover:text-slate-300'}`}>
                                         {tab === 'fleet' ? 'Unités' : tab === 'garage' ? 'Catalogue' : tab === 'roster' ? 'Effectif' : 'Journal'}
                                     </button>
                                 ))}
@@ -470,10 +459,10 @@
                                                 
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                                     {items.map(item => (
-                                                        <div key={item.uniqueId} className="bg-slate-900/40 border border-white/5 rounded-lg overflow-hidden hover:border-white/10 transition-all relative group backdrop-blur-sm">
+                                                        <div key={item.uniqueId} className="bg-slate-900/40 border border-white/5 rounded-lg overflow-hidden hover:border-white/10 transition-all relative group backdrop-blur-sm flex flex-col">
                                                             <div className={`absolute top-0 left-0 w-1 h-full ${item.status === 'En Mission' ? 'bg-blue-500 shadow-glow' : item.status === 'Maintenance' ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
                                                             
-                                                            <div className="p-4 pl-6">
+                                                            <div className="p-4 pl-6 flex flex-col h-full">
                                                                 <div className="flex justify-between items-start mb-4">
                                                                     <div>
                                                                         <div className="font-mono text-xs font-bold text-slate-400 mb-1">ID: {item.callsign}</div>
@@ -488,16 +477,35 @@
                                                                     </div>
                                                                 </div>
 
-                                                                <div className="grid grid-cols-2 gap-2">
+                                                                {/* CREW SELECTOR */}
+                                                                <div className="mb-4">
+                                                                    <label className="text-[9px] uppercase font-bold text-slate-500 mb-1 block tracking-wide">Responsable / Équipage</label>
+                                                                    <select 
+                                                                        className="w-full bg-slate-950 border border-slate-700 text-xs text-white rounded p-1.5 focus:border-blue-500 outline-none font-mono"
+                                                                        value={item.crew || ''}
+                                                                        onChange={(e) => updateVehicleCrew(item.uniqueId, e.target.value)}
+                                                                    >
+                                                                        <option value="">-- Non assigné --</option>
+                                                                        {roster.map(p => (
+                                                                            <option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+
+                                                                <div className="mt-auto space-y-2">
                                                                     {item.status === 'En Mission' ? (
-                                                                        <button onClick={() => updateStatus(item.uniqueId, 'Opérationnel')} className="h-9 rounded bg-slate-800 border border-slate-700 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/50 text-xs font-bold uppercase transition-all">Retour Base</button>
+                                                                        <button onClick={() => updateStatus(item.uniqueId, 'Opérationnel')} className="w-full h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded uppercase shadow-glow border border-emerald-400 transition-all">RETOUR MISSION</button>
                                                                     ) : (
-                                                                        <button onClick={() => updateStatus(item.uniqueId, 'En Mission')} className="h-9 rounded bg-blue-600 text-white shadow-glow hover:bg-blue-500 text-xs font-bold uppercase transition-all">Départ Mission</button>
+                                                                        <button onClick={() => updateStatus(item.uniqueId, 'En Mission')} className="w-full h-10 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded uppercase shadow-glow border border-blue-400 transition-all">PARTIR EN MISSION</button>
                                                                     )}
+
+                                                                    <button onClick={() => updateStatus(item.uniqueId, item.status === 'Maintenance' ? 'Opérationnel' : 'Maintenance')} className={`w-full py-2 font-bold text-[10px] rounded uppercase border transition-all ${item.status === 'Maintenance' ? 'bg-amber-600 text-white border-amber-400' : 'bg-slate-800 text-amber-500 border-slate-600 hover:bg-slate-700'}`}>
+                                                                        {item.status === 'Maintenance' ? 'FIN MAINTENANCE' : 'MAINTENANCE'}
+                                                                    </button>
                                                                     
-                                                                    <div className="flex gap-1">
-                                                                        <button onClick={() => updateStatus(item.uniqueId, 'Garage')} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded border border-slate-700 flex items-center justify-center transition-all" title="Garage"><RotateCcw size={14}/></button>
-                                                                        <button onClick={() => updateStatus(item.uniqueId, 'Détruit')} className="flex-1 bg-slate-800 hover:bg-red-900/40 text-slate-400 hover:text-red-400 rounded border border-slate-700 flex items-center justify-center transition-all" title="Détruire"><Flame size={14}/></button>
+                                                                    <div className="grid grid-cols-2 gap-2">
+                                                                        <button onClick={() => updateStatus(item.uniqueId, 'Garage')} className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 py-2 rounded text-[10px] font-bold uppercase transition-all" title="Rentrer au Garage">GARAGE</button>
+                                                                        <button onClick={() => updateStatus(item.uniqueId, 'Détruit')} className="bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 py-2 rounded text-[10px] font-bold uppercase transition-all" title="Signaler Destruction">DÉTRUIRE</button>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -565,73 +573,39 @@
                             </div>
                         )}
 
-                        {/* VUE ROSTER (EFFECTIF) */}
+                        {/* VUE ROSTER */}
                         {activeTab === 'roster' && (
                             <div className="max-w-4xl mx-auto animate-in space-y-6">
-                                {/* AJOUT PERSONNEL */}
                                 <div className="bg-slate-900/60 border border-blue-500/30 rounded p-4 flex flex-col md:flex-row gap-4 items-end">
                                     <div className="w-full md:flex-1">
                                         <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Nom / Matricule</label>
-                                        <input 
-                                            type="text" 
-                                            className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none uppercase font-mono"
-                                            value={newPerson.name}
-                                            onChange={e => setNewPerson({...newPerson, name: e.target.value})}
-                                            placeholder="Nom"
-                                        />
+                                        <input type="text" className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none uppercase font-mono" value={newPerson.name} onChange={e => setNewPerson({...newPerson, name: e.target.value})} placeholder="Nom" />
                                     </div>
                                     <div className="w-full md:w-32">
                                         <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Grade</label>
-                                        <select 
-                                            className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none"
-                                            value={newPerson.grade}
-                                            onChange={e => setNewPerson({...newPerson, grade: e.target.value})}
-                                        >
-                                            <option value="2CL">2CL</option>
-                                            <option value="1CL">1CL</option>
-                                            <option value="CPL">CPL</option>
-                                            <option value="CCH">CCH</option>
-                                            <option value="SGT">SGT</option>
-                                            <option value="SCH">SCH</option>
-                                            <option value="ADJ">ADJ</option>
-                                            <option value="ADC">ADC</option>
-                                            <option value="ASP">ASP</option>
-                                            <option value="SLT">SLT</option>
-                                            <option value="LTN">LTN</option>
-                                            <option value="CNE">CNE</option>
+                                        <select className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none" value={newPerson.grade} onChange={e => setNewPerson({...newPerson, grade: e.target.value})}>
+                                            <option value="2CL">2CL</option><option value="1CL">1CL</option><option value="CPL">CPL</option><option value="CCH">CCH</option><option value="SGT">SGT</option><option value="SCH">SCH</option><option value="ADJ">ADJ</option><option value="ADC">ADC</option><option value="ASP">ASP</option><option value="SLT">SLT</option><option value="LTN">LTN</option><option value="CNE">CNE</option>
                                         </select>
                                     </div>
-                                    <button onClick={addPersonnel} className="w-full md:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold uppercase text-xs shadow-glow transition-all">
-                                        Ajouter
-                                    </button>
+                                    <button onClick={addPersonnel} className="w-full md:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold uppercase text-xs shadow-glow transition-all">Ajouter</button>
                                 </div>
-
-                                {/* LISTE PERSONNEL */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                     {roster.map(person => (
                                         <div key={person.id} className="bg-slate-900/40 border border-slate-800 rounded p-3 flex items-center justify-between group hover:border-slate-600 transition-all">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-slate-400 font-bold text-xs border border-slate-700">
-                                                    {person.grade}
-                                                </div>
+                                                <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-slate-400 font-bold text-xs border border-slate-700">{person.grade}</div>
                                                 <div className="font-mono text-white font-bold">{person.name}</div>
                                             </div>
-                                            <button onClick={() => removePersonnel(person.id)} className="text-slate-600 hover:text-red-500 p-2 transition-colors">
-                                                <Trash2 size={16} />
-                                            </button>
+                                            <button onClick={() => removePersonnel(person.id)} className="text-slate-600 hover:text-red-500 p-2 transition-colors"><Trash2 size={16} /></button>
                                         </div>
                                     ))}
-                                    {roster.length === 0 && (
-                                        <div className="col-span-full text-center py-8 text-slate-600 border-2 border-dashed border-slate-800 rounded">
-                                            Aucun personnel enregistré.
-                                        </div>
-                                    )}
+                                    {roster.length === 0 && <div className="col-span-full text-center py-8 text-slate-600 border-2 border-dashed border-slate-800 rounded">Aucun personnel enregistré.</div>}
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    {/* MODALES (SERVICE + DESTRUCTION) - Idem v10 mais styled */}
+                    {/* MODALES */}
                     {serviceModal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur p-4 animate-in">
                             <div className="bg-slate-900 border border-blue-500/30 rounded-xl w-full max-w-sm shadow-2xl shadow-blue-900/20 overflow-hidden">
@@ -640,26 +614,9 @@
                                     <h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Identification</h3>
                                 </div>
                                 <div className="p-6 space-y-4">
-                                    <div>
-                                        <label className="block text-[10px] uppercase font-bold text-blue-400 mb-1 tracking-widest">Matricule</label>
-                                        <input type="text" className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none font-mono uppercase" placeholder="EX: USER-01" value={serviceModal.officer} onChange={e => setServiceModal({...serviceModal, officer: e.target.value})} autoFocus />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] uppercase font-bold text-blue-400 mb-1 tracking-widest">Grade</label>
-                                        <select className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none font-mono" value={serviceModal.grade} onChange={e => setServiceModal({...serviceModal, grade: e.target.value})}>
-                                            <option value="">Sélectionner...</option>
-                                            <option value="2CL">2ème Classe</option>
-                                            <option value="1CL">1ère Classe</option>
-                                            <option value="CPL">Caporal</option>
-                                            <option value="SGT">Sergent</option>
-                                            <option value="LTN">Lieutenant</option>
-                                            <option value="CNE">Capitaine</option>
-                                        </select>
-                                    </div>
-                                    <div className="flex gap-3 pt-2">
-                                        <button onClick={() => setServiceModal({isOpen: false, officer:'', grade:''})} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded text-xs font-bold hover:bg-slate-700">ANNULER</button>
-                                        <button onClick={handleServiceStart} disabled={!serviceModal.officer || !serviceModal.grade} className="flex-1 py-3 bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 rounded text-xs font-bold uppercase shadow-glow">VALIDER</button>
-                                    </div>
+                                    <div><label className="block text-[10px] uppercase font-bold text-blue-400 mb-1 tracking-widest">Matricule</label><input type="text" className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none font-mono uppercase" placeholder="EX: USER-01" value={serviceModal.officer} onChange={e => setServiceModal({...serviceModal, officer: e.target.value})} autoFocus /></div>
+                                    <div><label className="block text-[10px] uppercase font-bold text-blue-400 mb-1 tracking-widest">Grade</label><select className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none font-mono" value={serviceModal.grade} onChange={e => setServiceModal({...serviceModal, grade: e.target.value})}><option value="">Sélectionner...</option><option value="2CL">2ème Classe</option><option value="1CL">1ère Classe</option><option value="CPL">Caporal</option><option value="CCH">Caporal-Chef</option><option value="SGT">Sergent</option><option value="LTN">Lieutenant</option><option value="CNE">Capitaine</option></select></div>
+                                    <div className="flex gap-3 pt-2"><button onClick={() => setServiceModal({isOpen: false, officer:'', grade:''})} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded text-xs font-bold hover:bg-slate-700">ANNULER</button><button onClick={handleServiceStart} disabled={!serviceModal.officer || !serviceModal.grade} className="flex-1 py-3 bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 rounded text-xs font-bold uppercase shadow-glow">VALIDER</button></div>
                                 </div>
                             </div>
                         </div>
@@ -668,20 +625,11 @@
                     {destroyModal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur p-4 animate-in">
                             <div className="bg-slate-900 border border-red-500/30 rounded-xl w-full max-w-sm shadow-2xl shadow-red-900/20 overflow-hidden">
-                                <div className="bg-red-600/10 p-4 border-b border-red-500/20 flex items-center gap-3">
-                                    <div className="p-2 bg-red-600 rounded text-white shadow-glow-red"><AlertTriangle size={20} /></div>
-                                    <h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Perte Véhicule</h3>
-                                </div>
+                                <div className="bg-red-600/10 p-4 border-b border-red-500/20 flex items-center gap-3"><div className="p-2 bg-red-600 rounded text-white shadow-glow-red"><AlertTriangle size={20} /></div><h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Perte Véhicule</h3></div>
                                 <div className="p-6 space-y-4">
-                                    <div className="bg-red-950/30 p-3 rounded border border-red-500/20 flex justify-between items-center">
-                                        <span className="text-red-400 font-mono text-sm">{fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.callsign}</span>
-                                        <span className="text-slate-400 text-xs">{fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.type}</span>
-                                    </div>
+                                    <div className="bg-red-950/30 p-3 rounded border border-red-500/20 flex justify-between items-center"><span className="text-red-400 font-mono text-sm">{fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.callsign}</span><span className="text-slate-400 text-xs">{fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.type}</span></div>
                                     <textarea value={destroyReason} onChange={(e) => setDestroyReason(e.target.value)} className="w-full bg-slate-950 border border-slate-700 p-3 text-sm text-white focus:border-red-500 focus:outline-none rounded h-24 resize-none" placeholder="Rapport de destruction requis..." />
-                                    <div className="flex gap-3 pt-2">
-                                        <button onClick={() => setDestroyModal({isOpen: false, vehicleId: null})} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded text-xs font-bold hover:bg-slate-700">ANNULER</button>
-                                        <button onClick={confirmDestruction} disabled={!destroyReason.trim()} className="flex-1 py-3 bg-red-600 text-white hover:bg-red-500 disabled:opacity-50 rounded text-xs font-bold uppercase shadow-glow-red">CONFIRMER</button>
-                                    </div>
+                                    <div className="flex gap-3 pt-2"><button onClick={() => setDestroyModal({isOpen: false, vehicleId: null})} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded text-xs font-bold hover:bg-slate-700">ANNULER</button><button onClick={confirmDestruction} disabled={!destroyReason.trim()} className="flex-1 py-3 bg-red-600 text-white hover:bg-red-500 disabled:opacity-50 rounded text-xs font-bold uppercase shadow-glow-red">CONFIRMER</button></div>
                                 </div>
                             </div>
                         </div>
@@ -689,18 +637,15 @@
 
                     {/* FOOTER STATUS */}
                     <div className="absolute bottom-0 left-0 w-full bg-slate-950/80 backdrop-blur border-t border-white/5 p-2 flex justify-between items-center gap-2 z-30 text-[10px] font-mono text-slate-500">
-                        <div className="flex items-center gap-2">
-                             <div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div>
-                             <span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span>
-                        </div>
-                        <div>v10.0 build.2411</div>
+                        <div className="flex items-center gap-2"><div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div><span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span></div>
+                        <div>v14.0 Tactical</div>
                     </div>
                 </div>
             );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MilitaryMdtV13 />);
+        root.render(<MilitaryMdtV14 />);
     </script>
 </body>
 </html>
