@@ -3,17 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT Logistique FOF - Mobile v6</title>
+    <title>MDT Logistique FOF - v8 Live Data</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FIREBASE SDKs (Modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+        import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+
+        // CONFIGURATION (Utilise l'env ou la tienne par défaut)
+        // Note: Pour que ça marche chez toi, assure-toi que les règles Firestore autorisent l'écriture !
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
+            authDomain: "logiops-data.firebaseapp.com",
+            projectId: "logiops-data",
+            storageBucket: "logiops-data.firebasestorage.app",
+            messagingSenderId: "791163499354",
+            appId: "1:791163499354:web:2bb76506331db9d240b963",
+            measurementId: "G-FFMXKH47M9"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        // EXPOSE TO WINDOW FOR REACT
+        window.fb = { db, auth, doc, onSnapshot, setDoc, updateDoc, arrayUnion, getDoc, signInAnonymously, onAuthStateChanged };
+        
+        // ID de l'App pour le chemin de sauvegarde (change le si tu veux plusieurs MDT séparés)
+        window.APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'fof-logi-v1';
+    </script>
     
     <!-- REACT & BABEL -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- CONFIGURATION TAILWIND -->
     <script>
         tailwind.config = {
             theme: {
@@ -32,9 +60,7 @@
                             '100%': { opacity: '1', transform: 'translateY(0)' },
                         }
                     },
-                    screens: {
-                        'xs': '475px', // Breakpoint extra small pour mobile
-                    }
+                    screens: { 'xs': '475px' }
                 }
             }
         }
@@ -42,21 +68,16 @@
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&family=Oswald:wght@500;700&display=swap');
-        
-        /* Optimisation Mobile */
-        html, body { overscroll-behavior-y: none; } /* Empêche le refresh pull-to-refresh accidentel */
+        html, body { overscroll-behavior-y: none; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: #0f0f0f; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
-        body { background-color: #0a0a0a; color: #e2e8f0; -webkit-tap-highlight-color: transparent; }
-        
+        body { background-color: #0f172a; color: #e2e8f0; -webkit-tap-highlight-color: transparent; }
         .bg-grid {
             background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
             background-size: 40px 40px;
         }
-        
-        /* Utility pour cacher la scrollbar mais garder le scroll */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -68,9 +89,7 @@
         const { useState, useMemo, useEffect } = React;
 
         // --- ICONES ---
-        const Icon = ({ children, size = 18, className = "" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
-        );
+        const Icon = ({ children, size = 18, className = "" }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>);
         const Shield = (p) => <Icon {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></Icon>;
         const Save = (p) => <Icon {...p}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></Icon>;
         const RotateCcw = (p) => <Icon {...p}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 3v9h9"/></Icon>;
@@ -84,11 +103,14 @@
         const HeartPulse = (p) => <Icon {...p}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08c.82.82 2.13.85 3 .07l2.07-1.9a2.82 2.82 0 0 1 3.18 0l2.94 2.69c.31.29.24.79-.15.84a12 12 0 0 1-5.18.3 9.4 9.4 0 0 1-5.9-5.9 22.8 22.8 0 0 0-.25-2.14"/></Icon>;
         const Wrench = (p) => <Icon {...p}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></Icon>;
         const MapPin = (p) => <Icon {...p}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></Icon>;
-        const Menu = (p) => <Icon {...p}><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/></Icon>;
+        const Info = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></Icon>;
+        const Clock = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>;
+        const UserCheck = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></Icon>;
+        const LogOut = (p) => <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></Icon>;
 
-        // --- CATALOGUE GARAGE (Données) ---
+        // --- CATALOGUE ---
         const garageCatalog = [
-            // EM (Bleu)
+            // EM
             { id: 'cat_em1', type: 'Jeep EM', group: 'em', grade: '', cost: 110 },
             { id: 'cat_em2', type: 'QG Mobile', group: 'em', grade: '', cost: 420 },
             // Logistique
@@ -140,33 +162,87 @@
             'alat': { label: 'ALAT', color: 'bg-blue-500', text: 'text-blue-400', border: 'border-blue-500' },
         };
 
-        function MilitaryMdtV6() {
-            const [activeTab, setActiveTab] = useState('garage');
-            const [supplyStock, setSupplyStock] = useState(6000);
+        function MilitaryMdtV8() {
+            // --- ETATS ---
+            const [activeTab, setActiveTab] = useState('fleet');
             const [fleet, setFleet] = useState([]);
             const [logs, setLogs] = useState([]);
-            const [idCounter, setIdCounter] = useState(1);
-            const [medicActive, setMedicActive] = useState(true);
-
-            // Modal Destruction
+            const [service, setService] = useState({ active: false, officer: '', grade: '', start: null, end: null, effectif: 4, supply: 6000, medic: true });
+            
+            // Modals
+            const [showRules, setShowRules] = useState(false);
             const [destroyModal, setDestroyModal] = useState({ isOpen: false, vehicleId: null });
             const [destroyReason, setDestroyReason] = useState('');
+            const [serviceModal, setServiceModal] = useState({ isOpen: false, officer: '', grade: '' });
 
-            // --- ACTIONS ---
-            const addLog = (type, message, details = '') => {
+            // Firebase User
+            const [user, setUser] = useState(null);
+
+            // --- FIREBASE INIT & SYNC ---
+            useEffect(() => {
+                // 1. Auth
+                const initAuth = async () => {
+                    await window.fb.signInAnonymously(window.fb.auth);
+                };
+                initAuth();
+                window.fb.onAuthStateChanged(window.fb.auth, setUser);
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+
+                // 2. Realtime Sync - Global Data Document
+                const docRef = window.fb.doc(window.fb.db, 'artifacts', window.APP_ID, 'public', 'data', 'fof_storage', 'global_state');
+                
+                const unsubscribe = window.fb.onSnapshot(docRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        if (data.fleet) setFleet(data.fleet);
+                        if (data.logs) setLogs(data.logs);
+                        if (data.service) setService(data.service);
+                    } else {
+                        // Init doc if not exists
+                        window.fb.setDoc(docRef, { fleet: [], logs: [], service: { active: false, effectif: 4, supply: 6000, medic: true } });
+                    }
+                }, (error) => {
+                    console.error("Sync Error:", error);
+                });
+
+                return () => unsubscribe();
+            }, [user]);
+
+            // --- UPDATE HELPER ---
+            const updateCloud = async (newData) => {
+                if (!user) return;
+                const docRef = window.fb.doc(window.fb.db, 'artifacts', window.APP_ID, 'public', 'data', 'fof_storage', 'global_state');
+                try {
+                    await window.fb.updateDoc(docRef, newData);
+                } catch (e) {
+                    console.error("Save error", e);
+                }
+            };
+
+            // --- ACTIONS METIER ---
+
+            const addLogLocal = (type, message, details = '') => {
                 const newLog = {
                     id: Date.now(),
                     time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
                     type, message, details
                 };
-                setLogs(prev => [newLog, ...prev]);
+                const newLogs = [newLog, ...logs].slice(0, 50); // Keep last 50
+                updateCloud({ logs: newLogs });
             };
 
+            // Gestion Véhicules
             const deployVehicle = (vehicleModel) => {
-                const newId = idCounter;
-                setIdCounter(prev => prev + 1);
+                const newId = Date.now(); // Simple ID gen
                 const prefix = vehicleModel.type.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '');
-                const matricule = `${prefix}-${newId.toString().padStart(3, '0')}`;
+                // Count existing of same type to generate number? Let's stick to simple ID or random for concurrent safety
+                // Or better: Count fleet size + 1 for visual ID
+                const num = fleet.length + 1; 
+                const matricule = `${prefix}-${num.toString().padStart(3, '0')}`;
+
                 const newVehicle = {
                     uniqueId: newId,
                     ...vehicleModel,
@@ -174,8 +250,10 @@
                     status: 'Opérationnel',
                     statusSince: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})
                 };
-                setFleet(prev => [...prev, newVehicle]);
-                addLog('deploy', `SORTIE GARAGE: ${newVehicle.type}`, `Matricule: ${matricule}`);
+                
+                const newFleet = [...fleet, newVehicle];
+                updateCloud({ fleet: newFleet });
+                addLogLocal('deploy', `SORTIE GARAGE: ${newVehicle.type}`, `Matricule: ${matricule}`);
             };
 
             const updateStatus = (uniqueId, newStatus) => {
@@ -187,229 +265,340 @@
                     return;
                 }
                 if (newStatus === 'Garage') {
-                    setFleet(prev => prev.filter(item => item.uniqueId !== uniqueId));
-                    addLog('info', `RETOUR GARAGE: ${v.callsign}`, `Retour parc.`);
+                    const newFleet = fleet.filter(item => item.uniqueId !== uniqueId);
+                    updateCloud({ fleet: newFleet });
+                    addLogLocal('info', `RETOUR GARAGE: ${v.callsign}`, `Retour parc.`);
                     return;
                 }
-                setFleet(prev => prev.map(item => item.uniqueId === uniqueId ? { ...item, status: newStatus } : item));
-                if (newStatus === 'En Mission') addLog('mission', `DEPART MISSION: ${v.callsign}`, `Départ base.`);
-                if (newStatus === 'Maintenance') addLog('info', `MAINTENANCE: ${v.callsign}`, `Entrée atelier.`);
+
+                const newFleet = fleet.map(item => 
+                    item.uniqueId === uniqueId ? { ...item, status: newStatus } : item
+                );
+                updateCloud({ fleet: newFleet });
+
+                if (newStatus === 'En Mission') addLogLocal('mission', `DEPART MISSION: ${v.callsign}`, `Départ base.`);
+                if (newStatus === 'Maintenance') addLogLocal('info', `MAINTENANCE: ${v.callsign}`, `Entrée atelier.`);
             };
 
             const confirmDestruction = () => {
                 const v = fleet.find(item => item.uniqueId === destroyModal.vehicleId);
                 if (!v) return;
-                setFleet(prev => prev.filter(item => item.uniqueId !== destroyModal.vehicleId));
-                addLog('destroy', `PERTE TOTALE: ${v.callsign}`, `Cause: ${destroyReason}`);
+                const newFleet = fleet.filter(item => item.uniqueId !== destroyModal.vehicleId);
+                updateCloud({ fleet: newFleet });
+                addLogLocal('destroy', `PERTE TOTALE: ${v.callsign}`, `Cause: ${destroyReason}`);
                 setDestroyModal({ isOpen: false, vehicleId: null });
                 setDestroyReason('');
             };
 
+            // Gestion Service
+            const handleServiceStart = () => {
+                if (!serviceModal.officer || !serviceModal.grade) return;
+                
+                const startTime = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
+                const newService = {
+                    ...service,
+                    active: true,
+                    officer: serviceModal.officer,
+                    grade: serviceModal.grade,
+                    start: startTime,
+                    end: null
+                };
+                updateCloud({ service: newService });
+                addLogLocal('info', `PRISE DE SERVICE`, `${serviceModal.grade} ${serviceModal.officer}`);
+                setServiceModal({ isOpen: false, officer: '', grade: '' });
+            };
+
+            const handleServiceEnd = () => {
+                const endTime = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
+                // On reset pour le prochain
+                const newService = {
+                    ...service,
+                    active: false,
+                    officer: '',
+                    grade: '',
+                    start: null,
+                    end: endTime // Juste pour info visuelle temporaire si on voulait
+                };
+                updateCloud({ service: newService });
+                addLogLocal('info', `FIN DE SERVICE`, `${service.grade} ${service.officer} (Fin: ${endTime})`);
+            };
+
+            // Gestion Stocks / Medic
+            const updateGlobalState = (key, value) => {
+                const newService = { ...service, [key]: value };
+                updateCloud({ service: newService });
+            };
+
+            // Helpers Affichage
             const getFleetByGroup = (groupKey) => fleet.filter(v => v.group === groupKey);
             const getGarageByGroup = (groupKey) => garageCatalog.filter(v => v.group === groupKey);
-
-            // STATS avec DÉTRUITS
             const stats = useMemo(() => ({
                 deployed: fleet.length,
                 mission: fleet.filter(v => v.status === 'En Mission').length,
                 operational: fleet.filter(v => v.status === 'Opérationnel').length,
                 maintenance: fleet.filter(v => v.status === 'Maintenance').length,
-                // On calcule le nombre total de pertes via les logs pour cet exemple, ou on pourrait avoir un compteur séparé
                 destroyed: logs.filter(l => l.type === 'destroy').length 
             }), [fleet, logs]);
+
+            if (!user) return <div className="flex h-screen items-center justify-center bg-slate-900 text-white">Connexion Secure Server...</div>;
 
             return (
                 <div className="flex flex-col h-screen w-full font-sans overflow-hidden relative selection:bg-blue-500/30">
                     
-                    {/* HEADER RESPONSIVE */}
-                    <header className="bg-[#0f0f0f] border-b border-slate-800 p-3 shrink-0 z-20 flex flex-col gap-3">
-                        
-                        {/* Ligne 1 : Titre et Supply (Toujours visible) */}
-                        <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-blue-900/10 rounded border border-blue-500/20 flex items-center justify-center shrink-0">
-                                   <Shield size={20} className="text-blue-500" />
+                    {/* MODAL PRISE DE SERVICE */}
+                    {serviceModal.isOpen && (
+                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in">
+                            <div className="bg-slate-900 border-2 border-emerald-500 rounded w-full max-w-xs shadow-2xl">
+                                <div className="bg-emerald-600 p-3 flex items-center gap-2">
+                                    <UserCheck className="text-white" size={20} />
+                                    <h3 className="font-bold text-white uppercase">Identification</h3>
                                 </div>
-                                <h1 className="text-lg md:text-xl font-bold text-white uppercase font-heading leading-none">
-                                    Logistique FOF <span className="block text-xs text-slate-600 font-mono font-normal">MOBILE OPS V6</span>
-                                </h1>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1.5 bg-black px-2 py-1 rounded border border-slate-800">
-                                    <Box size={14} className="text-amber-500" />
-                                    <span className="font-mono text-white font-bold text-sm min-w-[3ch] text-center">{supplyStock}</span>
-                                    <div className="flex flex-col gap-0.5">
-                                        <button onClick={() => setSupplyStock(s => s + 100)} className="h-3 w-4 bg-slate-800 hover:bg-slate-700 text-[8px] rounded-t text-white flex items-center justify-center">▲</button>
-                                        <button onClick={() => setSupplyStock(s => s - 100)} className="h-3 w-4 bg-slate-800 hover:bg-slate-700 text-[8px] rounded-b text-white flex items-center justify-center">▼</button>
+                                <div className="p-4 space-y-3">
+                                    <div>
+                                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Pseudo / Matricule</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full bg-black border border-slate-700 rounded p-2 text-white focus:border-emerald-500 outline-none uppercase font-mono"
+                                            placeholder="Ex: MULTIFRUIT14"
+                                            value={serviceModal.officer}
+                                            onChange={e => setServiceModal({...serviceModal, officer: e.target.value})}
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Grade</label>
+                                        <select 
+                                            className="w-full bg-black border border-slate-700 rounded p-2 text-white focus:border-emerald-500 outline-none"
+                                            value={serviceModal.grade}
+                                            onChange={e => setServiceModal({...serviceModal, grade: e.target.value})}
+                                        >
+                                            <option value="">Sélectionner...</option>
+                                            <option value="2CL">2ème Classe</option>
+                                            <option value="1CL">1ère Classe</option>
+                                            <option value="CPL">Caporal</option>
+                                            <option value="CCH">Caporal-Chef</option>
+                                            <option value="SGT">Sergent</option>
+                                            <option value="SCH">Sergent-Chef</option>
+                                            <option value="ADJ">Adjudant</option>
+                                            <option value="ADC">Adjudant-Chef</option>
+                                            <option value="ASP">Aspirant</option>
+                                            <option value="SLT">Sous-Lieutenant</option>
+                                            <option value="LTN">Lieutenant</option>
+                                            <option value="CNE">Capitaine</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex gap-2 pt-2">
+                                        <button onClick={() => setServiceModal({isOpen: false, officer:'', grade:''})} className="flex-1 py-2 bg-slate-800 text-slate-400 rounded text-xs font-bold">Annuler</button>
+                                        <button onClick={handleServiceStart} disabled={!serviceModal.officer || !serviceModal.grade} className="flex-1 py-2 bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 rounded text-xs font-bold uppercase">Valider</button>
                                     </div>
                                 </div>
-                                <button onClick={() => setMedicActive(!medicActive)} className={`p-2 rounded border transition-all ${medicActive ? 'bg-green-600 border-green-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
-                                    <HeartPulse size={18} className={medicActive ? 'animate-pulse' : ''} />
-                                </button>
                             </div>
                         </div>
+                    )}
 
-                        {/* Ligne 2 : Navigation (Scrollable sur mobile) & Stats */}
-                        <div className="flex flex-col md:flex-row gap-3 justify-between">
-                            
-                            {/* Onglets Scrollables */}
-                            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 md:pb-0">
-                                <button onClick={() => setActiveTab('garage')} className={`whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase transition-all flex-shrink-0 ${activeTab === 'garage' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}>
-                                    <Warehouse size={14}/> Garage
-                                </button>
-                                <button onClick={() => setActiveTab('fleet')} className={`whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase transition-all flex-shrink-0 ${activeTab === 'fleet' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}>
-                                    <Car size={14}/> Flotte <span className="bg-black/30 px-1.5 py-0.5 rounded ml-1">{stats.deployed}</span>
-                                </button>
-                                <button onClick={() => setActiveTab('logs')} className={`whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase transition-all flex-shrink-0 ${activeTab === 'logs' ? 'bg-slate-200 text-black' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}>
-                                    <History size={14}/> Logs
-                                </button>
-                            </div>
-
-                            {/* Stats Grid Compacte (Avec DÉTRUITS) */}
-                            <div className="grid grid-cols-4 md:flex bg-black rounded border border-slate-800 divide-x divide-slate-800 text-[10px] md:text-xs">
-                                <div className="px-2 md:px-4 py-1.5 text-center bg-blue-900/10">
-                                    <div className="text-blue-500 font-bold uppercase mb-0.5">Mission</div>
-                                    <div className="text-base md:text-lg font-mono font-bold text-blue-400 leading-none">{stats.mission}</div>
+                    {/* MODAL DESTRUCTION (Reste identique) */}
+                    {destroyModal.isOpen && (
+                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in">
+                            <div className="bg-[#1e293b] border-2 border-red-600 rounded w-full max-w-sm shadow-2xl flex flex-col max-h-[90vh]">
+                                <div className="bg-red-600 p-3 flex items-center gap-3 shrink-0">
+                                    <AlertTriangle className="text-white" size={24} />
+                                    <h3 className="text-lg font-bold text-white uppercase tracking-widest font-heading">Perte Véhicule</h3>
                                 </div>
-                                <div className="px-2 md:px-4 py-1.5 text-center">
-                                    <div className="text-emerald-500 font-bold uppercase mb-0.5">Parc</div>
-                                    <div className="text-base md:text-lg font-mono font-bold text-emerald-500 leading-none">{stats.operational}</div>
-                                </div>
-                                <div className="px-2 md:px-4 py-1.5 text-center bg-amber-900/10">
-                                    <div className="text-amber-500 font-bold uppercase mb-0.5">Maint.</div>
-                                    <div className="text-base md:text-lg font-mono font-bold text-amber-500 leading-none">{stats.maintenance}</div>
-                                </div>
-                                <div className="px-2 md:px-4 py-1.5 text-center bg-red-900/20">
-                                    <div className="text-red-500 font-bold uppercase mb-0.5">Détruit</div>
-                                    <div className="text-base md:text-lg font-mono font-bold text-red-500 leading-none">{stats.destroyed}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </header>
-
-                    {/* CONTENU */}
-                    <div className="flex-1 overflow-y-auto p-3 md:p-6 bg-[#121212]">
-                        
-                        {/* --- VUE GARAGE --- */}
-                        {activeTab === 'garage' && (
-                            <div className="space-y-6 pb-20 animate-in">
-                                <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded text-amber-200 text-xs flex gap-2 items-center">
-                                    <Warehouse size={16} /> <span>Catalogue des véhicules disponibles.</span>
-                                </div>
-
-                                {Object.keys(groupsConfig).map(groupKey => {
-                                    const items = getGarageByGroup(groupKey);
-                                    const config = groupsConfig[groupKey];
-                                    if (!items.length) return null;
-
-                                    return (
-                                        <div key={groupKey}>
-                                            <div className="flex items-center gap-2 mb-2 pl-1">
-                                                <div className={`w-1 h-4 rounded-full ${config.color}`}></div>
-                                                <h2 className={`text-sm font-bold uppercase tracking-widest ${config.text} opacity-90 font-heading`}>{config.label}</h2>
-                                                <div className="h-px bg-slate-800 flex-1 ml-2 opacity-50"></div>
-                                            </div>
-                                            {/* Grille Mobile : 1 col sur XS, 2 col sur MD */}
-                                            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                                                {items.map(item => (
-                                                    <div key={item.id} className="bg-[#181818] border border-slate-800 active:border-slate-600 rounded p-3 flex justify-between items-center group touch-manipulation">
-                                                        <div>
-                                                            <div className="font-bold text-slate-200 text-sm">{item.type}</div>
-                                                            <div className="flex gap-2 text-[10px] mt-1">
-                                                                <span className="text-slate-500 font-mono">{item.cost} pts</span>
-                                                                {item.grade && <span className="bg-slate-800 px-1 rounded text-slate-400 font-bold">{item.grade}</span>}
-                                                            </div>
-                                                        </div>
-                                                        <button 
-                                                            onClick={() => deployVehicle(item)}
-                                                            className="bg-slate-800 text-amber-500 border border-slate-700 px-3 py-2 rounded text-[10px] font-bold uppercase active:bg-amber-600 active:text-white transition-colors"
-                                                        >
-                                                            <Plus size={14}/>
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                <div className="p-4 space-y-4 overflow-y-auto">
+                                    <div className="bg-red-900/20 p-3 rounded border border-red-900/50">
+                                        <div className="text-[10px] text-red-400 uppercase font-bold mb-1">Cible</div>
+                                        <div className="text-white font-bold text-lg font-heading">
+                                            {fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.callsign}
                                         </div>
-                                    );
-                                })}
+                                    </div>
+                                    <textarea 
+                                        value={destroyReason}
+                                        onChange={(e) => setDestroyReason(e.target.value)}
+                                        className="w-full bg-slate-900 border border-slate-700 p-3 text-sm text-white focus:border-red-500 focus:outline-none rounded h-24 resize-none"
+                                        placeholder="Cause, lieu, équipage..."
+                                    />
+                                    <div className="grid grid-cols-2 gap-3 pt-2">
+                                        <button onClick={() => setDestroyModal({isOpen: false, vehicleId: null})} className="py-3 bg-slate-700 active:bg-slate-600 text-white font-bold rounded uppercase text-xs">Annuler</button>
+                                        <button onClick={confirmDestruction} disabled={!destroyReason.trim()} className="py-3 bg-red-600 active:bg-red-500 disabled:opacity-50 text-white font-bold rounded uppercase text-xs">Confirmer</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* HEADER */}
+                    <header className="bg-[#0f172a] border-b border-slate-700 shadow-lg z-20 flex flex-col shrink-0">
+                        <div className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-600 rounded flex items-center justify-center shadow-lg shadow-blue-900/50 shrink-0">
+                                   <Shield size={22} className="text-white" />
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold text-white uppercase font-heading tracking-wide leading-none">Fiche Logistique</h1>
+                                    <div className="text-[10px] text-red-500 font-bold uppercase tracking-widest flex items-center gap-1 animate-pulse">
+                                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span> Conflit en cours
+                                    </div>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowRules(!showRules)} className="md:hidden p-2 text-slate-400 hover:text-white"><Info size={24} /></button>
+                            
+                            {/* BOUTON PRISE DE SERVICE */}
+                            <div>
+                                {!service.active ? (
+                                    <button 
+                                        onClick={() => setServiceModal({ isOpen: true, officer: '', grade: '' })}
+                                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded shadow-lg shadow-emerald-900/20 font-bold text-xs uppercase flex items-center gap-2 animate-pulse"
+                                    >
+                                        <UserCheck size={16} /> Prise de Service
+                                    </button>
+                                ) : (
+                                    <button 
+                                        onClick={handleServiceEnd}
+                                        className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded shadow-lg shadow-red-900/20 font-bold text-xs uppercase flex items-center gap-2 border border-red-400"
+                                    >
+                                        <LogOut size={16} /> Fin de Service
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {showRules && (
+                            <div className="bg-slate-800/50 p-4 text-xs text-slate-300 border-b border-slate-700 animate-in">
+                                <h3 className="text-amber-500 font-bold uppercase mb-2">Rappel Procédures</h3>
+                                <ul className="list-disc list-inside space-y-1 font-mono text-[10px] md:text-xs">
+                                    <li>SL Logi dirige sur fréq 45/47.</li>
+                                    <li>Priorité absolue au ravitaillement front.</li>
+                                </ul>
                             </div>
                         )}
 
-                        {/* --- VUE FLOTTE --- */}
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-0 divide-y md:divide-y-0 md:divide-x divide-slate-700 bg-slate-800/30">
+                            {/* Col 1: Info Service */}
+                            <div className="md:col-span-5 p-2 md:p-3 flex flex-col gap-2 justify-center">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold text-emerald-500 uppercase w-12">SL Logis</span>
+                                    {service.active ? (
+                                        <div className="flex-1 bg-emerald-900/20 border border-emerald-500/30 text-emerald-400 text-xs rounded px-2 py-1 font-mono font-bold flex justify-between">
+                                            <span>{service.officer}</span>
+                                            <span className="opacity-70">{service.grade}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex-1 bg-slate-900/50 border border-slate-700 border-dashed text-slate-500 text-xs rounded px-2 py-1 font-mono italic">Poste vacant</div>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex-1 flex items-center gap-2">
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase w-12">Début</span>
+                                        <div className="flex-1 bg-black/30 border border-slate-700 text-slate-300 text-xs rounded px-2 py-1 font-mono text-center">
+                                            {service.active ? service.start : '--:--'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Col 2: Gestion Ressources */}
+                            <div className="md:col-span-4 p-2 md:p-3 flex flex-col gap-2 justify-center">
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[10px] font-bold text-white uppercase flex items-center gap-1"><Wrench size={12} /> Effectif</span>
+                                    <div className="flex items-center bg-slate-900 rounded border border-slate-700">
+                                        <button onClick={() => updateGlobalState('effectif', Math.max(0, service.effectif - 1))} className="px-2 text-slate-400 hover:text-white">-</button>
+                                        <span className="px-2 text-xs font-bold text-white font-mono min-w-[20px] text-center">{service.effectif}</span>
+                                        <button onClick={() => updateGlobalState('effectif', service.effectif + 1)} className="px-2 text-slate-400 hover:text-white">+</button>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[10px] font-bold text-amber-500 uppercase flex items-center gap-1"><Box size={12} /> Supply</span>
+                                    <div className="flex items-center bg-slate-900 rounded border border-slate-700">
+                                        <button onClick={() => updateGlobalState('supply', service.supply - 100)} className="px-2 text-slate-400 hover:text-white">-</button>
+                                        <span className="px-2 text-xs font-bold text-white font-mono min-w-[40px] text-center">{service.supply}</span>
+                                        <button onClick={() => updateGlobalState('supply', service.supply + 100)} className="px-2 text-slate-400 hover:text-white">+</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Col 3: Medic & Toggle */}
+                            <div className="md:col-span-3 p-2 md:p-3 flex flex-col justify-center gap-2">
+                                <div onClick={() => updateGlobalState('medic', !service.medic)} className={`cursor-pointer flex items-center justify-between px-3 py-2 rounded border transition-all ${service.medic ? 'bg-blue-900/30 border-blue-500/50' : 'bg-slate-900 border-slate-800'}`}>
+                                    <span className={`text-[10px] font-bold uppercase ${service.medic ? 'text-blue-400' : 'text-slate-500'}`}>Medic V2 (EVASAN)</span>
+                                    <div className={`w-3 h-3 rounded-sm border flex items-center justify-center ${service.medic ? 'bg-blue-500 border-blue-500' : 'border-slate-600'}`}>
+                                        {service.medic && <Icon size={10} className="text-white"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></Icon>} 
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* NAV */}
+                        <div className="flex items-stretch bg-slate-900 border-b border-slate-800 overflow-x-auto no-scrollbar">
+                            <button onClick={() => setActiveTab('fleet')} className={`flex-1 min-w-[100px] py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 border-b-2 transition-all ${activeTab === 'fleet' ? 'border-blue-500 text-white bg-slate-800' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
+                                <Car size={14} /> Flotte <span className="bg-slate-700 text-white px-1.5 rounded-full text-[10px]">{stats.deployed}</span>
+                            </button>
+                            <button onClick={() => setActiveTab('garage')} className={`flex-1 min-w-[100px] py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 border-b-2 transition-all ${activeTab === 'garage' ? 'border-amber-500 text-white bg-slate-800' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
+                                <Warehouse size={14} /> Garage
+                            </button>
+                            <button onClick={() => setActiveTab('logs')} className={`flex-1 min-w-[100px] py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 border-b-2 transition-all ${activeTab === 'logs' ? 'border-slate-200 text-white bg-slate-800' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
+                                <History size={14} /> Journal
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* MAIN */}
+                    <div className="flex-1 overflow-y-auto p-2 md:p-4 bg-[#0f172a]">
+                        {/* FLOTTE */}
                         {activeTab === 'fleet' && (
                             <div className="space-y-6 pb-20 animate-in">
                                 {fleet.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-slate-800 rounded-lg text-slate-600 m-4">
+                                    <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-slate-700 rounded-lg text-slate-500 m-4 bg-slate-800/20">
                                         <Car size={48} className="mb-4 opacity-50"/>
-                                        <p className="font-bold">Aucun véhicule déployé</p>
-                                        <button onClick={() => setActiveTab('garage')} className="mt-4 px-4 py-2 bg-amber-500/10 text-amber-500 rounded font-bold text-xs uppercase">Ouvrir Garage</button>
+                                        <p className="font-bold text-sm">Aucune unité sur le terrain</p>
+                                        <button onClick={() => setActiveTab('garage')} className="mt-4 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded font-bold text-xs uppercase shadow-lg">Ouvrir le Garage</button>
                                     </div>
                                 ) : (
                                     Object.keys(groupsConfig).map(groupKey => {
                                         const items = getFleetByGroup(groupKey);
                                         const config = groupsConfig[groupKey];
                                         if (!items.length) return null;
-
                                         return (
                                             <div key={groupKey}>
-                                                 <div className="flex items-center gap-2 mb-2 pl-1">
+                                                 <div className="flex items-center gap-2 mb-2 pl-1 mt-4 first:mt-0">
                                                     <div className={`w-1 h-4 rounded-full ${config.color}`}></div>
                                                     <h2 className={`text-sm font-bold uppercase tracking-widest ${config.text} opacity-90 font-heading`}>{config.label} <span className="text-slate-600 ml-1 text-xs font-mono">({items.length})</span></h2>
                                                     <div className="h-px bg-slate-800 flex-1 ml-2 opacity-50"></div>
                                                 </div>
-                                                
-                                                {/* Grille Mobile : 1 col sur XS (Cartes larges) */}
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                                     {items.map(item => (
-                                                        <div key={item.uniqueId} className={`relative bg-[#161616] border flex flex-col rounded overflow-hidden shadow-sm ${
-                                                            item.status === 'En Mission' ? 'border-blue-500/50' : 
+                                                        <div key={item.uniqueId} className={`relative bg-[#1e293b] border flex flex-col rounded overflow-hidden shadow-md ${
+                                                            item.status === 'En Mission' ? 'border-blue-500/50 ring-1 ring-blue-500/20' : 
                                                             item.status === 'Maintenance' ? 'border-amber-500/50' : 'border-slate-700'
                                                         }`}>
-                                                            {/* Status Bar */}
-                                                            <div className={`h-1 w-full ${
-                                                                item.status === 'Opérationnel' ? 'bg-emerald-500' : 
-                                                                item.status === 'En Mission' ? 'bg-blue-500' : 'bg-amber-500'
-                                                            }`}></div>
-
+                                                            <div className={`h-1 w-full ${item.status === 'Opérationnel' ? 'bg-emerald-500' : item.status === 'En Mission' ? 'bg-blue-500' : 'bg-amber-500'}`}></div>
                                                             <div className="p-3 flex-1 flex flex-col">
                                                                 <div className="flex justify-between items-start mb-3">
                                                                     <div>
-                                                                        <div className="font-mono text-xs font-bold text-slate-400 bg-black/30 px-1.5 rounded inline-block mb-1">{item.callsign}</div>
-                                                                        <div className="font-bold text-sm text-slate-100 leading-tight">{item.type}</div>
+                                                                        <div className="font-mono text-xs font-bold text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded inline-block mb-1 border border-slate-800">{item.callsign}</div>
+                                                                        <div className="font-bold text-sm text-slate-200 leading-tight">{item.type}</div>
                                                                     </div>
-                                                                    <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                                                                        item.status === 'Opérationnel' ? 'bg-emerald-900/20 text-emerald-400 border-emerald-900/50' :
-                                                                        item.status === 'En Mission' ? 'bg-blue-900/20 text-blue-400 border-blue-900/50 animate-pulse' :
-                                                                        'bg-amber-900/20 text-amber-400 border-amber-900/50'
-                                                                    }`}>
-                                                                        {item.status}
-                                                                    </div>
+                                                                    <div className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                                                                        item.status === 'Opérationnel' ? 'bg-emerald-900/30 text-emerald-400 border-emerald-900/50' :
+                                                                        item.status === 'En Mission' ? 'bg-blue-900/30 text-blue-400 border-blue-900/50 animate-pulse' :
+                                                                        'bg-amber-900/30 text-amber-400 border-amber-900/50'
+                                                                    }`}>{item.status}</div>
                                                                 </div>
-
                                                                 <div className="mt-auto space-y-2">
-                                                                    {/* Gros boutons tactiles (h-10) */}
                                                                     <div className="grid grid-cols-2 gap-2">
                                                                         {item.status === 'En Mission' ? (
-                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Opérationnel')} className="bg-slate-800 active:bg-emerald-700 text-emerald-500 active:text-white h-10 rounded text-xs font-bold uppercase border border-slate-700 flex items-center justify-center gap-1">Retour</button>
+                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Opérationnel')} className="bg-slate-700 active:bg-emerald-700 text-emerald-400 active:text-white h-9 rounded text-[10px] font-bold uppercase border border-slate-600 flex items-center justify-center gap-1 hover:bg-slate-600">Retour</button>
                                                                         ) : (
-                                                                            <button onClick={() => updateStatus(item.uniqueId, 'En Mission')} className="bg-slate-800 active:bg-blue-700 text-blue-500 active:text-white h-10 rounded text-xs font-bold uppercase border border-slate-700 flex items-center justify-center gap-1">Mission</button>
+                                                                            <button onClick={() => updateStatus(item.uniqueId, 'En Mission')} className="bg-slate-700 active:bg-blue-700 text-blue-400 active:text-white h-9 rounded text-[10px] font-bold uppercase border border-slate-600 flex items-center justify-center gap-1 hover:bg-slate-600">Mission</button>
                                                                         )}
-                                                                        
                                                                         {item.status === 'Maintenance' ? (
-                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Opérationnel')} className="bg-slate-800 active:bg-emerald-700 text-emerald-500 active:text-white h-10 rounded text-xs font-bold uppercase border border-slate-700 flex items-center justify-center gap-1">Fin Maint.</button>
+                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Opérationnel')} className="bg-slate-700 active:bg-emerald-700 text-emerald-400 active:text-white h-9 rounded text-[10px] font-bold uppercase border border-slate-600 flex items-center justify-center gap-1 hover:bg-slate-600">Fin Maint.</button>
                                                                         ) : (
-                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Maintenance')} className="bg-slate-800 active:bg-amber-700 text-amber-500 active:text-white h-10 rounded text-xs font-bold uppercase border border-slate-700 flex items-center justify-center gap-1">Maint.</button>
+                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Maintenance')} className="bg-slate-700 active:bg-amber-700 text-amber-400 active:text-white h-9 rounded text-[10px] font-bold uppercase border border-slate-600 flex items-center justify-center gap-1 hover:bg-slate-600">Maint.</button>
                                                                         )}
                                                                     </div>
-
-                                                                    <div className="grid grid-cols-2 gap-2 pt-1">
-                                                                         <button onClick={() => updateStatus(item.uniqueId, 'Garage')} className="text-slate-500 active:text-white text-[10px] uppercase font-bold py-2 flex items-center justify-center gap-1 bg-black/20 rounded">
-                                                                            <RotateCcw size={12}/> Rentrer
-                                                                         </button>
-                                                                         <button onClick={() => updateStatus(item.uniqueId, 'Détruit')} className="text-red-800 active:text-red-500 text-[10px] uppercase font-bold py-2 flex items-center justify-center gap-1 bg-red-900/10 rounded">
-                                                                            <Flame size={12}/> Détruire
-                                                                         </button>
+                                                                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700/50">
+                                                                         <button onClick={() => updateStatus(item.uniqueId, 'Garage')} className="text-slate-400 hover:text-white text-[9px] uppercase font-bold py-1 flex items-center justify-center gap-1 hover:bg-slate-700 rounded transition-colors"><RotateCcw size={10}/> Rentrer</button>
+                                                                         <button onClick={() => updateStatus(item.uniqueId, 'Détruit')} className="text-red-400 hover:text-red-200 text-[9px] uppercase font-bold py-1 flex items-center justify-center gap-1 hover:bg-red-900/30 rounded transition-colors"><Flame size={10}/> Détruire</button>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -423,27 +612,56 @@
                             </div>
                         )}
 
-                        {/* --- VUE LOGS --- */}
+                        {/* GARAGE */}
+                        {activeTab === 'garage' && (
+                            <div className="space-y-6 pb-20 animate-in">
+                                <div className="bg-slate-800/50 border border-slate-700 p-3 rounded text-slate-300 text-xs flex gap-2 items-center mb-4">
+                                    <Warehouse size={16} className="text-amber-500" /> <span>Cliquez sur <strong>DÉPLOYER</strong> pour affecter un véhicule à la flotte.</span>
+                                </div>
+                                {Object.keys(groupsConfig).map(groupKey => {
+                                    const items = getGarageByGroup(groupKey);
+                                    const config = groupsConfig[groupKey];
+                                    if (!items.length) return null;
+                                    return (
+                                        <div key={groupKey}>
+                                            <div className="flex items-center gap-2 mb-2 pl-1 mt-4 first:mt-0">
+                                                <div className={`w-1 h-4 rounded-full ${config.color}`}></div>
+                                                <h2 className={`text-sm font-bold uppercase tracking-widest ${config.text} opacity-90 font-heading`}>{config.label}</h2>
+                                                <div className="h-px bg-slate-800 flex-1 ml-2 opacity-50"></div>
+                                            </div>
+                                            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                                {items.map(item => (
+                                                    <div key={item.id} className="bg-[#1e293b] border border-slate-700 hover:border-slate-500 rounded p-3 flex justify-between items-center group touch-manipulation transition-colors">
+                                                        <div>
+                                                            <div className="font-bold text-slate-200 text-sm">{item.type}</div>
+                                                            <div className="flex gap-2 text-[10px] mt-1">
+                                                                <span className="text-slate-500 font-mono">{item.cost} pts</span>
+                                                                {item.grade && <span className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-400 font-bold border border-slate-700">{item.grade}</span>}
+                                                            </div>
+                                                        </div>
+                                                        <button onClick={() => deployVehicle(item)} className="bg-slate-800 text-amber-500 border border-slate-600 px-3 py-2 rounded text-[10px] font-bold uppercase hover:bg-amber-600 hover:text-white active:scale-95 transition-all"><Plus size={14}/></button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* LOGS */}
                         {activeTab === 'logs' && (
                             <div className="max-w-3xl mx-auto pb-20 animate-in">
                                 <div className="space-y-2">
                                     {logs.length === 0 ? (
-                                        <div className="text-center py-10 text-slate-600 border border-dashed border-slate-800 rounded">Rien à signaler.</div>
+                                        <div className="text-center py-10 text-slate-600 border-2 border-dashed border-slate-800 rounded-lg"><History size={32} className="mx-auto mb-2 opacity-50"/>Aucune activité enregistrée.</div>
                                     ) : (
                                         logs.map(log => (
-                                            <div key={log.id} className="bg-[#141414] border border-slate-800 p-3 rounded flex gap-3 text-sm">
+                                            <div key={log.id} className="bg-[#1e293b] border border-slate-700 p-3 rounded flex gap-3 text-sm">
                                                 <div className="font-mono text-xs text-slate-500 w-10 shrink-0 pt-0.5">{log.time}</div>
-                                                <div className={`w-1 shrink-0 rounded-full ${
-                                                    log.type === 'destroy' ? 'bg-red-500' : 
-                                                    log.type === 'mission' ? 'bg-blue-500' : 
-                                                    log.type === 'deploy' ? 'bg-amber-500' : 'bg-emerald-500'
-                                                }`}></div>
+                                                <div className={`w-1 shrink-0 rounded-full ${log.type === 'destroy' ? 'bg-red-500' : log.type === 'mission' ? 'bg-blue-500' : log.type === 'deploy' ? 'bg-emerald-500' : 'bg-slate-500'}`}></div>
                                                 <div>
-                                                    <div className={`font-bold text-xs md:text-sm ${
-                                                        log.type === 'destroy' ? 'text-red-400' : 
-                                                        log.type === 'mission' ? 'text-blue-400' : 
-                                                        log.type === 'deploy' ? 'text-amber-400' : 'text-slate-200'
-                                                    }`}>{log.message}</div>
+                                                    <div className={`font-bold text-xs md:text-sm ${log.type === 'destroy' ? 'text-red-400' : log.type === 'mission' ? 'text-blue-400' : log.type === 'deploy' ? 'text-emerald-400' : 'text-slate-300'}`}>{log.message}</div>
                                                     <div className="text-[10px] text-slate-500 mt-0.5">{log.details}</div>
                                                 </div>
                                             </div>
@@ -452,51 +670,22 @@
                                 </div>
                             </div>
                         )}
-
                     </div>
                     
-                    {/* MODALE DESTRUCTION (Responsive) */}
-                    {destroyModal.isOpen && (
-                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in">
-                            <div className="bg-[#121212] border-2 border-red-600 rounded w-full max-w-sm shadow-2xl flex flex-col max-h-[90vh]">
-                                <div className="bg-red-600 p-3 flex items-center gap-3 shrink-0">
-                                    <AlertTriangle className="text-white" size={24} />
-                                    <h3 className="text-lg font-bold text-white uppercase tracking-widest font-heading">Perte Véhicule</h3>
-                                </div>
-                                <div className="p-4 space-y-4 overflow-y-auto">
-                                    <div className="bg-red-900/10 p-2 rounded border border-red-900/30">
-                                        <div className="text-[10px] text-red-400 uppercase font-bold">Confirmer destruction de :</div>
-                                        <div className="text-white font-bold text-lg">
-                                            {fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.callsign}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Rapport (Obligatoire)</label>
-                                        <textarea 
-                                            value={destroyReason}
-                                            onChange={(e) => setDestroyReason(e.target.value)}
-                                            className="w-full bg-black border border-slate-700 p-3 text-sm text-white focus:border-red-500 focus:outline-none rounded h-24 resize-none"
-                                            placeholder="Cause, lieu, équipage..."
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3 pt-2">
-                                        <button onClick={() => setDestroyModal({isOpen: false, vehicleId: null})} className="py-3 bg-slate-800 active:bg-slate-700 text-white font-bold rounded uppercase text-xs">Annuler</button>
-                                        <button 
-                                            onClick={confirmDestruction}
-                                            disabled={!destroyReason.trim()}
-                                            className="py-3 bg-red-600 active:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded uppercase text-xs shadow-lg"
-                                        >Confirmer</button>
-                                    </div>
-                                </div>
-                            </div>
+                    {/* STATUS FOOTER */}
+                    <div className="absolute bottom-0 left-0 w-full bg-[#0f172a] border-t border-slate-800 p-2 flex justify-between items-center gap-2 shadow-2xl z-30">
+                        <div className="flex items-center gap-2">
+                             <div className={`w-2 h-2 rounded-full ${user ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`}></div>
+                             <span className="text-[10px] text-slate-500 font-mono">{user ? 'SYNC ACTIVE' : 'CONNECTING...'}</span>
                         </div>
-                    )}
+                        <div className="text-[10px] text-slate-700 font-mono">APP_ID: {window.APP_ID}</div>
+                    </div>
                 </div>
             );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MilitaryMdtV6 />);
+        root.render(<MilitaryMdtV8 />);
     </script>
 </body>
 </html>
