@@ -3,13 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT FOF - Tactical OS v11.5 (Live Map)</title>
+    <title>MDT Logistique FOF - v9 Mobile</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- THREE.JS (Moteur 3D) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
     <!-- FIREBASE SDKs -->
     <script type="module">
@@ -47,61 +44,39 @@
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
                         mono: ['JetBrains Mono', 'monospace'],
-                        tech: ['Rajdhani', 'sans-serif']
+                        heading: ['Oswald', 'sans-serif']
                     },
-                    colors: {
-                        slate: {
-                            850: '#1bd2e',
-                            900: '#0f172a',
-                            950: '#020617',
-                        }
-                    },
-                    animation: { 'in': 'fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)' },
+                    animation: { 'in': 'fadeIn 0.3s ease-out' },
                     keyframes: {
-                        fadeIn: { '0%': { opacity: '0', transform: 'translateY(8px) scale(0.98)' }, '100%': { opacity: '1', transform: 'translateY(0) scale(1)' } }
+                        fadeIn: { '0%': { opacity: '0', transform: 'translateY(10px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } }
                     },
-                    boxShadow: {
-                        'glow': '0 0 20px -5px rgba(59, 130, 246, 0.5)',
-                        'glow-red': '0 0 20px -5px rgba(239, 68, 68, 0.5)',
-                        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
-                    }
+                    screens: { 'xs': '475px' }
                 }
             }
         }
     </script>
     
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&family=Rajdhani:wght@500;600;700&display=swap');
-        
-        html, body { overscroll-behavior-y: none; background-color: #020617; color: #e2e8f0; -webkit-tap-highlight-color: transparent; }
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&family=Oswald:wght@500;700&display=swap');
+        html, body { overscroll-behavior-y: none; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        
-        .tactical-bg {
-            background-color: #020617;
-            background-image: 
-                linear-gradient(rgba(30, 41, 59, 0.3) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(30, 41, 59, 0.3) 1px, transparent 1px);
-            background-size: 30px 30px;
+        ::-webkit-scrollbar-track { background: #0f0f0f; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        body { background-color: #0f172a; color: #e2e8f0; -webkit-tap-highlight-color: transparent; }
+        .bg-grid {
+            background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
         }
-        
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.7);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="tactical-bg">
+<body class="bg-grid">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useMemo, useEffect, useRef } = React;
+        const { useState, useMemo, useEffect } = React;
 
         // --- ICONES ---
         const Icon = ({ children, size = 18, className = "" }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>);
@@ -124,110 +99,8 @@
         const ChevronDown = (p) => <Icon {...p}><polyline points="6 9 12 15 18 9"/></Icon>;
         const ChevronUp = (p) => <Icon {...p}><polyline points="18 15 12 9 6 15"/></Icon>;
         const Trash2 = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Icon>;
-        const LayoutDashboard = (p) => <Icon {...p}><rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" /><rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" /></Icon>;
 
-        // --- COMPOSANT 3D: GLOBE HOLOGRAPHIQUE ACTIF ---
-        const HoloGlobe = ({ fleet }) => {
-            const mountRef = useRef(null);
-            const sceneRef = useRef(null);
-            const groupRef = useRef(null);
-
-            useEffect(() => {
-                if (!mountRef.current) return;
-
-                // Setup Scene
-                const w = mountRef.current.clientWidth;
-                const h = mountRef.current.clientHeight;
-                const scene = new THREE.Scene();
-                sceneRef.current = scene;
-                const camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 1000);
-                camera.position.z = 2.2;
-
-                const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-                renderer.setSize(w, h);
-                mountRef.current.appendChild(renderer.domElement);
-
-                // Main Group (for rotation)
-                const mainGroup = new THREE.Group();
-                scene.add(mainGroup);
-
-                // Dots Group (for vehicles)
-                const dotsGroup = new THREE.Group();
-                mainGroup.add(dotsGroup);
-                groupRef.current = dotsGroup;
-
-                // Globe Wireframe
-                const geometry = new THREE.SphereGeometry(1, 24, 24);
-                const material = new THREE.MeshBasicMaterial({ 
-                    color: 0x1e40af, // Blue-800
-                    wireframe: true,
-                    transparent: true,
-                    opacity: 0.15
-                });
-                const sphere = new THREE.Mesh(geometry, material);
-                mainGroup.add(sphere);
-
-                // Core Glow (Black sphere to hide back dots)
-                const coreGeo = new THREE.SphereGeometry(0.98, 32, 32);
-                const coreMat = new THREE.MeshBasicMaterial({ color: 0x020617 }); 
-                const core = new THREE.Mesh(coreGeo, coreMat);
-                mainGroup.add(core);
-
-                // Animation Loop
-                let frameId;
-                const animate = () => {
-                    frameId = requestAnimationFrame(animate);
-                    mainGroup.rotation.y += 0.003;
-                    renderer.render(scene, camera);
-                };
-                animate();
-
-                const handleResize = () => {
-                    if (!mountRef.current) return;
-                    const newW = mountRef.current.clientWidth;
-                    const newH = mountRef.current.clientHeight;
-                    renderer.setSize(newW, newH);
-                    camera.aspect = newW / newH;
-                    camera.updateProjectionMatrix();
-                };
-                window.addEventListener('resize', handleResize);
-
-                return () => {
-                    window.removeEventListener('resize', handleResize);
-                    cancelAnimationFrame(frameId);
-                    if (mountRef.current) mountRef.current.innerHTML = '';
-                };
-            }, []);
-
-            // Update Dots when Fleet changes
-            useEffect(() => {
-                if (!groupRef.current) return;
-                
-                // Clear existing dots
-                groupRef.current.clear();
-
-                fleet.forEach(v => {
-                    if (!v.pos) return; // Skip if no position data
-                    
-                    let color = 0x10b981; // Emerald (Opérationnel)
-                    if (v.status === 'En Mission') color = 0x3b82f6; // Blue
-                    if (v.status === 'Maintenance') color = 0xf59e0b; // Amber
-                    if (v.status === 'Détruit') color = 0xef4444; // Red
-
-                    const dotGeo = new THREE.SphereGeometry(0.04, 8, 8);
-                    const dotMat = new THREE.MeshBasicMaterial({ color: color });
-                    const dot = new THREE.Mesh(dotGeo, dotMat);
-                    
-                    dot.position.set(v.pos.x, v.pos.y, v.pos.z);
-                    groupRef.current.add(dot);
-                });
-
-            }, [fleet]);
-
-            return <div ref={mountRef} className="w-full h-full" />;
-        };
-
-        // --- DONNEES CATALOGUE ---
+        // --- CATALOGUE ---
         const garageCatalog = [
             { id: 'cat_em1', type: 'Jeep EM', group: 'em', grade: '', cost: 110 },
             { id: 'cat_em2', type: 'QG Mobile', group: 'em', grade: '', cost: 420 },
@@ -263,28 +136,31 @@
         ];
 
         const groupsConfig = {
-            'em': { label: 'Commandement', color: 'bg-blue-500', text: 'text-blue-400' },
-            'logi': { label: 'Logistique', color: 'bg-fuchsia-500', text: 'text-fuchsia-400' },
-            'transport': { label: 'Transport', color: 'bg-yellow-500', text: 'text-yellow-400' },
-            'blinde': { label: 'Blindés', color: 'bg-orange-500', text: 'text-orange-400' },
-            'infanterie': { label: 'Combat', color: 'bg-emerald-500', text: 'text-emerald-400' },
-            'sanitaire': { label: 'Sanitaire', color: 'bg-green-400', text: 'text-green-400' },
-            'char': { label: 'Chars', color: 'bg-purple-600', text: 'text-purple-400' },
-            'alat': { label: 'ALAT', color: 'bg-sky-500', text: 'text-sky-400' },
+            'em': { label: 'Commandement (EM)', color: 'bg-blue-600', text: 'text-blue-500', border: 'border-blue-600' },
+            'logi': { label: 'Logistique', color: 'bg-fuchsia-400', text: 'text-fuchsia-400', border: 'border-fuchsia-400' },
+            'transport': { label: 'Transport', color: 'bg-yellow-400', text: 'text-yellow-400', border: 'border-yellow-400' },
+            'blinde': { label: 'Blindés JLTV', color: 'bg-orange-500', text: 'text-orange-500', border: 'border-orange-500' },
+            'infanterie': { label: 'Combat Infanterie', color: 'bg-amber-600', text: 'text-amber-600', border: 'border-amber-600' },
+            'sanitaire': { label: 'Sanitaire', color: 'bg-green-600', text: 'text-green-600', border: 'border-green-600' },
+            'char': { label: 'Chars', color: 'bg-purple-800', text: 'text-purple-500', border: 'border-purple-800' },
+            'alat': { label: 'ALAT', color: 'bg-blue-500', text: 'text-blue-400', border: 'border-blue-500' },
         };
 
-        function MilitaryMdtV11_5() {
+        function MilitaryMdtV9() {
+            // --- ETATS ---
             const [activeTab, setActiveTab] = useState('fleet');
             const [fleet, setFleet] = useState([]);
             const [logs, setLogs] = useState([]);
             const [service, setService] = useState({ active: false, officer: '', grade: '', start: null, end: null, effectif: 4, supply: 6000, medic: true });
             const [user, setUser] = useState(null);
-            const [showDashboard, setShowDashboard] = useState(true);
+            
+            // UI States
+            const [showDashboard, setShowDashboard] = useState(true); // Replié par défaut ou non? True=ouvert
             const [destroyModal, setDestroyModal] = useState({ isOpen: false, vehicleId: null });
             const [destroyReason, setDestroyReason] = useState('');
             const [serviceModal, setServiceModal] = useState({ isOpen: false, officer: '', grade: '' });
 
-            // --- FIREBASE ---
+            // --- FIREBASE SYNC ---
             useEffect(() => {
                 const initAuth = async () => { await window.fb.signInAnonymously(window.fb.auth); };
                 initAuth();
@@ -293,7 +169,9 @@
 
             useEffect(() => {
                 if (!user) return;
+                // Sur mobile, on masque le dashboard par défaut pour gagner de la place
                 if (window.innerWidth < 768) setShowDashboard(false);
+
                 const docRef = window.fb.doc(window.fb.db, 'artifacts', window.APP_ID, 'public', 'data', 'fof_storage', 'global_state');
                 const unsubscribe = window.fb.onSnapshot(docRef, (docSnap) => {
                     if (docSnap.exists()) {
@@ -311,42 +189,41 @@
             const updateCloud = async (newData) => {
                 if (!user) return;
                 const docRef = window.fb.doc(window.fb.db, 'artifacts', window.APP_ID, 'public', 'data', 'fof_storage', 'global_state');
-                try { await window.fb.updateDoc(docRef, newData); } catch (e) { console.error(e); }
+                try { await window.fb.updateDoc(docRef, newData); } catch (e) { console.error("Save error", e); }
             };
 
-            // --- LOGIC ---
+            // --- ACTIONS ---
             const addLogLocal = (type, message, details = '') => {
-                const newLog = { id: Date.now(), time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), type, message, details };
+                const newLog = {
+                    id: Date.now(),
+                    time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+                    type, message, details
+                };
                 const newLogs = [newLog, ...logs].slice(0, 100); 
                 updateCloud({ logs: newLogs });
             };
-            const deleteLog = (logId) => { if(confirm("Supprimer ?")) updateCloud({ logs: logs.filter(l => l.id !== logId) }); };
-            
+
+            const deleteLog = (logId) => {
+                if(!confirm("Supprimer cette entrée du journal ?")) return;
+                const newLogs = logs.filter(l => l.id !== logId);
+                updateCloud({ logs: newLogs });
+            };
+
             const deployVehicle = (vehicleModel) => {
                 const newId = Date.now();
                 const prefix = vehicleModel.type.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '');
                 const num = fleet.length + 1; 
                 const matricule = `${prefix}-${num.toString().padStart(3, '0')}`;
-                
-                // Génération position 3D aléatoire sur la sphère (Rayon 1)
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos((Math.random() * 2) - 1);
-                const pos = {
-                    x: 1 * Math.sin(phi) * Math.cos(theta),
-                    y: 1 * Math.sin(phi) * Math.sin(theta),
-                    z: 1 * Math.cos(phi)
+                const newVehicle = {
+                    uniqueId: newId,
+                    ...vehicleModel,
+                    callsign: matricule,
+                    status: 'Opérationnel',
+                    statusSince: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})
                 };
-
-                const newVehicle = { 
-                    uniqueId: newId, 
-                    ...vehicleModel, 
-                    callsign: matricule, 
-                    status: 'Opérationnel', 
-                    statusSince: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}),
-                    pos: pos // Sauvegarde de la position
-                };
-                updateCloud({ fleet: [...fleet, newVehicle] });
-                addLogLocal('deploy', `DÉPLOIEMENT: ${newVehicle.type}`, `Matricule: ${matricule}`);
+                const newFleet = [...fleet, newVehicle];
+                updateCloud({ fleet: newFleet });
+                addLogLocal('deploy', `SORTIE GARAGE: ${newVehicle.type}`, `Matricule: ${matricule}`);
             };
 
             const updateStatus = (uniqueId, newStatus) => {
@@ -354,42 +231,48 @@
                 if (!v) return;
                 if (newStatus === 'Détruit') { setDestroyModal({ isOpen: true, vehicleId: uniqueId }); return; }
                 if (newStatus === 'Garage') {
-                    updateCloud({ fleet: fleet.filter(item => item.uniqueId !== uniqueId) });
-                    addLogLocal('info', `RETOUR PARC: ${v.callsign}`, `Retour opérationnel.`);
+                    const newFleet = fleet.filter(item => item.uniqueId !== uniqueId);
+                    updateCloud({ fleet: newFleet });
+                    addLogLocal('info', `RETOUR GARAGE: ${v.callsign}`, `Retour parc.`);
                     return;
                 }
-                updateCloud({ fleet: fleet.map(item => item.uniqueId === uniqueId ? { ...item, status: newStatus } : item) });
-                if (newStatus === 'En Mission') addLogLocal('mission', `DÉPART MISSION: ${v.callsign}`);
-                if (newStatus === 'Maintenance') addLogLocal('info', `MAINTENANCE: ${v.callsign}`);
+                const newFleet = fleet.map(item => item.uniqueId === uniqueId ? { ...item, status: newStatus } : item);
+                updateCloud({ fleet: newFleet });
+                if (newStatus === 'En Mission') addLogLocal('mission', `DEPART MISSION: ${v.callsign}`, `Départ base.`);
+                if (newStatus === 'Maintenance') addLogLocal('info', `MAINTENANCE: ${v.callsign}`, `Entrée atelier.`);
             };
 
             const confirmDestruction = () => {
                 const v = fleet.find(item => item.uniqueId === destroyModal.vehicleId);
                 if (!v) return;
-                // On garde le véhicule mais statut détruit pour affichage rouge sur globe, puis suppression ?
-                // Pour le RP, "Perte" = Suppression de la liste active ou statut "Détruit" persistant ?
-                // Ici je le retire de la liste active pour nettoyer le dashboard, mais on pourrait le garder.
-                updateCloud({ fleet: fleet.filter(item => item.uniqueId !== destroyModal.vehicleId) });
-                addLogLocal('destroy', `PERTE TOTALE: ${v.callsign}`, `Rapport: ${destroyReason}`);
+                const newFleet = fleet.filter(item => item.uniqueId !== destroyModal.vehicleId);
+                updateCloud({ fleet: newFleet });
+                addLogLocal('destroy', `PERTE TOTALE: ${v.callsign}`, `Cause: ${destroyReason}`);
                 setDestroyModal({ isOpen: false, vehicleId: null });
                 setDestroyReason('');
             };
 
             const handleServiceStart = () => {
-                if (!serviceModal.officer) return;
+                if (!serviceModal.officer || !serviceModal.grade) return;
                 const startTime = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-                updateCloud({ service: { ...service, active: true, officer: serviceModal.officer, grade: serviceModal.grade, start: startTime, end: null } });
+                const newService = { ...service, active: true, officer: serviceModal.officer, grade: serviceModal.grade, start: startTime, end: null };
+                updateCloud({ service: newService });
                 addLogLocal('info', `PRISE DE SERVICE`, `${serviceModal.grade} ${serviceModal.officer}`);
                 setServiceModal({ isOpen: false, officer: '', grade: '' });
             };
 
             const handleServiceEnd = () => {
                 const endTime = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-                updateCloud({ service: { ...service, active: false, officer: '', grade: '', start: null, end: endTime } });
-                addLogLocal('info', `FIN DE SERVICE`, `${service.grade} ${service.officer}`);
+                const newService = { ...service, active: false, officer: '', grade: '', start: null, end: endTime };
+                updateCloud({ service: newService });
+                addLogLocal('info', `FIN DE SERVICE`, `${service.grade} ${service.officer} (Fin: ${endTime})`);
             };
 
-            const updateGlobalState = (key, value) => updateCloud({ service: { ...service, [key]: value } });
+            const updateGlobalState = (key, value) => {
+                const newService = { ...service, [key]: value };
+                updateCloud({ service: newService });
+            };
+
             const getFleetByGroup = (groupKey) => fleet.filter(v => v.group === groupKey);
             const getGarageByGroup = (groupKey) => garageCatalog.filter(v => v.group === groupKey);
             const stats = useMemo(() => ({
@@ -400,199 +283,199 @@
                 destroyed: logs.filter(l => l.type === 'destroy').length 
             }), [fleet, logs]);
 
-            if (!user) return <div className="flex h-screen items-center justify-center bg-[#020617] text-blue-500 font-tech text-xl tracking-widest animate-pulse">INITIALISATION SYSTÈME FOF...</div>;
+            if (!user) return <div className="flex h-screen items-center justify-center bg-slate-900 text-white font-mono">CONNEXION SATELLITE EN COURS...</div>;
 
             return (
-                <div className="flex flex-col h-screen w-full font-sans overflow-hidden relative text-slate-200">
+                <div className="flex flex-col h-screen w-full font-sans overflow-hidden relative selection:bg-blue-500/30">
                     
-                    {/* --- EN-TÊTE --- */}
-                    <header className="glass-panel z-30 flex flex-col shrink-0 border-b border-white/5 relative">
-                        <div className="absolute inset-0 bg-gradient-to-r from-blue-900/10 to-transparent pointer-events-none"></div>
+                    {/* HEADER FIXED */}
+                    <header className="bg-[#0f172a] border-b border-slate-700 shadow-lg z-20 flex flex-col shrink-0">
                         
-                        {/* TOP BAR */}
-                        <div className="flex items-center justify-between px-4 py-3 relative z-10">
+                        {/* TOP BAR: TITRE + ACTIONS PRINCIPALES */}
+                        <div className="flex items-center justify-between px-3 py-2 bg-slate-900 border-b border-slate-800">
                             <div className="flex items-center gap-3">
-                                <div className="relative">
-                                    <div className="absolute inset-0 bg-blue-500 blur opacity-20"></div>
-                                    <div className="w-10 h-10 bg-gradient-to-br from-slate-800 to-slate-900 rounded border border-slate-700 flex items-center justify-center relative">
-                                       <Shield size={20} className="text-blue-400" />
-                                    </div>
+                                <div className="w-9 h-9 bg-blue-600 rounded flex items-center justify-center shadow-lg shadow-blue-900/50 shrink-0">
+                                   <Shield size={18} className="text-white" />
                                 </div>
                                 <div>
-                                    <h1 className="text-2xl font-bold text-white font-tech uppercase leading-none tracking-wide">Logistique <span className="text-blue-500">FOF</span></h1>
-                                    <div className="text-[10px] font-mono text-slate-400 flex items-center gap-2 mt-0.5">
-                                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shadow-glow-red"></span>
-                                        OPÉRATION EN COURS
+                                    <h1 className="text-lg font-bold text-white uppercase font-heading tracking-wide leading-none">Fiche Logistique</h1>
+                                    <div className="text-[10px] text-red-500 font-bold uppercase tracking-widest flex items-center gap-1 animate-pulse">
+                                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span> Conflit en cours
                                     </div>
                                 </div>
                             </div>
                             
-                            <div className="flex items-center gap-3">
-                                <button onClick={() => setShowDashboard(!showDashboard)} className="p-2 text-slate-400 hover:text-white bg-slate-800/50 rounded border border-slate-700/50 transition-all hover:bg-slate-700">
+                            <div className="flex items-center gap-2">
+                                {/* BOUTON TOGGLE DASHBOARD (Nouveau) */}
+                                <button 
+                                    onClick={() => setShowDashboard(!showDashboard)}
+                                    className="bg-slate-800 border border-slate-700 text-slate-300 p-2 rounded hover:bg-slate-700 transition-colors"
+                                    title={showDashboard ? "Masquer Gestion" : "Afficher Gestion"}
+                                >
                                     {showDashboard ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}
                                 </button>
 
-                                {!service.active ? (
-                                    <button onClick={() => setServiceModal({ isOpen: true, officer: '', grade: '' })} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm shadow-glow transition-all flex items-center gap-2">
-                                        <UserCheck size={16} /> <span className="hidden md:inline">Prise de Service</span>
-                                    </button>
-                                ) : (
-                                    <button onClick={handleServiceEnd} className="bg-red-900/30 hover:bg-red-900/50 border border-red-500/30 text-red-400 px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm transition-all flex items-center gap-2">
-                                        <LogOut size={16} /> <span className="hidden md:inline">Fin de Service</span>
-                                    </button>
-                                )}
+                                {/* BOUTON SERVICE */}
+                                <div>
+                                    {!service.active ? (
+                                        <button onClick={() => setServiceModal({ isOpen: true, officer: '', grade: '' })} className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded shadow-lg font-bold text-[10px] md:text-xs uppercase flex items-center gap-2 animate-pulse">
+                                            <UserCheck size={14} /> <span className="hidden md:inline">Prise de Service</span>
+                                        </button>
+                                    ) : (
+                                        <button onClick={handleServiceEnd} className="bg-red-600 hover:bg-red-500 text-white px-3 py-2 rounded shadow-lg font-bold text-[10px] md:text-xs uppercase flex items-center gap-2 border border-red-400">
+                                            <LogOut size={14} /> <span className="hidden md:inline">Fin</span>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
-                        {/* DASHBOARD EXPANDABLE */}
+                        {/* DASHBOARD REPLIABLE (Second Menu) */}
                         {showDashboard && (
-                            <div className="bg-slate-900/50 border-y border-white/5 animate-in backdrop-blur-md relative z-10">
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4">
-                                    {/* COLONNE 1: GLOBE HOLOGRAPHIQUE (LIVE MAP) */}
-                                    <div className="md:col-span-1 space-y-2">
-                                        <div className="text-xs uppercase font-bold text-slate-500 flex justify-between">
-                                            <span>Live Map</span>
-                                            <span className="text-blue-400 animate-pulse text-[10px]">• ONLINE</span>
-                                        </div>
-                                        <div className="h-32 bg-slate-950/80 border border-blue-500/30 rounded overflow-hidden relative shadow-inner">
-                                            <HoloGlobe fleet={fleet} />
-                                        </div>
-                                        <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
-                                            <span>OFFICIER: <span className="text-white font-bold">{service.active ? service.officer : 'N/A'}</span></span>
-                                            <span>{service.active ? service.start : '--:--'}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* COLONNE 2: RESSOURCES */}
-                                    <div className="md:col-span-2 flex flex-col justify-center">
-                                        <div className="grid grid-cols-2 gap-2 h-full">
-                                            <div className="bg-slate-950/50 border border-slate-800 rounded p-3 flex flex-col items-center justify-center">
-                                                <span className="text-[10px] uppercase text-slate-400 font-bold mb-1">Effectif Actif</span>
-                                                <div className="flex items-center gap-4">
-                                                    <button onClick={() => updateGlobalState('effectif', Math.max(0, service.effectif - 1))} className="text-slate-500 hover:text-white text-xl">-</button>
-                                                    <span className="text-3xl font-mono font-bold text-white">{service.effectif}</span>
-                                                    <button onClick={() => updateGlobalState('effectif', service.effectif + 1)} className="text-slate-500 hover:text-white text-xl">+</button>
-                                                </div>
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-0 divide-y md:divide-y-0 md:divide-x divide-slate-700 bg-slate-800/30 animate-in border-b border-slate-700">
+                                {/* Info Service */}
+                                <div className="md:col-span-5 p-2 flex flex-col gap-2 justify-center">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold text-emerald-500 uppercase w-12">SL Logis</span>
+                                        {service.active ? (
+                                            <div className="flex-1 bg-emerald-900/20 border border-emerald-500/30 text-emerald-400 text-xs rounded px-2 py-1 font-mono font-bold flex justify-between">
+                                                <span>{service.officer}</span><span className="opacity-70">{service.grade}</span>
                                             </div>
-                                            <div className="bg-slate-950/50 border border-slate-800 rounded p-3 flex flex-col items-center justify-center">
-                                                <span className="text-[10px] uppercase text-slate-400 font-bold mb-1">Supply Base</span>
-                                                <div className="flex items-center gap-4">
-                                                    <button onClick={() => updateGlobalState('supply', service.supply - 100)} className="text-slate-500 hover:text-white text-xl">-</button>
-                                                    <span className="text-3xl font-mono font-bold text-amber-400">{service.supply}</span>
-                                                    <button onClick={() => updateGlobalState('supply', service.supply + 100)} className="text-slate-500 hover:text-white text-xl">+</button>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        ) : (
+                                            <div className="flex-1 bg-slate-900/50 border border-slate-700 border-dashed text-slate-500 text-xs rounded px-2 py-1 font-mono italic">Vacant</div>
+                                        )}
                                     </div>
-
-                                    {/* COLONNE 3: MEDIC */}
-                                    <div className="md:col-span-1 flex flex-col gap-2 justify-center">
-                                        <div onClick={() => updateGlobalState('medic', !service.medic)} className={`h-full cursor-pointer p-3 rounded border flex flex-col items-center justify-center transition-all ${service.medic ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-slate-950/50 border-slate-800'}`}>
-                                            <div className={`w-4 h-4 rounded-full mb-2 transition-all ${service.medic ? 'bg-emerald-400 shadow-glow' : 'bg-slate-600'}`}></div>
-                                            <span className={`font-tech font-bold uppercase ${service.medic ? 'text-emerald-400' : 'text-slate-500'}`}>EVASAN DISPO</span>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 flex items-center gap-2">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase w-12">Début</span>
+                                            <div className="flex-1 bg-black/30 border border-slate-700 text-slate-300 text-xs rounded px-2 py-1 font-mono text-center">{service.active ? service.start : '--:--'}</div>
                                         </div>
                                     </div>
                                 </div>
-
-                                {/* NOUVELLE BARRE DE STATS FULL WIDTH */}
-                                <div className="grid grid-cols-4 divide-x divide-slate-800 border-t border-slate-800 bg-slate-950/80">
-                                    <div className="py-2 text-center">
-                                        <span className="block text-[9px] font-bold uppercase text-blue-500 mb-0.5">En Mission</span>
-                                        <span className="block text-xl font-mono font-bold text-white leading-none">{stats.mission}</span>
+                                {/* Gestion Ressources */}
+                                <div className="md:col-span-4 p-2 flex flex-col gap-2 justify-center">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[10px] font-bold text-white uppercase flex items-center gap-1"><Wrench size={12} /> Effectif</span>
+                                        <div className="flex items-center bg-slate-900 rounded border border-slate-700">
+                                            <button onClick={() => updateGlobalState('effectif', Math.max(0, service.effectif - 1))} className="px-3 py-1 text-slate-400 hover:text-white border-r border-slate-700">-</button>
+                                            <span className="px-2 text-xs font-bold text-white font-mono min-w-[30px] text-center">{service.effectif}</span>
+                                            <button onClick={() => updateGlobalState('effectif', service.effectif + 1)} className="px-3 py-1 text-slate-400 hover:text-white border-l border-slate-700">+</button>
+                                        </div>
                                     </div>
-                                    <div className="py-2 text-center">
-                                        <span className="block text-[9px] font-bold uppercase text-emerald-500 mb-0.5">Au Parc</span>
-                                        <span className="block text-xl font-mono font-bold text-white leading-none">{stats.operational}</span>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[10px] font-bold text-amber-500 uppercase flex items-center gap-1"><Box size={12} /> Supply</span>
+                                        <div className="flex items-center bg-slate-900 rounded border border-slate-700">
+                                            <button onClick={() => updateGlobalState('supply', service.supply - 100)} className="px-3 py-1 text-slate-400 hover:text-white border-r border-slate-700">-</button>
+                                            <span className="px-2 text-xs font-bold text-white font-mono min-w-[50px] text-center">{service.supply}</span>
+                                            <button onClick={() => updateGlobalState('supply', service.supply + 100)} className="px-3 py-1 text-slate-400 hover:text-white border-l border-slate-700">+</button>
+                                        </div>
                                     </div>
-                                    <div className="py-2 text-center bg-amber-900/10">
-                                        <span className="block text-[9px] font-bold uppercase text-amber-500 mb-0.5">Maintenance</span>
-                                        <span className="block text-xl font-mono font-bold text-white leading-none">{stats.maintenance}</span>
-                                    </div>
-                                    <div className="py-2 text-center bg-red-900/20">
-                                        <span className="block text-[9px] font-bold uppercase text-red-500 mb-0.5">Pertes</span>
-                                        <span className="block text-xl font-mono font-bold text-white leading-none">{stats.destroyed}</span>
+                                </div>
+                                {/* Medic Toggle */}
+                                <div className="md:col-span-3 p-2 flex flex-col justify-center gap-2">
+                                    <div onClick={() => updateGlobalState('medic', !service.medic)} className={`cursor-pointer flex items-center justify-between px-3 py-2 rounded border transition-all ${service.medic ? 'bg-blue-900/30 border-blue-500/50' : 'bg-slate-900 border-slate-800'}`}>
+                                        <span className={`text-[10px] font-bold uppercase ${service.medic ? 'text-blue-400' : 'text-slate-500'}`}>Medic V2 (EVASAN)</span>
+                                        <div className={`w-3 h-3 rounded-sm border flex items-center justify-center ${service.medic ? 'bg-blue-500 border-blue-500' : 'border-slate-600'}`}>
+                                            {service.medic && <Icon size={10} className="text-white"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></Icon>} 
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* NAVIGATION (SEGMENTED CONTROL) */}
-                        <div className="p-2 bg-slate-900/80 backdrop-blur flex justify-center relative z-20">
-                            <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800 w-full max-w-lg">
-                                {['fleet', 'garage', 'logs'].map(tab => (
-                                    <button 
-                                        key={tab}
-                                        onClick={() => setActiveTab(tab)}
-                                        className={`flex-1 py-2 rounded text-xs font-bold uppercase tracking-wider transition-all font-tech ${activeTab === tab ? 'bg-blue-600 text-white shadow-glow' : 'text-slate-500 hover:text-slate-300'}`}
-                                    >
-                                        {tab === 'fleet' ? 'Unités' : tab === 'garage' ? 'Catalogue' : 'Journal'}
-                                    </button>
-                                ))}
+                        {/* STATS BAR (PERSISTANTE) */}
+                        <div className="flex bg-black border-b border-slate-800 divide-x divide-slate-800 text-[10px] md:text-xs overflow-x-auto">
+                            <div className="flex-1 px-2 py-1.5 text-center bg-blue-900/10">
+                                <span className="text-blue-500 font-bold uppercase block">Mission</span>
+                                <span className="text-sm font-mono font-bold text-blue-400">{stats.mission}</span>
                             </div>
+                            <div className="flex-1 px-2 py-1.5 text-center">
+                                <span className="text-emerald-500 font-bold uppercase block">Au Parc</span>
+                                <span className="text-sm font-mono font-bold text-emerald-500">{stats.operational}</span>
+                            </div>
+                            <div className="flex-1 px-2 py-1.5 text-center bg-amber-900/10">
+                                <span className="text-amber-500 font-bold uppercase block">Maint.</span>
+                                <span className="text-sm font-mono font-bold text-amber-500">{stats.maintenance}</span>
+                            </div>
+                            <div className="flex-1 px-2 py-1.5 text-center bg-red-900/20">
+                                <span className="text-red-500 font-bold uppercase block">Détruit</span>
+                                <span className="text-sm font-mono font-bold text-red-500">{stats.destroyed}</span>
+                            </div>
+                        </div>
+
+                        {/* NAVIGATION */}
+                        <div className="flex items-stretch bg-slate-900 border-b border-slate-800 overflow-x-auto no-scrollbar">
+                            <button onClick={() => setActiveTab('fleet')} className={`flex-1 min-w-[100px] py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 border-b-2 transition-all ${activeTab === 'fleet' ? 'border-blue-500 text-white bg-slate-800' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
+                                <Car size={14} /> Flotte <span className="bg-slate-700 text-white px-1.5 rounded-full text-[10px]">{stats.deployed}</span>
+                            </button>
+                            <button onClick={() => setActiveTab('garage')} className={`flex-1 min-w-[100px] py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 border-b-2 transition-all ${activeTab === 'garage' ? 'border-amber-500 text-white bg-slate-800' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
+                                <Warehouse size={14} /> Garage
+                            </button>
+                            <button onClick={() => setActiveTab('logs')} className={`flex-1 min-w-[100px] py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 border-b-2 transition-all ${activeTab === 'logs' ? 'border-slate-200 text-white bg-slate-800' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
+                                <History size={14} /> Journal
+                            </button>
                         </div>
                     </header>
 
-                    {/* MAIN CONTENT */}
-                    <div className="flex-1 overflow-y-auto p-4 pb-24">
+                    {/* CONTENU PRINCIPAL */}
+                    <div className="flex-1 overflow-y-auto p-2 md:p-4 bg-[#0f172a]">
                         
-                        {/* VUE FLOTTE */}
+                        {/* FLOTTE */}
                         {activeTab === 'fleet' && (
-                            <div className="space-y-8 animate-in">
+                            <div className="space-y-6 pb-20 animate-in">
                                 {fleet.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-slate-800 rounded-2xl text-slate-600">
-                                        <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mb-4 border border-slate-800">
-                                            <Car size={32} className="opacity-50"/>
-                                        </div>
-                                        <p className="font-tech text-lg uppercase tracking-widest">Aucune unité active</p>
-                                        <button onClick={() => setActiveTab('garage')} className="mt-4 px-6 py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/50 rounded font-bold text-xs uppercase tracking-wider transition-all">
-                                            Accéder au Garage
-                                        </button>
+                                    <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-slate-700 rounded-lg text-slate-500 m-4 bg-slate-800/20">
+                                        <Car size={48} className="mb-4 opacity-50"/>
+                                        <p className="font-bold text-sm">Aucune unité sur le terrain</p>
+                                        <button onClick={() => setActiveTab('garage')} className="mt-4 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded font-bold text-xs uppercase shadow-lg">Ouvrir le Garage</button>
                                     </div>
                                 ) : (
                                     Object.keys(groupsConfig).map(groupKey => {
                                         const items = getFleetByGroup(groupKey);
                                         const config = groupsConfig[groupKey];
                                         if (!items.length) return null;
-
                                         return (
-                                            <div key={groupKey} className="space-y-3">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-1 h-6 rounded-full ${config.color} shadow-glow`}></div>
-                                                    <h2 className={`text-lg font-bold uppercase tracking-widest font-tech ${config.text} opacity-90`}>{config.label}</h2>
-                                                    <div className="text-xs font-mono text-slate-600 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">{items.length}</div>
-                                                    <div className="h-px bg-gradient-to-r from-slate-800 to-transparent flex-1"></div>
+                                            <div key={groupKey}>
+                                                 <div className="flex items-center gap-2 mb-2 pl-1 mt-4 first:mt-0">
+                                                    <div className={`w-1 h-4 rounded-full ${config.color}`}></div>
+                                                    <h2 className={`text-sm font-bold uppercase tracking-widest ${config.text} opacity-90 font-heading`}>{config.label} <span className="text-slate-600 ml-1 text-xs font-mono">({items.length})</span></h2>
+                                                    <div className="h-px bg-slate-800 flex-1 ml-2 opacity-50"></div>
                                                 </div>
-                                                
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                                     {items.map(item => (
-                                                        <div key={item.uniqueId} className="bg-slate-900/40 border border-white/5 rounded-lg overflow-hidden hover:border-white/10 transition-all relative group backdrop-blur-sm">
-                                                            <div className={`absolute top-0 left-0 w-1 h-full ${item.status === 'En Mission' ? 'bg-blue-500 shadow-glow' : item.status === 'Maintenance' ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
-                                                            
-                                                            <div className="p-4 pl-6">
-                                                                <div className="flex justify-between items-start mb-4">
+                                                        <div key={item.uniqueId} className={`relative bg-[#1e293b] border flex flex-col rounded overflow-hidden shadow-md ${
+                                                            item.status === 'En Mission' ? 'border-blue-500/50 ring-1 ring-blue-500/20' : 
+                                                            item.status === 'Maintenance' ? 'border-amber-500/50' : 'border-slate-700'
+                                                        }`}>
+                                                            <div className={`h-1 w-full ${item.status === 'Opérationnel' ? 'bg-emerald-500' : item.status === 'En Mission' ? 'bg-blue-500' : 'bg-amber-500'}`}></div>
+                                                            <div className="p-3 flex-1 flex flex-col">
+                                                                <div className="flex justify-between items-start mb-3">
                                                                     <div>
-                                                                        <div className="font-mono text-xs font-bold text-slate-400 mb-1">ID: {item.callsign}</div>
-                                                                        <div className="font-tech text-lg font-bold text-white leading-tight">{item.type}</div>
+                                                                        <div className="font-mono text-xs font-bold text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded inline-block mb-1 border border-slate-800">{item.callsign}</div>
+                                                                        <div className="font-bold text-sm text-slate-200 leading-tight">{item.type}</div>
                                                                     </div>
-                                                                    <div className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-wider border ${
-                                                                        item.status === 'Opérationnel' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
-                                                                        item.status === 'En Mission' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 animate-pulse' :
-                                                                        'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                                                                    }`}>
-                                                                        {item.status}
-                                                                    </div>
+                                                                    <div className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                                                                        item.status === 'Opérationnel' ? 'bg-emerald-900/30 text-emerald-400 border-emerald-900/50' :
+                                                                        item.status === 'En Mission' ? 'bg-blue-900/30 text-blue-400 border-blue-900/50 animate-pulse' :
+                                                                        'bg-amber-900/30 text-amber-400 border-amber-900/50'
+                                                                    }`}>{item.status}</div>
                                                                 </div>
-
-                                                                <div className="grid grid-cols-2 gap-2">
-                                                                    {item.status === 'En Mission' ? (
-                                                                        <button onClick={() => updateStatus(item.uniqueId, 'Opérationnel')} className="h-9 rounded bg-slate-800 border border-slate-700 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/50 text-xs font-bold uppercase transition-all">Retour Base</button>
-                                                                    ) : (
-                                                                        <button onClick={() => updateStatus(item.uniqueId, 'En Mission')} className="h-9 rounded bg-blue-600 text-white shadow-glow hover:bg-blue-500 text-xs font-bold uppercase transition-all">Départ Mission</button>
-                                                                    )}
-                                                                    
-                                                                    <div className="flex gap-1">
-                                                                        <button onClick={() => updateStatus(item.uniqueId, 'Garage')} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded border border-slate-700 flex items-center justify-center transition-all" title="Garage"><RotateCcw size={14}/></button>
-                                                                        <button onClick={() => updateStatus(item.uniqueId, 'Détruit')} className="flex-1 bg-slate-800 hover:bg-red-900/40 text-slate-400 hover:text-red-400 rounded border border-slate-700 flex items-center justify-center transition-all" title="Détruire"><Flame size={14}/></button>
+                                                                <div className="mt-auto space-y-2">
+                                                                    <div className="grid grid-cols-2 gap-2">
+                                                                        {item.status === 'En Mission' ? (
+                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Opérationnel')} className="bg-slate-700 active:bg-emerald-700 text-emerald-400 active:text-white h-9 rounded text-[10px] font-bold uppercase border border-slate-600 flex items-center justify-center gap-1 hover:bg-slate-600">Retour</button>
+                                                                        ) : (
+                                                                            <button onClick={() => updateStatus(item.uniqueId, 'En Mission')} className="bg-slate-700 active:bg-blue-700 text-blue-400 active:text-white h-9 rounded text-[10px] font-bold uppercase border border-slate-600 flex items-center justify-center gap-1 hover:bg-slate-600">Mission</button>
+                                                                        )}
+                                                                        {item.status === 'Maintenance' ? (
+                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Opérationnel')} className="bg-slate-700 active:bg-emerald-700 text-emerald-400 active:text-white h-9 rounded text-[10px] font-bold uppercase border border-slate-600 flex items-center justify-center gap-1 hover:bg-slate-600">Fin Maint.</button>
+                                                                        ) : (
+                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Maintenance')} className="bg-slate-700 active:bg-amber-700 text-amber-400 active:text-white h-9 rounded text-[10px] font-bold uppercase border border-slate-600 flex items-center justify-center gap-1 hover:bg-slate-600">Maint.</button>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700/50">
+                                                                         <button onClick={() => updateStatus(item.uniqueId, 'Garage')} className="text-slate-400 hover:text-white text-[9px] uppercase font-bold py-1 flex items-center justify-center gap-1 hover:bg-slate-700 rounded transition-colors"><RotateCcw size={10}/> Rentrer</button>
+                                                                         <button onClick={() => updateStatus(item.uniqueId, 'Détruit')} className="text-red-400 hover:text-red-200 text-[9px] uppercase font-bold py-1 flex items-center justify-center gap-1 hover:bg-red-900/30 rounded transition-colors"><Flame size={10}/> Détruire</button>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -606,33 +489,34 @@
                             </div>
                         )}
 
-                        {/* VUE GARAGE */}
+                        {/* GARAGE */}
                         {activeTab === 'garage' && (
-                            <div className="space-y-8 animate-in">
+                            <div className="space-y-6 pb-20 animate-in">
+                                <div className="bg-slate-800/50 border border-slate-700 p-3 rounded text-slate-300 text-xs flex gap-2 items-center mb-4">
+                                    <Warehouse size={16} className="text-amber-500" /> <span>Cliquez sur <strong>DÉPLOYER</strong> pour affecter un véhicule à la flotte.</span>
+                                </div>
                                 {Object.keys(groupsConfig).map(groupKey => {
                                     const items = getGarageByGroup(groupKey);
                                     const config = groupsConfig[groupKey];
                                     if (!items.length) return null;
-
                                     return (
                                         <div key={groupKey}>
-                                            <div className="flex items-center gap-3 mb-3 pl-1">
-                                                <h2 className={`text-lg font-bold uppercase tracking-widest font-tech ${config.text}`}>{config.label}</h2>
-                                                <div className={`h-px flex-1 opacity-30 bg-gradient-to-r from-current to-transparent ${config.text}`}></div>
+                                            <div className="flex items-center gap-2 mb-2 pl-1 mt-4 first:mt-0">
+                                                <div className={`w-1 h-4 rounded-full ${config.color}`}></div>
+                                                <h2 className={`text-sm font-bold uppercase tracking-widest ${config.text} opacity-90 font-heading`}>{config.label}</h2>
+                                                <div className="h-px bg-slate-800 flex-1 ml-2 opacity-50"></div>
                                             </div>
-                                            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
+                                            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                                                 {items.map(item => (
-                                                    <div key={item.id} className="bg-slate-900/30 border border-slate-800 hover:border-blue-500/50 rounded p-3 flex flex-col gap-3 group transition-all hover:bg-slate-900/60">
-                                                        <div className="flex justify-between items-start">
-                                                            <div>
-                                                                <div className="font-bold text-slate-200 text-sm">{item.type}</div>
-                                                                <div className="text-xs font-mono text-slate-500 mt-0.5">{item.cost} pts</div>
+                                                    <div key={item.id} className="bg-[#1e293b] border border-slate-700 hover:border-slate-500 rounded p-3 flex justify-between items-center group touch-manipulation transition-colors">
+                                                        <div>
+                                                            <div className="font-bold text-slate-200 text-sm">{item.type}</div>
+                                                            <div className="flex gap-2 text-[10px] mt-1">
+                                                                <span className="text-slate-500 font-mono">{item.cost} pts</span>
+                                                                {item.grade && <span className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-400 font-bold border border-slate-700">{item.grade}</span>}
                                                             </div>
-                                                            {item.grade && <span className="text-[9px] font-bold bg-slate-950 px-1.5 py-0.5 rounded text-slate-400 border border-slate-800">{item.grade}</span>}
                                                         </div>
-                                                        <button onClick={() => deployVehicle(item)} className="w-full py-2 bg-slate-800 group-hover:bg-blue-600 group-hover:text-white text-blue-400 border border-slate-700 group-hover:border-blue-500 rounded text-[10px] font-bold uppercase tracking-widest transition-all">
-                                                            Déployer
-                                                        </button>
+                                                        <button onClick={() => deployVehicle(item)} className="bg-slate-800 text-amber-500 border border-slate-600 px-3 py-2 rounded text-[10px] font-bold uppercase hover:bg-amber-600 hover:text-white active:scale-95 transition-all"><Plus size={14}/></button>
                                                     </div>
                                                 ))}
                                             </div>
@@ -642,53 +526,66 @@
                             </div>
                         )}
 
-                        {/* VUE LOGS */}
+                        {/* LOGS */}
                         {activeTab === 'logs' && (
-                            <div className="max-w-3xl mx-auto animate-in space-y-3">
-                                <h2 className="font-tech text-xl text-slate-400 uppercase tracking-widest mb-4">Historique Opérationnel</h2>
-                                {logs.map(log => (
-                                    <div key={log.id} className="group bg-slate-900/40 border border-slate-800 p-3 rounded flex items-start gap-4 hover:bg-slate-900/60 transition-colors">
-                                        <div className="font-mono text-xs text-slate-500 pt-1">{log.time}</div>
-                                        <div className={`w-1 h-8 rounded-full shrink-0 ${log.type === 'destroy' ? 'bg-red-500 shadow-glow-red' : log.type === 'mission' ? 'bg-blue-500 shadow-glow' : 'bg-slate-600'}`}></div>
-                                        <div className="flex-1">
-                                            <div className={`font-bold text-sm ${log.type === 'destroy' ? 'text-red-400' : log.type === 'mission' ? 'text-blue-400' : 'text-slate-300'}`}>{log.message}</div>
-                                            <div className="text-xs text-slate-500 font-mono mt-0.5">{log.details}</div>
-                                        </div>
-                                        <button onClick={() => deleteLog(log.id)} className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-500 transition-all"><Trash2 size={14} /></button>
-                                    </div>
-                                ))}
+                            <div className="max-w-3xl mx-auto pb-20 animate-in">
+                                <div className="space-y-2">
+                                    {logs.length === 0 ? (
+                                        <div className="text-center py-10 text-slate-600 border-2 border-dashed border-slate-800 rounded-lg"><History size={32} className="mx-auto mb-2 opacity-50"/>Aucune activité enregistrée.</div>
+                                    ) : (
+                                        logs.map(log => (
+                                            <div key={log.id} className="bg-[#1e293b] border border-slate-700 p-3 rounded flex items-start gap-3 text-sm group">
+                                                <div className="font-mono text-xs text-slate-500 w-10 shrink-0 pt-0.5">{log.time}</div>
+                                                <div className={`w-1 h-8 rounded-full shrink-0 ${log.type === 'destroy' ? 'bg-red-500' : log.type === 'mission' ? 'bg-blue-500' : log.type === 'deploy' ? 'bg-emerald-500' : 'bg-slate-500'}`}></div>
+                                                <div className="flex-1">
+                                                    <div className={`font-bold text-xs md:text-sm ${log.type === 'destroy' ? 'text-red-400' : log.type === 'mission' ? 'text-blue-400' : log.type === 'deploy' ? 'text-emerald-400' : 'text-slate-300'}`}>{log.message}</div>
+                                                    <div className="text-[10px] text-slate-500 mt-0.5">{log.details}</div>
+                                                </div>
+                                                <button onClick={() => deleteLog(log.id)} className="text-slate-600 hover:text-red-500 p-1 rounded hover:bg-slate-800 transition-colors">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
-
-                    {/* MODALES (SERVICE + DESTRUCTION) - Idem v10 mais styled */}
+                    
+                    {/* MODALS (SERVICE + DESTRUCTION) */}
                     {serviceModal.isOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur p-4 animate-in">
-                            <div className="bg-slate-900 border border-blue-500/30 rounded-xl w-full max-w-sm shadow-2xl shadow-blue-900/20 overflow-hidden">
-                                <div className="bg-blue-600/10 p-4 border-b border-blue-500/20 flex items-center gap-3">
-                                    <div className="p-2 bg-blue-600 rounded text-white shadow-glow"><UserCheck size={20} /></div>
-                                    <h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Identification</h3>
+                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in">
+                            <div className="bg-slate-900 border-2 border-emerald-500 rounded w-full max-w-xs shadow-2xl">
+                                <div className="bg-emerald-600 p-3 flex items-center gap-2">
+                                    <UserCheck className="text-white" size={20} />
+                                    <h3 className="font-bold text-white uppercase">Identification</h3>
                                 </div>
-                                <div className="p-6 space-y-4">
+                                <div className="p-4 space-y-3">
                                     <div>
-                                        <label className="block text-[10px] uppercase font-bold text-blue-400 mb-1 tracking-widest">Matricule</label>
-                                        <input type="text" className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none font-mono uppercase" placeholder="EX: USER-01" value={serviceModal.officer} onChange={e => setServiceModal({...serviceModal, officer: e.target.value})} autoFocus />
+                                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Pseudo / Matricule</label>
+                                        <input type="text" className="w-full bg-black border border-slate-700 rounded p-2 text-white focus:border-emerald-500 outline-none uppercase font-mono" placeholder="Ex: MULTIFRUIT14" value={serviceModal.officer} onChange={e => setServiceModal({...serviceModal, officer: e.target.value})} autoFocus />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] uppercase font-bold text-blue-400 mb-1 tracking-widest">Grade</label>
-                                        <select className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none font-mono" value={serviceModal.grade} onChange={e => setServiceModal({...serviceModal, grade: e.target.value})}>
+                                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Grade</label>
+                                        <select className="w-full bg-black border border-slate-700 rounded p-2 text-white focus:border-emerald-500 outline-none" value={serviceModal.grade} onChange={e => setServiceModal({...serviceModal, grade: e.target.value})}>
                                             <option value="">Sélectionner...</option>
                                             <option value="2CL">2ème Classe</option>
                                             <option value="1CL">1ère Classe</option>
                                             <option value="CPL">Caporal</option>
+                                            <option value="CCH">Caporal-Chef</option>
                                             <option value="SGT">Sergent</option>
+                                            <option value="SCH">Sergent-Chef</option>
+                                            <option value="ADJ">Adjudant</option>
+                                            <option value="ADC">Adjudant-Chef</option>
+                                            <option value="ASP">Aspirant</option>
+                                            <option value="SLT">Sous-Lieutenant</option>
                                             <option value="LTN">Lieutenant</option>
                                             <option value="CNE">Capitaine</option>
                                         </select>
                                     </div>
-                                    <div className="flex gap-3 pt-2">
-                                        <button onClick={() => setServiceModal({isOpen: false, officer:'', grade:''})} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded text-xs font-bold hover:bg-slate-700">ANNULER</button>
-                                        <button onClick={handleServiceStart} disabled={!serviceModal.officer || !serviceModal.grade} className="flex-1 py-3 bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 rounded text-xs font-bold uppercase shadow-glow">VALIDER</button>
+                                    <div className="flex gap-2 pt-2">
+                                        <button onClick={() => setServiceModal({isOpen: false, officer:'', grade:''})} className="flex-1 py-2 bg-slate-800 text-slate-400 rounded text-xs font-bold">Annuler</button>
+                                        <button onClick={handleServiceStart} disabled={!serviceModal.officer || !serviceModal.grade} className="flex-1 py-2 bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 rounded text-xs font-bold uppercase">Valider</button>
                                     </div>
                                 </div>
                             </div>
@@ -696,41 +593,43 @@
                     )}
 
                     {destroyModal.isOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur p-4 animate-in">
-                            <div className="bg-slate-900 border border-red-500/30 rounded-xl w-full max-w-sm shadow-2xl shadow-red-900/20 overflow-hidden">
-                                <div className="bg-red-600/10 p-4 border-b border-red-500/20 flex items-center gap-3">
-                                    <div className="p-2 bg-red-600 rounded text-white shadow-glow-red"><AlertTriangle size={20} /></div>
-                                    <h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Perte Véhicule</h3>
+                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in">
+                            <div className="bg-[#1e293b] border-2 border-red-600 rounded w-full max-w-sm shadow-2xl flex flex-col max-h-[90vh]">
+                                <div className="bg-red-600 p-3 flex items-center gap-3 shrink-0">
+                                    <AlertTriangle className="text-white" size={24} />
+                                    <h3 className="text-lg font-bold text-white uppercase tracking-widest font-heading">Perte Véhicule</h3>
                                 </div>
-                                <div className="p-6 space-y-4">
-                                    <div className="bg-red-950/30 p-3 rounded border border-red-500/20 flex justify-between items-center">
-                                        <span className="text-red-400 font-mono text-sm">{fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.callsign}</span>
-                                        <span className="text-slate-400 text-xs">{fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.type}</span>
+                                <div className="p-4 space-y-4 overflow-y-auto">
+                                    <div className="bg-red-900/20 p-3 rounded border border-red-900/50">
+                                        <div className="text-[10px] text-red-400 uppercase font-bold mb-1">Cible</div>
+                                        <div className="text-white font-bold text-lg font-heading">
+                                            {fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.callsign}
+                                        </div>
                                     </div>
-                                    <textarea value={destroyReason} onChange={(e) => setDestroyReason(e.target.value)} className="w-full bg-slate-950 border border-slate-700 p-3 text-sm text-white focus:border-red-500 focus:outline-none rounded h-24 resize-none" placeholder="Rapport de destruction requis..." />
-                                    <div className="flex gap-3 pt-2">
-                                        <button onClick={() => setDestroyModal({isOpen: false, vehicleId: null})} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded text-xs font-bold hover:bg-slate-700">ANNULER</button>
-                                        <button onClick={confirmDestruction} disabled={!destroyReason.trim()} className="flex-1 py-3 bg-red-600 text-white hover:bg-red-500 disabled:opacity-50 rounded text-xs font-bold uppercase shadow-glow-red">CONFIRMER</button>
+                                    <textarea value={destroyReason} onChange={(e) => setDestroyReason(e.target.value)} className="w-full bg-slate-900 border border-slate-700 p-3 text-sm text-white focus:border-red-500 focus:outline-none rounded h-24 resize-none" placeholder="Cause, lieu, équipage..." />
+                                    <div className="grid grid-cols-2 gap-3 pt-2">
+                                        <button onClick={() => setDestroyModal({isOpen: false, vehicleId: null})} className="py-3 bg-slate-700 active:bg-slate-600 text-white font-bold rounded uppercase text-xs">Annuler</button>
+                                        <button onClick={confirmDestruction} disabled={!destroyReason.trim()} className="py-3 bg-red-600 active:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded uppercase text-xs shadow-lg">Confirmer</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* FOOTER STATUS */}
-                    <div className="absolute bottom-0 left-0 w-full bg-slate-950/80 backdrop-blur border-t border-white/5 p-2 flex justify-between items-center gap-2 z-30 text-[10px] font-mono text-slate-500">
+                    {/* STATUS FOOTER */}
+                    <div className="absolute bottom-0 left-0 w-full bg-[#0f172a] border-t border-slate-800 p-2 flex justify-between items-center gap-2 shadow-2xl z-30">
                         <div className="flex items-center gap-2">
-                             <div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div>
-                             <span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span>
+                             <div className={`w-2 h-2 rounded-full ${user ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`}></div>
+                             <span className="text-[10px] text-slate-500 font-mono">{user ? 'SYNC ACTIVE' : 'CONNECTING...'}</span>
                         </div>
-                        <div>v11.5 Live Map</div>
+                        <div className="text-[10px] text-slate-700 font-mono">APP_ID: {window.APP_ID}</div>
                     </div>
                 </div>
             );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MilitaryMdtV11_5 />);
+        root.render(<MilitaryMdtV9 />);
     </script>
 </body>
 </html>
