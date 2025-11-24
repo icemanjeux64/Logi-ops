@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT FOF - Tactical v18</title>
+    <title>MDT FOF - Tactical v19</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -119,6 +119,7 @@
         const Wrench = (p) => <Icon {...p}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></Icon>;
         const MapPin = (p) => <Icon {...p}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></Icon>;
         const Info = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></Icon>;
+        const Clock = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>;
         const UserCheck = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></Icon>;
         const Users = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>;
         const LogOut = (p) => <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></Icon>;
@@ -126,6 +127,7 @@
         const ChevronUp = (p) => <Icon {...p}><polyline points="18 15 12 9 6 15"/></Icon>;
         const Trash2 = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Icon>;
         const Edit2 = (p) => <Icon {...p}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></Icon>;
+        const Lock = (p) => <Icon {...p}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Icon>;
 
         // --- CATALOGUE ---
         const garageCatalog = [
@@ -173,12 +175,12 @@
             'alat': { label: 'ALAT', color: 'bg-sky-500', text: 'text-sky-400', border: 'border-sky-500/30' },
         };
 
-        function MilitaryMdtV18() {
+        function MilitaryMdtV19() {
             const [activeTab, setActiveTab] = useState('fleet');
             const [fleet, setFleet] = useState([]);
             const [logs, setLogs] = useState([]);
-            const [service, setService] = useState({ active: false, officer: '', grade: '', start: null, end: null, medic: true });
-            const [supplyLocations, setSupplyLocations] = useState([]); // NOUVEAU STATE
+            const [service, setService] = useState({ active: false, officer: '', grade: '', start: null, end: null, supply: 6000, medic: true, ownerUid: null });
+            const [supplyLocations, setSupplyLocations] = useState([]); 
             const [roster, setRoster] = useState([]); 
             const [user, setUser] = useState(null);
             const [showDashboard, setShowDashboard] = useState(true);
@@ -188,10 +190,17 @@
             const [destroyReason, setDestroyReason] = useState('');
             const [destroyReporter, setDestroyReporter] = useState('');
             const [serviceModal, setServiceModal] = useState({ isOpen: false, officer: '', grade: '' });
-            const [supplyModal, setSupplyModal] = useState({ isOpen: false }); // NOUVEAU MODAL
+            const [supplyModal, setSupplyModal] = useState({ isOpen: false });
             const [newPerson, setNewPerson] = useState({ name: '', grade: '2CL' });
-            const [newSupply, setNewSupply] = useState({ name: '', amount: 0 }); // NOUVEAU STATE
+            const [newSupply, setNewSupply] = useState({ name: '', amount: 0 });
             const [showRules, setShowRules] = useState(false);
+
+            // --- PERMISSIONS ---
+            // Seul le créateur du service (SL) a le pouvoir suprême
+            const isSL = useMemo(() => {
+                if (!service.active) return true; // Si pas de service, tout le monde peut le prendre
+                return service.ownerUid === user?.uid;
+            }, [service, user]);
 
             // --- FIREBASE ---
             useEffect(() => {
@@ -211,15 +220,11 @@
                         if (data.logs) setLogs(data.logs);
                         if (data.service) setService(data.service);
                         if (data.roster) setRoster(data.roster);
-                        // INIT SUPPLY LOCATIONS IF MISSING
-                        if (data.supplyLocations) {
-                             setSupplyLocations(data.supplyLocations);
-                        } else {
-                             // Migration from old single value
-                             const initialSupply = data.service?.supply || 6000;
+                        if (data.supplyLocations) setSupplyLocations(data.supplyLocations);
+                        else if (data.service?.supply) {
+                             const initialSupply = data.service.supply;
                              const defaultLoc = [{ id: 'base_main', name: 'Base Principale', amount: initialSupply }];
                              setSupplyLocations(defaultLoc);
-                             updateCloud({ supplyLocations: defaultLoc });
                         }
                     } else {
                         window.fb.setDoc(docRef, { 
@@ -247,6 +252,7 @@
             const deleteLog = (logId) => { if(confirm("Supprimer ?")) updateCloud({ logs: logs.filter(l => l.id !== logId) }); };
             
             const deployVehicle = (vehicleModel) => {
+                if (!isSL) return; // Security check
                 const newId = Date.now();
                 const prefix = vehicleModel.type.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '');
                 const num = fleet.length + 1; 
@@ -268,6 +274,9 @@
                 if (!v) return;
                 if (newStatus === 'Détruit') { setDestroyModal({ isOpen: true, vehicleId: uniqueId }); return; }
                 if (newStatus === 'Garage') {
+                    // Everyone can return to garage? Let's say yes for fluidity, or restrict to SL.
+                    // Restriction: Only SL can put back to garage
+                    if (!isSL) { alert("Seul le SL peut rentrer un véhicule au garage."); return; }
                     updateCloud({ fleet: fleet.filter(item => item.uniqueId !== uniqueId) });
                     addLogLocal('info', `RETOUR PARC: ${v.callsign}`, `Retour opérationnel.`);
                     return;
@@ -298,7 +307,7 @@
                 setDestroyReporter('');
             };
 
-            // Personnel
+            // Personnel (Allowed for everyone)
             const addPersonnel = () => {
                 if (!newPerson.name) return;
                 const newRoster = [...roster, { id: Date.now(), ...newPerson, onDuty: false, dutyStart: null }];
@@ -322,18 +331,21 @@
                 addLogLocal('info', isStarting ? `PRISE DE POSTE` : `FIN DE POSTE`, `${person.grade} ${person.name}`);
             };
 
-            // Supply Chain Management
+            // Supply (Restricted to SL)
             const addSupplyLocation = () => {
+                if (!isSL) return;
                 if (!newSupply.name) return;
                 const newLocations = [...supplyLocations, { id: Date.now(), ...newSupply }];
                 updateCloud({ supplyLocations: newLocations });
                 setNewSupply({ name: '', amount: 0 });
             };
             const removeSupplyLocation = (id) => {
+                if (!isSL) return;
                 const newLocations = supplyLocations.filter(l => l.id !== id);
                 updateCloud({ supplyLocations: newLocations });
             };
             const updateSupplyAmount = (id, amount) => {
+                if (!isSL) return;
                 const newLocations = supplyLocations.map(l => l.id === id ? { ...l, amount } : l);
                 updateCloud({ supplyLocations: newLocations });
             };
@@ -342,16 +354,42 @@
             const handleServiceStart = () => {
                 if (!serviceModal.officer) return;
                 const startTime = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-                updateCloud({ service: { ...service, active: true, officer: serviceModal.officer, grade: serviceModal.grade, start: startTime, end: null } });
+                updateCloud({ 
+                    service: { 
+                        ...service, 
+                        active: true, 
+                        officer: serviceModal.officer, 
+                        grade: serviceModal.grade, 
+                        start: startTime, 
+                        end: null,
+                        ownerUid: user.uid // THE KEY: Lock the session to this user
+                    } 
+                });
                 addLogLocal('info', `SUPERVISION (SL)`, `Prise de commandement: ${serviceModal.grade} ${serviceModal.officer}`);
                 setServiceModal({ isOpen: false, officer: '', grade: '' });
             };
             const handleServiceEnd = () => {
+                if (!isSL) return;
                 const endTime = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-                updateCloud({ service: { ...service, active: false, officer: '', grade: '', start: null, end: endTime } });
+                updateCloud({ 
+                    service: { 
+                        ...service, 
+                        active: false, 
+                        officer: '', 
+                        grade: '', 
+                        start: null, 
+                        end: endTime,
+                        ownerUid: null // Release lock
+                    } 
+                });
                 addLogLocal('info', `FIN SUPERVISION`, `Fin de service SL. (Fin: ${endTime})`);
             };
-            const updateGlobalState = (key, value) => updateCloud({ service: { ...service, [key]: value } });
+            const updateGlobalState = (key, value) => {
+                if (!isSL && key !== 'medic') return; // Medic allowed for all? Usually yes for emergency. Let's say yes.
+                // Actually, let's restrict Effectif counters manual adjustment too, since it's auto-calculated or managed by SL
+                if (key === 'effectif' && !isSL) return;
+                updateCloud({ service: { ...service, [key]: value } });
+            };
 
             const getFleetByGroup = (groupKey) => fleet.filter(v => v.group === groupKey);
             const getGarageByGroup = (groupKey) => garageCatalog.filter(v => v.group === groupKey);
@@ -377,8 +415,10 @@
                         
                         <div className="flex items-center justify-between px-4 py-3 relative z-10">
                             <div className="flex items-center gap-3">
+                                {/* LOGO */}
                                 <img src="Logo.png" alt="Logo FOF" className="h-10 w-auto object-contain drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
                                 <div className="hidden w-10 h-10 bg-gradient-to-br from-slate-800 to-slate-900 rounded border border-slate-700 items-center justify-center relative"><Shield size={20} className="text-blue-400" /></div>
+
                                 <div>
                                     <h1 className="text-2xl font-bold text-white font-tech uppercase leading-none tracking-wide">Logistique <span className="text-blue-500">FOF</span></h1>
                                     <div className="text-[10px] font-mono text-slate-400 flex items-center gap-2 mt-0.5">
@@ -387,21 +427,31 @@
                                     </div>
                                 </div>
                             </div>
+                            
                             <div className="flex items-center gap-3">
                                 <button onClick={() => setShowRules(!showRules)} className="md:hidden p-2 text-slate-400 hover:text-white bg-slate-800/50 rounded border border-slate-700/50 transition-all hover:bg-slate-700 flex items-center gap-2" title="Règlement">
                                     <Info size={18} /> <span className="hidden md:inline text-xs font-bold uppercase">Règlement</span>
                                 </button>
+
                                 <button onClick={() => setShowDashboard(!showDashboard)} className="p-2 text-slate-400 hover:text-white bg-slate-800/50 rounded border border-slate-700/50 transition-all hover:bg-slate-700">
                                     {showDashboard ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}
                                 </button>
+
                                 {!service.active ? (
                                     <button onClick={() => setServiceModal({ isOpen: true, officer: '', grade: '' })} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm shadow-glow transition-all flex items-center gap-2">
                                         <UserCheck size={16} /> <span className="hidden md:inline">Superviseur (SL)</span>
                                     </button>
                                 ) : (
-                                    <button onClick={handleServiceEnd} className="bg-red-900/30 hover:bg-red-900/50 border border-red-500/30 text-red-400 px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm transition-all flex items-center gap-2">
-                                        <LogOut size={16} /> <span className="hidden md:inline">Fin Service SL</span>
-                                    </button>
+                                    // BOUTON FIN DE SERVICE : Seulement pour le SL
+                                    isSL ? (
+                                        <button onClick={handleServiceEnd} className="bg-red-900/30 hover:bg-red-900/50 border border-red-500/30 text-red-400 px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm transition-all flex items-center gap-2">
+                                            <LogOut size={16} /> <span className="hidden md:inline">Fin Service SL</span>
+                                        </button>
+                                    ) : (
+                                        <div className="px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm bg-slate-800 text-slate-500 border border-slate-700 flex items-center gap-2 cursor-not-allowed" title="Seul le SL peut clore la session">
+                                            <Lock size={14} /> <span>Opérateur</span>
+                                        </div>
+                                    )
                                 )}
                             </div>
                         </div>
@@ -433,11 +483,16 @@
                                 <div className="md:col-span-1 space-y-2 flex flex-col justify-center">
                                     <div className="bg-slate-950/80 border border-blue-900/30 rounded p-4 h-full flex flex-col justify-center relative overflow-hidden group">
                                         <div className="absolute right-0 top-0 p-2 opacity-10 text-blue-500"><UserCheck size={64} /></div>
-                                        <span className="text-[10px] uppercase text-slate-500 font-bold mb-1">Supervision (SL Logis)</span>
-                                        <div className="font-tech text-2xl font-bold text-white truncate">{service.active ? service.officer : 'AUCUN SL'}</div>
-                                        <div className="text-sm font-mono text-blue-400">{service.active ? service.grade : '--'}</div>
+                                        <span className="text-[10px] uppercase text-slate-500 font-bold mb-1">Commandement Logistique</span>
+                                        <div className="font-tech text-2xl font-bold text-white truncate">
+                                            {service.active ? service.officer : 'AUCUN SL'}
+                                        </div>
+                                        <div className="text-sm font-mono text-blue-400">
+                                            {service.active ? service.grade : '--'}
+                                        </div>
                                         <div className="mt-4 pt-2 border-t border-white/5 flex justify-between text-xs font-mono text-slate-400">
-                                            <span>DEBUT:</span><span className="text-white">{service.active ? service.start : '--:--'}</span>
+                                            <span>DEBUT:</span>
+                                            <span className="text-white">{service.active ? service.start : '--:--'}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -449,13 +504,13 @@
                                             <span className="text-4xl font-mono font-bold text-white tracking-tighter">{activePersonnelCount}</span>
                                             <span className="text-[9px] text-slate-500">SUR {roster.length} INSCRITS</span>
                                         </div>
-                                        {/* SUPPLY WIDGET (CLICKABLE) */}
+                                        {/* SUPPLY WIDGET */}
                                         <div 
-                                            onClick={() => setSupplyModal({ isOpen: true })}
-                                            className="bg-slate-950/50 border border-slate-800 rounded p-3 flex flex-col items-center justify-center hover:bg-slate-900/50 transition-colors cursor-pointer group"
+                                            onClick={() => { if(isSL) setSupplyModal({ isOpen: true }) }}
+                                            className={`bg-slate-950/50 border border-slate-800 rounded p-3 flex flex-col items-center justify-center transition-colors group ${isSL ? 'hover:bg-slate-900/50 cursor-pointer' : 'opacity-80 cursor-not-allowed'}`}
                                         >
                                             <span className="text-[10px] uppercase text-slate-400 font-bold mb-1 flex items-center gap-1 group-hover:text-amber-400 transition-colors">
-                                                <Box size={10}/> Supply Total <Edit2 size={10} className="opacity-50"/>
+                                                <Box size={10}/> Supply Total {isSL && <Edit2 size={10} className="opacity-50"/>}
                                             </span>
                                             <span className="text-4xl font-mono font-bold text-amber-400 tracking-tighter group-hover:scale-110 transition-transform">
                                                 {totalSupply}
@@ -506,9 +561,9 @@
                                             <Car size={32} className="opacity-50"/>
                                         </div>
                                         <p className="font-tech text-lg uppercase tracking-widest">Aucune unité active</p>
-                                        <button onClick={() => setActiveTab('garage')} className="mt-4 px-6 py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/50 rounded font-bold text-xs uppercase tracking-wider transition-all">
+                                        {isSL && <button onClick={() => setActiveTab('garage')} className="mt-4 px-6 py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/50 rounded font-bold text-xs uppercase tracking-wider transition-all">
                                             Accéder au Garage
-                                        </button>
+                                        </button>}
                                     </div>
                                 ) : (
                                     Object.keys(groupsConfig).map(groupKey => {
@@ -570,7 +625,15 @@
                                                                     </button>
                                                                     
                                                                     <div className="grid grid-cols-2 gap-2">
-                                                                        <button onClick={() => updateStatus(item.uniqueId, 'Garage')} className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 py-2 rounded text-[10px] font-bold uppercase transition-all" title="Rentrer au Garage">GARAGE</button>
+                                                                        {/* GARAGE: RESTREINT AU SL */}
+                                                                        <button 
+                                                                            onClick={() => updateStatus(item.uniqueId, 'Garage')} 
+                                                                            disabled={!isSL}
+                                                                            className={`border py-2 rounded text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1 ${isSL ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-600' : 'bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed'}`} 
+                                                                            title={isSL ? "Rentrer au Garage" : "Réservé SL"}
+                                                                        >
+                                                                            {isSL ? <RotateCcw size={14}/> : <Lock size={12}/>} GARAGE
+                                                                        </button>
                                                                         <button onClick={() => updateStatus(item.uniqueId, 'Détruit')} className="bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 py-2 rounded text-[10px] font-bold uppercase transition-all" title="Signaler Destruction">DÉTRUIRE</button>
                                                                     </div>
                                                                 </div>
@@ -601,7 +664,7 @@
                                             </div>
                                             <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
                                                 {items.map(item => (
-                                                    <div key={item.id} className="bg-slate-900/30 border border-slate-800 hover:border-blue-500/50 rounded p-3 flex flex-col gap-3 group transition-all hover:bg-slate-900/60">
+                                                    <div key={item.id} className={`bg-slate-900/30 border rounded p-3 flex flex-col gap-3 group transition-all ${isSL ? 'border-slate-800 hover:border-blue-500/50 hover:bg-slate-900/60' : 'border-slate-800 opacity-75'}`}>
                                                         <div className="flex justify-between items-start">
                                                             <div>
                                                                 <div className="font-bold text-slate-200 text-sm">{item.type}</div>
@@ -609,8 +672,12 @@
                                                             </div>
                                                             {item.grade && <span className="text-[9px] font-bold bg-slate-950 px-1.5 py-0.5 rounded text-slate-400 border border-slate-800">{item.grade}</span>}
                                                         </div>
-                                                        <button onClick={() => deployVehicle(item)} className="w-full py-2 bg-slate-800 group-hover:bg-blue-600 group-hover:text-white text-blue-400 border border-slate-700 group-hover:border-blue-500 rounded text-[10px] font-bold uppercase tracking-widest transition-all">
-                                                            Déployer
+                                                        <button 
+                                                            onClick={() => deployVehicle(item)} 
+                                                            disabled={!isSL}
+                                                            className={`w-full py-2 rounded text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${isSL ? 'bg-slate-800 group-hover:bg-blue-600 group-hover:text-white text-blue-400 border border-slate-700 group-hover:border-blue-500' : 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed'}`}
+                                                        >
+                                                            {!isSL && <Lock size={10}/>} Déployer
                                                         </button>
                                                     </div>
                                                 ))}
@@ -770,7 +837,11 @@
                                     {/* SELECTEUR DECLARANT */}
                                     <div>
                                         <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1 tracking-widest">Déclarant (Obligatoire)</label>
-                                        <select className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none font-mono" value={destroyReporter} onChange={(e) => setDestroyReporter(e.target.value)}>
+                                        <select 
+                                            className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none font-mono"
+                                            value={destroyReporter}
+                                            onChange={(e) => setDestroyReporter(e.target.value)}
+                                        >
                                             <option value="">-- Sélectionner Personnel --</option>
                                             {roster.filter(p => p.onDuty).map(p => (<option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>))}
                                         </select>
@@ -786,14 +857,14 @@
                     {/* FOOTER STATUS */}
                     <div className="absolute bottom-0 left-0 w-full bg-slate-950/80 backdrop-blur border-t border-white/5 p-2 flex justify-between items-center gap-2 z-30 text-[10px] font-mono text-slate-500">
                         <div className="flex items-center gap-2"><div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div><span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span></div>
-                        <div>v18.0 SupplyChain</div>
+                        <div>v19.0 Security</div>
                     </div>
                 </div>
             );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MilitaryMdtV18 />);
+        root.render(<MilitaryMdtV19 />);
     </script>
 </body>
 </html>
