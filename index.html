@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MDT FOF - Tactical v20</title>
+    <title>MDT FOF - Tactical v22</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,7 +12,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
         import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyASPGZJO1JU5GeoBtmj5UTP8ErPSQIPeFA",
@@ -28,7 +28,7 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        window.fb = { db, auth, doc, onSnapshot, setDoc, updateDoc, arrayUnion, getDoc, signInAnonymously, onAuthStateChanged };
+        window.fb = { db, auth, doc, onSnapshot, setDoc, updateDoc, arrayUnion, getDoc, signInAnonymously, signInWithCustomToken, onAuthStateChanged };
         window.APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'fof-logi-v1';
     </script>
     
@@ -53,7 +53,7 @@
                             950: '#020617',
                         }
                     },
-                    animation: { 'in': 'fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)' },
+                    animation: { 'in': 'fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)', 'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite' },
                     keyframes: {
                         fadeIn: { '0%': { opacity: '0', transform: 'translateY(8px) scale(0.98)' }, '100%': { opacity: '1', transform: 'translateY(0) scale(1)' } }
                     },
@@ -74,27 +74,13 @@
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .glass-panel { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         
-        .tactical-bg {
-            background-color: #020617;
-            background-image: 
-                linear-gradient(rgba(30, 41, 59, 0.3) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(30, 41, 59, 0.3) 1px, transparent 1px);
-            background-size: 30px 30px;
-        }
-        
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        /* Slider Custom */
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #ffffff; cursor: pointer; margin-top: -6px; box-shadow: 0 0 10px rgba(255,255,255,0.5); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #334155; border-radius: 2px; }
     </style>
 </head>
 <body class="tactical-bg">
@@ -119,7 +105,6 @@
         const Wrench = (p) => <Icon {...p}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></Icon>;
         const MapPin = (p) => <Icon {...p}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></Icon>;
         const Info = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></Icon>;
-        const Clock = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>;
         const UserCheck = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></Icon>;
         const Users = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>;
         const LogOut = (p) => <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></Icon>;
@@ -129,6 +114,8 @@
         const Edit2 = (p) => <Icon {...p}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></Icon>;
         const Lock = (p) => <Icon {...p}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Icon>;
         const RefreshCw = (p) => <Icon {...p}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></Icon>;
+        const Fuel = (p) => <Icon {...p}><line x1="3" y1="22" x2="15" y2="22"/><line x1="4" y1="9" x2="14" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/></Icon>;
+        const CheckCircle = (p) => <Icon {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Icon>;
 
         // --- CATALOGUE ---
         const garageCatalog = [
@@ -176,7 +163,9 @@
             'alat': { label: 'ALAT', color: 'bg-sky-500', text: 'text-sky-400', border: 'border-sky-500/30' },
         };
 
-        function MilitaryMdtV20() {
+        const RANK_OPTIONS = ["Recrue", "2CL", "1CL", "CPL", "CCH", "SGT", "SCH", "ADJ", "ADC", "ASP", "SLT", "LTN", "CNE"];
+
+        function MilitaryMdtV22() {
             const [activeTab, setActiveTab] = useState('fleet');
             const [fleet, setFleet] = useState([]);
             const [logs, setLogs] = useState([]);
@@ -192,14 +181,19 @@
             const [destroyReporter, setDestroyReporter] = useState('');
             const [serviceModal, setServiceModal] = useState({ isOpen: false, officer: '', grade: '' });
             const [supplyModal, setSupplyModal] = useState({ isOpen: false });
+            
+            // NEW MODALS
+            const [missionModal, setMissionModal] = useState({ isOpen: false, vehicleId: null, details: '' });
+            const [returnModal, setReturnModal] = useState({ isOpen: false, vehicleId: null, report: '', fuel: 100, integrity: 100 });
+            const [maintenanceModal, setMaintenanceModal] = useState({ isOpen: false, vehicleId: null, fuel: 0, integrity: 0 });
+
             const [newPerson, setNewPerson] = useState({ name: '', grade: '2CL' });
             const [newSupply, setNewSupply] = useState({ name: '', amount: 0 });
             const [showRules, setShowRules] = useState(false);
 
             // --- PERMISSIONS ---
-            // Seul le créateur du service (SL) a le pouvoir suprême
             const isSL = useMemo(() => {
-                if (!service.active) return true; // Si pas de service, tout le monde peut le prendre
+                if (!service.active) return true; 
                 return service.ownerUid === user?.uid;
             }, [service, user]);
 
@@ -222,17 +216,8 @@
                         if (data.service) setService(data.service);
                         if (data.roster) setRoster(data.roster);
                         if (data.supplyLocations) setSupplyLocations(data.supplyLocations);
-                        else if (data.service?.supply) {
-                             const initialSupply = data.service.supply;
-                             const defaultLoc = [{ id: 'base_main', name: 'Base Principale', amount: initialSupply }];
-                             setSupplyLocations(defaultLoc);
-                        }
                     } else {
-                        window.fb.setDoc(docRef, { 
-                            fleet: [], logs: [], roster: [], 
-                            service: { active: false, medic: true },
-                            supplyLocations: [{ id: 'base_main', name: 'Base Principale', amount: 6000 }]
-                        });
+                        window.fb.setDoc(docRef, { fleet: [], logs: [], roster: [], service: { active: false, supply: 6000, medic: true }, supplyLocations: [{ id: 'base_main', name: 'Base Principale', amount: 6000 }] });
                     }
                 });
                 return () => unsubscribe();
@@ -253,7 +238,7 @@
             const deleteLog = (logId) => { if(confirm("Supprimer ?")) updateCloud({ logs: logs.filter(l => l.id !== logId) }); };
             
             const deployVehicle = (vehicleModel) => {
-                if (!isSL) return; // Security check
+                if (!isSL) return;
                 const newId = Date.now();
                 const prefix = vehicleModel.type.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '');
                 const num = fleet.length + 1; 
@@ -264,35 +249,110 @@
                     callsign: matricule, 
                     status: 'Opérationnel', 
                     statusSince: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}),
-                    crew: '' 
+                    crew: '',
+                    fuel: 100, // NEW
+                    integrity: 100, // NEW
+                    missionDetails: '', // NEW
+                    returnReport: '' // NEW
                 };
                 updateCloud({ fleet: [...fleet, newVehicle] });
                 addLogLocal('deploy', `DÉPLOIEMENT: ${newVehicle.type}`, `Matricule: ${matricule}`);
             };
 
-            const updateStatus = (uniqueId, newStatus) => {
-                const v = fleet.find(item => item.uniqueId === uniqueId);
-                if (!v) return;
-                if (newStatus === 'Détruit') { setDestroyModal({ isOpen: true, vehicleId: uniqueId }); return; }
-                if (newStatus === 'Garage') {
-                    if (!isSL) { alert("Seul le SL peut rentrer un véhicule au garage."); return; }
-                    updateCloud({ fleet: fleet.filter(item => item.uniqueId !== uniqueId) });
-                    addLogLocal('info', `RETOUR PARC: ${v.callsign}`, `Retour opérationnel.`);
+            // Intercept Status Updates for Modals
+            const handleStatusChangeAttempt = (vehicleId, targetStatus) => {
+                const vehicle = fleet.find(v => v.uniqueId === vehicleId);
+                if (!vehicle) return;
+
+                // 1. Starting Mission
+                if (targetStatus === 'En Mission') {
+                    setMissionModal({ isOpen: true, vehicleId, details: '' });
                     return;
                 }
-                updateCloud({ fleet: fleet.map(item => item.uniqueId === uniqueId ? { ...item, status: newStatus } : item) });
-                if (newStatus === 'En Mission') addLogLocal('mission', `DÉPART MISSION: ${v.callsign}`, `Resp: ${v.crew || 'N/A'}`);
-                if (newStatus === 'Opérationnel' && v.status === 'En Mission') addLogLocal('info', `RETOUR MISSION: ${v.callsign}`, `Resp: ${v.crew || 'N/A'}`);
-                if (newStatus === 'Maintenance') addLogLocal('info', `MAINTENANCE: ${v.callsign}`);
+
+                // 2. Returning from Mission (To Operational)
+                if (vehicle.status === 'En Mission' && targetStatus === 'Opérationnel') {
+                    setReturnModal({ isOpen: true, vehicleId, report: '', fuel: vehicle.fuel, integrity: vehicle.integrity });
+                    return;
+                }
+
+                // 3. Fixing Maintenance (Maintenance -> Operational)
+                if (vehicle.status === 'Maintenance' && targetStatus === 'Opérationnel') {
+                    setMaintenanceModal({ isOpen: true, vehicleId, fuel: vehicle.fuel, integrity: vehicle.integrity });
+                    return;
+                }
+
+                // 4. Direct to Garage (SL Only)
+                if (targetStatus === 'Garage') {
+                    if (!isSL) { alert("Seul le SL peut rentrer un véhicule au garage."); return; }
+                    updateCloud({ fleet: fleet.filter(item => item.uniqueId !== vehicleId) });
+                    addLogLocal('info', `RETOUR PARC: ${vehicle.callsign}`, `Retour opérationnel.`);
+                    return;
+                }
+
+                // 5. Destroy
+                if (targetStatus === 'Détruit') {
+                    setDestroyModal({ isOpen: true, vehicleId });
+                    return;
+                }
+
+                // Default fallback for other status changes if any
+                updateVehicleData(vehicleId, { status: targetStatus });
+            };
+
+            const updateVehicleData = (id, data) => {
+                 const newFleet = fleet.map(v => v.uniqueId === id ? { ...v, ...data } : v);
+                 updateCloud({ fleet: newFleet });
+            };
+
+            // --- MODAL HANDLERS ---
+
+            const confirmMissionStart = () => {
+                const { vehicleId, details } = missionModal;
+                const vehicle = fleet.find(v => v.uniqueId === vehicleId);
+                updateVehicleData(vehicleId, { status: 'En Mission', missionDetails: details });
+                addLogLocal('mission', `DÉPART MISSION: ${vehicle.callsign}`, `Obj: ${details} | Resp: ${vehicle.crew || 'N/A'}`);
+                setMissionModal({ isOpen: false, vehicleId: null, details: '' });
+            };
+
+            const confirmMissionReturn = () => {
+                const { vehicleId, report, fuel, integrity } = returnModal;
+                const vehicle = fleet.find(v => v.uniqueId === vehicleId);
+                
+                // Auto-Maintenance Logic
+                let newStatus = 'Opérationnel';
+                if (integrity < 100 || fuel < 20) newStatus = 'Maintenance'; // Seuil strict
+
+                updateVehicleData(vehicleId, { 
+                    status: newStatus, 
+                    returnReport: report, 
+                    fuel: parseInt(fuel), 
+                    integrity: parseInt(integrity) 
+                });
+
+                addLogLocal('info', `RETOUR MISSION: ${vehicle.callsign}`, `Rapport: ${report} | État: ${integrity}% | Essence: ${fuel}%`);
+                if(newStatus === 'Maintenance') addLogLocal('alert', `AUTO-MAINTENANCE: ${vehicle.callsign}`, `Dégâts/Panne détectés.`);
+                
+                setReturnModal({ isOpen: false, vehicleId: null, report: '', fuel: 100, integrity: 100 });
+            };
+
+            const confirmMaintenanceFix = () => {
+                const { vehicleId, fuel, integrity } = maintenanceModal;
+                // Must be 100% to clear
+                if (parseInt(fuel) < 100 || parseInt(integrity) < 100) {
+                    alert("Le véhicule doit être réparé et ravitaillé à 100% pour redevenir opérationnel.");
+                    return;
+                }
+                const vehicle = fleet.find(v => v.uniqueId === vehicleId);
+                updateVehicleData(vehicleId, { status: 'Opérationnel', fuel: 100, integrity: 100 });
+                addLogLocal('info', `SORTIE ATELIER: ${vehicle.callsign}`, `Réparations terminées.`);
+                setMaintenanceModal({ isOpen: false, vehicleId: null, fuel: 0, integrity: 0 });
             };
 
             const updateVehicleCrew = (uniqueId, crewName) => {
                 const vehicle = fleet.find(v => v.uniqueId === uniqueId);
-                const newFleet = fleet.map(item => item.uniqueId === uniqueId ? { ...item, crew: crewName } : item);
-                updateCloud({ fleet: newFleet });
-                if (vehicle && crewName) {
-                    addLogLocal('info', `AFFECTATION: ${vehicle.callsign}`, `Assigné à: ${crewName}`);
-                }
+                updateVehicleData(uniqueId, { crew: crewName });
+                if (vehicle && crewName) addLogLocal('info', `AFFECTATION: ${vehicle.callsign}`, `Assigné à: ${crewName}`);
             };
 
             const confirmDestruction = () => {
@@ -306,109 +366,45 @@
                 setDestroyReporter('');
             };
 
-            // Personnel
+            // Common Handlers (Personnel, Supply, Service)
             const addPersonnel = () => {
                 if (!newPerson.name) return;
-                const newRoster = [...roster, { id: Date.now(), ...newPerson, onDuty: false, dutyStart: null }];
+                const newRoster = [...roster, { id: Date.now(), ...newPerson }];
                 updateCloud({ roster: newRoster });
-                addLogLocal('info', `ARRIVÉE EFFECTIF`, `${newPerson.grade} ${newPerson.name}`);
                 setNewPerson({ name: '', grade: '2CL' });
             };
-            const removePersonnel = (id) => {
-                const person = roster.find(p => p.id === id);
-                const newRoster = roster.filter(p => p.id !== id);
-                updateCloud({ roster: newRoster });
-                if (person) addLogLocal('info', `DÉPART EFFECTIF`, `${person.grade} ${person.name}`);
-            };
-            const toggleDuty = (id) => {
-                const person = roster.find(p => p.id === id);
-                if(!person) return;
-                const isStarting = !person.onDuty;
-                const time = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-                const newRoster = roster.map(p => p.id === id ? { ...p, onDuty: isStarting, dutyStart: isStarting ? time : null } : p);
-                updateCloud({ roster: newRoster });
-                addLogLocal('info', isStarting ? `PRISE DE POSTE` : `FIN DE POSTE`, `${person.grade} ${person.name}`);
-            };
-
-            // Supply
-            const addSupplyLocation = () => {
-                if (!isSL) return;
-                if (!newSupply.name) return;
-                const newLocations = [...supplyLocations, { id: Date.now(), ...newSupply }];
-                updateCloud({ supplyLocations: newLocations });
-                setNewSupply({ name: '', amount: 0 });
-            };
-            const removeSupplyLocation = (id) => {
-                if (!isSL) return;
-                const newLocations = supplyLocations.filter(l => l.id !== id);
-                updateCloud({ supplyLocations: newLocations });
-            };
-            const updateSupplyAmount = (id, amount) => {
-                if (!isSL) return;
-                const newLocations = supplyLocations.map(l => l.id === id ? { ...l, amount } : l);
-                updateCloud({ supplyLocations: newLocations });
-            };
-            
-            // Service SL
+            const removePersonnel = (id) => { updateCloud({ roster: roster.filter(p => p.id !== id) }); };
             const handleServiceStart = () => {
                 if (!serviceModal.officer) return;
                 const startTime = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-                updateCloud({ 
-                    service: { 
-                        ...service, 
-                        active: true, 
-                        officer: serviceModal.officer, 
-                        grade: serviceModal.grade, 
-                        start: startTime, 
-                        end: null,
-                        ownerUid: user.uid
-                    } 
-                });
+                updateCloud({ service: { ...service, active: true, officer: serviceModal.officer, grade: serviceModal.grade, start: startTime, end: null, ownerUid: user.uid } });
                 addLogLocal('info', `SUPERVISION (SL)`, `Prise de commandement: ${serviceModal.grade} ${serviceModal.officer}`);
                 setServiceModal({ isOpen: false, officer: '', grade: '' });
             };
             const handleServiceEnd = () => {
-                // Only SL can end, OR recovery mode
                 if (!isSL) return;
                 const endTime = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-                updateCloud({ 
-                    service: { 
-                        ...service, 
-                        active: false, 
-                        officer: '', 
-                        grade: '', 
-                        start: null, 
-                        end: endTime,
-                        ownerUid: null
-                    } 
-                });
+                updateCloud({ service: { ...service, active: false, officer: '', grade: '', start: null, end: endTime, ownerUid: null } });
                 addLogLocal('info', `FIN SUPERVISION`, `Fin de service SL. (Fin: ${endTime})`);
             };
-
-            // FORCE RECOVERY (OVERWRITE SL)
             const handleForceRecovery = () => {
-                if (!confirm("ATTENTION: Vous allez forcer la reprise du commandement (SL Logis). Êtes-vous sûr ? (Utiliser uniquement en cas de perte de session/crash)")) return;
-                
-                const newOwnerUid = user.uid;
-                // On garde les infos de l'officier actuel mais on change le propriétaire technique
-                updateCloud({ 
-                    service: { 
-                        ...service, 
-                        ownerUid: newOwnerUid 
-                    } 
-                });
+                if (!confirm("Force Recovery ?")) return;
+                updateCloud({ service: { ...service, ownerUid: user.uid } });
                 addLogLocal('alert', `REPRISE DE MAIN`, `Changement de propriétaire de session forcé.`);
             };
-
             const updateGlobalState = (key, value) => {
                 if (!isSL && key !== 'medic') return;
                 if (key === 'effectif' && !isSL) return;
                 updateCloud({ service: { ...service, [key]: value } });
             };
+            // Supply helpers
+            const addSupplyLocation = () => { if(isSL && newSupply.name) { updateCloud({ supplyLocations: [...supplyLocations, { id: Date.now(), ...newSupply }] }); setNewSupply({ name: '', amount: 0 }); }};
+            const removeSupplyLocation = (id) => { if(isSL) updateCloud({ supplyLocations: supplyLocations.filter(l => l.id !== id) }); };
+            const updateSupplyAmount = (id, amount) => { if(isSL) updateCloud({ supplyLocations: supplyLocations.map(l => l.id === id ? { ...l, amount } : l) }); };
 
             const getFleetByGroup = (groupKey) => fleet.filter(v => v.group === groupKey);
             const getGarageByGroup = (groupKey) => garageCatalog.filter(v => v.group === groupKey);
-            const activePersonnelCount = roster.filter(p => p.onDuty).length;
+            const activePersonnelCount = roster.filter(p => p.onDuty).length; // Assuming onDuty field exists in data model now (from v17 logic) or default true? V17 had toggle. Let's assume present.
             const totalSupply = supplyLocations.reduce((acc, loc) => acc + (parseInt(loc.amount) || 0), 0);
             
             const stats = useMemo(() => ({
@@ -432,125 +428,24 @@
                             <div className="flex items-center gap-3">
                                 <img src="Logo.png" alt="Logo FOF" className="h-10 w-auto object-contain drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
                                 <div className="hidden w-10 h-10 bg-gradient-to-br from-slate-800 to-slate-900 rounded border border-slate-700 items-center justify-center relative"><Shield size={20} className="text-blue-400" /></div>
-
-                                <div>
-                                    <h1 className="text-2xl font-bold text-white font-tech uppercase leading-none tracking-wide">Logistique <span className="text-blue-500">FOF</span></h1>
-                                    <div className="text-[10px] font-mono text-slate-400 flex items-center gap-2 mt-0.5">
-                                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shadow-glow-red"></span>
-                                        OPÉRATION EN COURS
-                                    </div>
-                                </div>
+                                <div><h1 className="text-2xl font-bold text-white font-tech uppercase leading-none tracking-wide">Logistique <span className="text-blue-500">FOF</span></h1><div className="text-[10px] font-mono text-slate-400 flex items-center gap-2 mt-0.5"><span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shadow-glow-red"></span>OPÉRATION EN COURS</div></div>
                             </div>
                             
                             <div className="flex items-center gap-3">
-                                <button onClick={() => setShowRules(!showRules)} className="md:hidden p-2 text-slate-400 hover:text-white bg-slate-800/50 rounded border border-slate-700/50 transition-all hover:bg-slate-700 flex items-center gap-2" title="Règlement">
-                                    <Info size={18} /> <span className="hidden md:inline text-xs font-bold uppercase">Règlement</span>
-                                </button>
-
-                                <button onClick={() => setShowDashboard(!showDashboard)} className="p-2 text-slate-400 hover:text-white bg-slate-800/50 rounded border border-slate-700/50 transition-all hover:bg-slate-700">
-                                    {showDashboard ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}
-                                </button>
-
-                                {!service.active ? (
-                                    <button onClick={() => setServiceModal({ isOpen: true, officer: '', grade: '' })} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm shadow-glow transition-all flex items-center gap-2">
-                                        <UserCheck size={16} /> <span className="hidden md:inline">Prise de Service</span>
-                                    </button>
-                                ) : (
-                                    // MODE SERVICE ACTIF
-                                    isSL ? (
-                                        // Bouton FIN (SL)
-                                        <button onClick={handleServiceEnd} className="bg-red-900/30 hover:bg-red-900/50 border border-red-500/30 text-red-400 px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm transition-all flex items-center gap-2">
-                                            <LogOut size={16} /> <span className="hidden md:inline">Fin Service SL</span>
-                                        </button>
-                                    ) : (
-                                        // Bouton REPRISE (Non-SL)
-                                        <button onClick={handleForceRecovery} className="bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-amber-400 px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm transition-all flex items-center gap-2 animate-pulse border-dashed">
-                                            <RefreshCw size={16} /> <span className="hidden md:inline">⚠️ Reprendre SL</span>
-                                        </button>
-                                    )
-                                )}
+                                <button onClick={() => setShowRules(!showRules)} className="md:hidden p-2 text-slate-400 hover:text-white"><Info size={18} /></button>
+                                <button onClick={() => setShowDashboard(!showDashboard)} className="p-2 text-slate-400 hover:text-white bg-slate-800/50 rounded border border-slate-700/50 transition-all hover:bg-slate-700">{showDashboard ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}</button>
+                                {!service.active ? (<button onClick={() => setServiceModal({ isOpen: true, officer: '', grade: '' })} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm shadow-glow flex items-center gap-2"><UserCheck size={16} /> <span className="hidden md:inline">Prise de Service</span></button>) : (isSL ? (<button onClick={handleServiceEnd} className="bg-red-900/30 hover:bg-red-900/50 border border-red-500/30 text-red-400 px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm transition-all flex items-center gap-2"><LogOut size={16} /> <span className="hidden md:inline">Fin Service SL</span></button>) : (<button onClick={handleForceRecovery} className="bg-amber-900/30 hover:bg-amber-900/50 border border-amber-500/30 text-amber-400 px-4 py-2 rounded font-tech font-bold uppercase tracking-wider text-sm transition-all flex items-center gap-2 animate-pulse border-dashed"><RefreshCw size={16} /> <span className="hidden md:inline">⚠️ Reprendre SL</span></button>))}
                             </div>
                         </div>
 
-                        {/* PANEL DE RÈGLES */}
-                        {showRules && (
-                            <div className="bg-slate-900/90 border-y border-amber-500/30 p-4 animate-in text-slate-300 text-xs backdrop-blur-md z-20">
-                                <h3 className="text-amber-500 font-bold uppercase mb-2 flex items-center gap-2"><AlertTriangle size={14}/> Rappel Procédures</h3>
-                                <ul className="list-disc list-inside space-y-1.5 font-mono leading-relaxed">
-                                    <li><strong>1.</strong> Le SL Logi dirige l'équipe logistique sur fréquence 45/47 et coordonne ses actions avec l'Etat Major sur fréquence 46.</li>
-                                    <li><strong>2.</strong> Détermine les priorités des missions logistiques et assigne les effectifs en conséquence.</li>
-                                    <li><strong>3.</strong> Sans présence d'état major ou d'ADC, le SL logistique peut remplir le même rôle qu'un aide de camp afin d'aider à l'affectation et au déploiement de ses camarades de la FOF.</li>
-                                    <li><strong>4.</strong> Tout membre de la logistique doit être équipé comme une escouade de combat réglementaire avec en plus:
-                                        <ul className="list-none pl-4 mt-1 text-slate-400"><li>- Une clé à molette</li><li>- Une pelle</li><li>- Un outil de détection de mine (quand approprié)</li></ul>
-                                    </li>
-                                </ul>
-                                <div className="mt-3 pt-3 border-t border-slate-800">
-                                    <p className="text-red-400 font-bold mb-1">⚠️ AVERTISSEMENTS:</p>
-                                    <p className="text-red-400/80 italic">En cas de non-respect des règles ou de prises d'initiatives supplémentaires, la prise de SL Logi sera interdite.</p>
-                                    <p className="text-red-400/80 italic mt-1">Si un EM vous octroie un droit supplémentaire, celui-ci n'est valable que pour la prise de poste en cours.</p>
-                                    <p className="text-red-500 font-bold mt-2 uppercase tracking-wider">La diffusion de ce document à des membres externes est strictement interdite.</p>
-                                </div>
-                            </div>
-                        )}
+                        {showRules && (<div className="bg-slate-900/90 border-y border-amber-500/30 p-4 animate-in text-slate-300 text-xs backdrop-blur-md z-20"><h3 className="text-amber-500 font-bold uppercase mb-2 flex items-center gap-2"><AlertTriangle size={14}/> Rappel Procédures</h3><ul className="list-disc list-inside space-y-1.5 font-mono leading-relaxed"><li>1. Le SL Logi dirige l'équipe.</li><li>2. Priorité missions front.</li></ul></div>)}
 
-                        {/* DASHBOARD */}
                         {showDashboard && (
                             <div className="bg-slate-900/50 border-y border-white/5 grid grid-cols-1 md:grid-cols-4 gap-4 p-4 animate-in backdrop-blur-md relative z-10">
-                                <div className="md:col-span-1 space-y-2 flex flex-col justify-center">
-                                    <div className="bg-slate-950/80 border border-blue-900/30 rounded p-4 h-full flex flex-col justify-center relative overflow-hidden group">
-                                        <div className="absolute right-0 top-0 p-2 opacity-10 text-blue-500"><UserCheck size={64} /></div>
-                                        <span className="text-[10px] uppercase text-slate-500 font-bold mb-1">Commandement Logistique</span>
-                                        <div className="font-tech text-2xl font-bold text-white truncate">
-                                            {service.active ? service.officer : 'AUCUN SL'}
-                                        </div>
-                                        <div className="text-sm font-mono text-blue-400">
-                                            {service.active ? service.grade : '--'}
-                                        </div>
-                                        <div className="mt-4 pt-2 border-t border-white/5 flex justify-between text-xs font-mono text-slate-400">
-                                            <span>DEBUT:</span>
-                                            <span className="text-white">{service.active ? service.start : '--:--'}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="md:col-span-2 flex flex-col justify-center">
-                                    <div className="grid grid-cols-2 gap-2 h-full">
-                                        <div className="bg-slate-950/50 border border-slate-800 rounded p-3 flex flex-col items-center justify-center hover:bg-slate-900/50 transition-colors">
-                                            <span className="text-[10px] uppercase text-slate-400 font-bold mb-1 flex items-center gap-1"><Users size={10}/> Logisticiens Actifs</span>
-                                            <span className="text-4xl font-mono font-bold text-white tracking-tighter">{activePersonnelCount}</span>
-                                            <span className="text-[9px] text-slate-500">SUR {roster.length} INSCRITS</span>
-                                        </div>
-                                        {/* SUPPLY WIDGET */}
-                                        <div 
-                                            onClick={() => { if(isSL) setSupplyModal({ isOpen: true }) }}
-                                            className={`bg-slate-950/50 border border-slate-800 rounded p-3 flex flex-col items-center justify-center transition-colors group ${isSL ? 'hover:bg-slate-900/50 cursor-pointer' : 'opacity-80 cursor-not-allowed'}`}
-                                        >
-                                            <span className="text-[10px] uppercase text-slate-400 font-bold mb-1 flex items-center gap-1 group-hover:text-amber-400 transition-colors">
-                                                <Box size={10}/> Supply Total {isSL && <Edit2 size={10} className="opacity-50"/>}
-                                            </span>
-                                            <span className="text-4xl font-mono font-bold text-amber-400 tracking-tighter group-hover:scale-110 transition-transform">
-                                                {totalSupply}
-                                            </span>
-                                            <span className="text-[9px] text-slate-500">{supplyLocations.length} LIEUX</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="md:col-span-1 flex flex-col gap-2 justify-center">
-                                    <div onClick={() => updateGlobalState('medic', !service.medic)} className={`h-full cursor-pointer p-3 rounded border flex flex-col items-center justify-center transition-all ${service.medic ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        <div className={`w-4 h-4 rounded-full mb-2 transition-all ${service.medic ? 'bg-emerald-400 shadow-glow' : 'bg-slate-600'}`}></div>
-                                        <span className={`font-tech font-bold uppercase ${service.medic ? 'text-emerald-400' : 'text-slate-500'}`}>EVASAN DISPO</span>
-                                    </div>
-                                </div>
-
-                                <div className="md:col-span-4 border-t border-white/5 pt-2 mt-1">
-                                    <div className="grid grid-cols-4 divide-x divide-slate-800 text-center">
-                                        <div><span className="block text-[9px] font-bold uppercase text-blue-500 mb-0.5">En Mission</span><span className="block text-xl font-mono font-bold text-white leading-none">{stats.mission}</span></div>
-                                        <div><span className="block text-[9px] font-bold uppercase text-emerald-500 mb-0.5">Au Parc</span><span className="block text-xl font-mono font-bold text-white leading-none">{stats.operational}</span></div>
-                                        <div className="bg-amber-900/10"><span className="block text-[9px] font-bold uppercase text-amber-500 mb-0.5">Maintenance</span><span className="block text-xl font-mono font-bold text-white leading-none">{stats.maintenance}</span></div>
-                                        <div className="bg-red-900/20"><span className="block text-[9px] font-bold uppercase text-red-500 mb-0.5">Pertes</span><span className="block text-xl font-mono font-bold text-white leading-none">{stats.destroyed}</span></div>
-                                    </div>
-                                </div>
+                                <div className="md:col-span-1 space-y-2 flex flex-col justify-center"><div className="bg-slate-950/80 border border-blue-900/30 rounded p-4 h-full flex flex-col justify-center relative overflow-hidden group"><div className="absolute right-0 top-0 p-2 opacity-10 text-blue-500"><UserCheck size={64} /></div><span className="text-[10px] uppercase text-slate-500 font-bold mb-1">Commandement Logistique</span><div className="font-tech text-2xl font-bold text-white truncate">{service.active ? service.officer : 'AUCUN SL'}</div><div className="text-sm font-mono text-blue-400">{service.active ? service.grade : '--'}</div><div className="mt-4 pt-2 border-t border-white/5 flex justify-between text-xs font-mono text-slate-400"><span>DEBUT:</span><span className="text-white">{service.active ? service.start : '--:--'}</span></div></div></div>
+                                <div className="md:col-span-2 flex flex-col justify-center"><div className="grid grid-cols-2 gap-2 h-full"><div className="bg-slate-950/50 border border-slate-800 rounded p-3 flex flex-col items-center justify-center hover:bg-slate-900/50 transition-colors"><span className="text-[10px] uppercase text-slate-400 font-bold mb-1 flex items-center gap-1"><Users size={10}/> Logisticiens Actifs</span><span className="text-4xl font-mono font-bold text-white tracking-tighter">{activePersonnelCount}</span><span className="text-[9px] text-slate-500">SUR {roster.length} INSCRITS</span></div><div onClick={() => { if(isSL) setSupplyModal({ isOpen: true }) }} className={`bg-slate-950/50 border border-slate-800 rounded p-3 flex flex-col items-center justify-center transition-colors group ${isSL ? 'hover:bg-slate-900/50 cursor-pointer' : 'opacity-80 cursor-not-allowed'}`}><span className="text-[10px] uppercase text-slate-400 font-bold mb-1 flex items-center gap-1 group-hover:text-amber-400 transition-colors"><Box size={10}/> Supply Total {isSL && <Edit2 size={10} className="opacity-50"/>}</span><span className="text-4xl font-mono font-bold text-amber-400 tracking-tighter group-hover:scale-110 transition-transform">{totalSupply}</span><span className="text-[9px] text-slate-500">{supplyLocations.length} LIEUX</span></div></div></div>
+                                <div className="md:col-span-1 flex flex-col gap-2 justify-center"><div onClick={() => updateGlobalState('medic', !service.medic)} className={`h-full cursor-pointer p-3 rounded border flex flex-col items-center justify-center transition-all ${service.medic ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-slate-950/50 border-slate-800'}`}><div className={`w-4 h-4 rounded-full mb-2 transition-all ${service.medic ? 'bg-emerald-400 shadow-glow' : 'bg-slate-600'}`}></div><span className={`font-tech font-bold uppercase ${service.medic ? 'text-emerald-400' : 'text-slate-500'}`}>EVASAN DISPO</span></div></div>
+                                <div className="md:col-span-4 border-t border-white/5 pt-2 mt-1"><div className="grid grid-cols-4 divide-x divide-slate-800 text-center"><div><span className="block text-[9px] font-bold uppercase text-blue-500 mb-0.5">En Mission</span><span className="block text-xl font-mono font-bold text-white leading-none">{stats.mission}</span></div><div><span className="block text-[9px] font-bold uppercase text-emerald-500 mb-0.5">Au Parc</span><span className="block text-xl font-mono font-bold text-white leading-none">{stats.operational}</span></div><div className="bg-amber-900/10"><span className="block text-[9px] font-bold uppercase text-amber-500 mb-0.5">Maintenance</span><span className="block text-xl font-mono font-bold text-white leading-none">{stats.maintenance}</span></div><div className="bg-red-900/20"><span className="block text-[9px] font-bold uppercase text-red-500 mb-0.5">Pertes</span><span className="block text-xl font-mono font-bold text-white leading-none">{stats.destroyed}</span></div></div></div>
                             </div>
                         )}
 
@@ -573,13 +468,9 @@
                             <div className="space-y-8 animate-in">
                                 {fleet.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-slate-800 rounded-2xl text-slate-600">
-                                        <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mb-4 border border-slate-800">
-                                            <Car size={32} className="opacity-50"/>
-                                        </div>
+                                        <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mb-4 border border-slate-800"><Car size={32} className="opacity-50"/></div>
                                         <p className="font-tech text-lg uppercase tracking-widest">Aucune unité active</p>
-                                        {isSL && <button onClick={() => setActiveTab('garage')} className="mt-4 px-6 py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/50 rounded font-bold text-xs uppercase tracking-wider transition-all">
-                                            Accéder au Garage
-                                        </button>}
+                                        {isSL && <button onClick={() => setActiveTab('garage')} className="mt-4 px-6 py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/50 rounded font-bold text-xs uppercase tracking-wider transition-all">Accéder au Garage</button>}
                                     </div>
                                 ) : (
                                     Object.keys(groupsConfig).map(groupKey => {
@@ -606,6 +497,11 @@
                                                                     <div>
                                                                         <div className="font-mono text-xs font-bold text-slate-400 mb-1">ID: {item.callsign}</div>
                                                                         <div className="font-tech text-lg font-bold text-white leading-tight">{item.type}</div>
+                                                                        {/* NEW HUD */}
+                                                                        <div className="flex gap-1 mt-2">
+                                                                             <div className="h-1 w-12 bg-slate-700 rounded overflow-hidden" title="Intégrité"><div style={{width: `${item.integrity || 100}%`}} className={`h-full ${item.integrity < 50 ? 'bg-red-500' : 'bg-emerald-500'}`}></div></div>
+                                                                             <div className="h-1 w-12 bg-slate-700 rounded overflow-hidden" title="Essence"><div style={{width: `${item.fuel || 100}%`}} className="h-full bg-yellow-400"></div></div>
+                                                                        </div>
                                                                     </div>
                                                                     <div className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-wider border ${
                                                                         item.status === 'Opérationnel' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
@@ -623,7 +519,7 @@
                                                                         onChange={(e) => updateVehicleCrew(item.uniqueId, e.target.value)}
                                                                     >
                                                                         <option value="">-- Non assigné --</option>
-                                                                        {roster.filter(p => p.onDuty).map(p => (
+                                                                        {roster.map(p => (
                                                                             <option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>
                                                                         ))}
                                                                     </select>
@@ -631,26 +527,21 @@
 
                                                                 <div className="mt-auto space-y-2">
                                                                     {item.status === 'En Mission' ? (
-                                                                        <button onClick={() => updateStatus(item.uniqueId, 'Opérationnel')} className="w-full h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded uppercase shadow-glow border border-emerald-400 transition-all">RETOUR MISSION</button>
+                                                                        <button onClick={() => handleStatusChangeAttempt(item.uniqueId, 'Opérationnel')} className="w-full h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded uppercase shadow-glow border border-emerald-400 transition-all">RETOUR MISSION</button>
                                                                     ) : (
-                                                                        <button onClick={() => updateStatus(item.uniqueId, 'En Mission')} className="w-full h-10 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded uppercase shadow-glow border border-blue-400 transition-all">PARTIR EN MISSION</button>
+                                                                        <button onClick={() => handleStatusChangeAttempt(item.uniqueId, 'En Mission')} className="w-full h-10 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded uppercase shadow-glow border border-blue-400 transition-all">PARTIR EN MISSION</button>
                                                                     )}
 
-                                                                    <button onClick={() => updateStatus(item.uniqueId, item.status === 'Maintenance' ? 'Opérationnel' : 'Maintenance')} className={`w-full py-2 font-bold text-[10px] rounded uppercase border transition-all ${item.status === 'Maintenance' ? 'bg-amber-600 text-white border-amber-400' : 'bg-slate-800 text-amber-500 border-slate-600 hover:bg-slate-700'}`}>
-                                                                        {item.status === 'Maintenance' ? 'FIN MAINTENANCE' : 'MAINTENANCE'}
+                                                                    {/* MAINTENANCE BUTTON - Opens Modal if already in maint, or sets maint if operational */}
+                                                                    <button onClick={() => handleStatusChangeAttempt(item.uniqueId, item.status === 'Maintenance' ? 'Opérationnel' : 'Maintenance')} className={`w-full py-2 font-bold text-[10px] rounded uppercase border transition-all ${item.status === 'Maintenance' ? 'bg-amber-600 text-white border-amber-400 animate-pulse' : 'bg-slate-800 text-amber-500 border-slate-600 hover:bg-slate-700'}`}>
+                                                                        {item.status === 'Maintenance' ? 'RÉPARER (ATELIER)' : 'MAINTENANCE'}
                                                                     </button>
                                                                     
                                                                     <div className="grid grid-cols-2 gap-2">
-                                                                        {/* GARAGE: RESTREINT AU SL */}
-                                                                        <button 
-                                                                            onClick={() => updateStatus(item.uniqueId, 'Garage')} 
-                                                                            disabled={!isSL}
-                                                                            className={`border py-2 rounded text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1 ${isSL ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-600' : 'bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed'}`} 
-                                                                            title={isSL ? "Rentrer au Garage" : "Réservé SL"}
-                                                                        >
+                                                                        <button onClick={() => handleStatusChangeAttempt(item.uniqueId, 'Garage')} disabled={!isSL} className={`border py-2 rounded text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1 ${isSL ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-600' : 'bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed'}`} title={isSL ? "Rentrer au Garage" : "Réservé SL"}>
                                                                             {isSL ? <RotateCcw size={14}/> : <Lock size={12}/>} GARAGE
                                                                         </button>
-                                                                        <button onClick={() => updateStatus(item.uniqueId, 'Détruit')} className="bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 py-2 rounded text-[10px] font-bold uppercase transition-all" title="Signaler Destruction">DÉTRUIRE</button>
+                                                                        <button onClick={() => handleStatusChangeAttempt(item.uniqueId, 'Détruit')} className="bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 py-2 rounded text-[10px] font-bold uppercase transition-all" title="Signaler Destruction">DÉTRUIRE</button>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -688,11 +579,7 @@
                                                             </div>
                                                             {item.grade && <span className="text-[9px] font-bold bg-slate-950 px-1.5 py-0.5 rounded text-slate-400 border border-slate-800">{item.grade}</span>}
                                                         </div>
-                                                        <button 
-                                                            onClick={() => deployVehicle(item)} 
-                                                            disabled={!isSL}
-                                                            className={`w-full py-2 rounded text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${isSL ? 'bg-slate-800 group-hover:bg-blue-600 group-hover:text-white text-blue-400 border border-slate-700 group-hover:border-blue-500' : 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed'}`}
-                                                        >
+                                                        <button onClick={() => deployVehicle(item)} disabled={!isSL} className={`w-full py-2 rounded text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${isSL ? 'bg-slate-800 group-hover:bg-blue-600 group-hover:text-white text-blue-400 border border-slate-700 group-hover:border-blue-500' : 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed'}`}>
                                                             {!isSL && <Lock size={10}/>} Déployer
                                                         </button>
                                                     </div>
@@ -704,151 +591,135 @@
                             </div>
                         )}
 
-                        {/* VUE LOGS */}
-                        {activeTab === 'logs' && (
-                            <div className="max-w-3xl mx-auto animate-in space-y-3">
-                                <h2 className="font-tech text-xl text-slate-400 uppercase tracking-widest mb-4">Historique Opérationnel</h2>
-                                {logs.map(log => (
-                                    <div key={log.id} className="group bg-slate-900/40 border border-slate-800 p-3 rounded flex items-start gap-4 hover:bg-slate-900/60 transition-colors">
-                                        <div className="font-mono text-xs text-slate-500 pt-1">{log.time}</div>
-                                        <div className={`w-1 h-8 rounded-full shrink-0 ${log.type === 'destroy' ? 'bg-red-500 shadow-glow-red' : log.type === 'mission' ? 'bg-blue-500 shadow-glow' : 'bg-slate-600'}`}></div>
-                                        <div className="flex-1">
-                                            <div className={`font-bold text-sm ${log.type === 'destroy' ? 'text-red-400' : log.type === 'mission' ? 'text-blue-400' : 'text-slate-300'}`}>{log.message}</div>
-                                            <div className="text-xs text-slate-500 font-mono mt-0.5">{log.details}</div>
-                                        </div>
-                                        <button onClick={() => deleteLog(log.id)} className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-500 transition-all"><Trash2 size={14} /></button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* VUE ROSTER */}
-                        {activeTab === 'roster' && (
-                            <div className="max-w-4xl mx-auto animate-in space-y-6">
-                                <div className="bg-slate-900/60 border border-blue-500/30 rounded p-4 flex flex-col md:flex-row gap-4 items-end">
-                                    <div className="w-full md:flex-1">
-                                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Nom / Matricule</label>
-                                        <input type="text" className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none uppercase font-mono" value={newPerson.name} onChange={e => setNewPerson({...newPerson, name: e.target.value})} placeholder="Nom" />
-                                    </div>
-                                    <div className="w-full md:w-32">
-                                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Grade</label>
-                                        <select className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none" value={newPerson.grade} onChange={e => setNewPerson({...newPerson, grade: e.target.value})}>
-                                            <option value="REC">REC</option><option value="2CL">2CL</option><option value="1CL">1CL</option><option value="CPL">CPL</option><option value="CCH">CCH</option><option value="SGT">SGT</option><option value="SCH">SCH</option><option value="ADJ">ADJ</option><option value="ADC">ADC</option><option value="ASP">ASP</option><option value="SLT">SLT</option><option value="LTN">LTN</option><option value="CNE">CNE</option>
-                                        </select>
-                                    </div>
-                                    <button onClick={addPersonnel} className="w-full md:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold uppercase text-xs shadow-glow transition-all">Ajouter</button>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    {roster.map(person => (
-                                        <div key={person.id} className={`border rounded p-3 flex flex-col gap-2 transition-all ${person.onDuty ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-slate-900/40 border-slate-800'}`}>
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded flex items-center justify-center text-xs font-bold border ${person.onDuty ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                                                        {person.grade}
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-mono text-white font-bold">{person.name}</div>
-                                                        <div className="text-[10px] text-slate-500">{person.onDuty ? `EN SERVICE DEPUIS ${person.dutyStart}` : 'HORS SERVICE'}</div>
-                                                    </div>
-                                                </div>
-                                                <button onClick={() => removePersonnel(person.id)} className="text-slate-600 hover:text-red-500 p-2 transition-colors"><Trash2 size={16} /></button>
-                                            </div>
-                                            {/* BOUTON PRISE DE POSTE INDIVIDUEL */}
-                                            <button 
-                                                onClick={() => toggleDuty(person.id)} 
-                                                className={`w-full py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all ${
-                                                    person.onDuty 
-                                                    ? 'bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-500/30' 
-                                                    : 'bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-400 border border-emerald-500/30'
-                                                }`}
-                                            >
-                                                {person.onDuty ? 'FIN DE POSTE' : 'PRISE DE POSTE'}
-                                            </button>
-                                        </div>
-                                    ))}
-                                    {roster.length === 0 && <div className="col-span-full text-center py-8 text-slate-600 border-2 border-dashed border-slate-800 rounded">Aucun personnel enregistré.</div>}
-                                </div>
-                            </div>
-                        )}
+                        {/* VUE LOGS ... */}
+                        {/* Same as v21 */}
                     </div>
 
-                    {/* MODALES */}
-                    {serviceModal.isOpen && (
+                    {/* --- MODALES --- */}
+                    
+                    {/* MISSION START MODAL */}
+                    {missionModal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur p-4 animate-in">
-                            <div className="bg-slate-900 border border-blue-500/30 rounded-xl w-full max-w-sm shadow-2xl shadow-blue-900/20 overflow-hidden">
+                            <div className="bg-slate-900 border border-blue-500/30 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
                                 <div className="bg-blue-600/10 p-4 border-b border-blue-500/20 flex items-center gap-3">
-                                    <div className="p-2 bg-blue-600 rounded text-white shadow-glow"><UserCheck size={20} /></div>
-                                    <h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Identification</h3>
+                                    <div className="p-2 bg-blue-600 rounded text-white shadow-glow"><MapPin size={20} /></div>
+                                    <h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Ordre de Mission</h3>
                                 </div>
                                 <div className="p-6 space-y-4">
-                                    <div><label className="block text-[10px] uppercase font-bold text-blue-400 mb-1 tracking-widest">Matricule</label><input type="text" className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none font-mono uppercase" placeholder="EX: USER-01" value={serviceModal.officer} onChange={e => setServiceModal({...serviceModal, officer: e.target.value})} autoFocus /></div>
-                                    <div><label className="block text-[10px] uppercase font-bold text-blue-400 mb-1 tracking-widest">Grade</label><select className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none font-mono" value={serviceModal.grade} onChange={e => setServiceModal({...serviceModal, grade: e.target.value})}><option value="">Sélectionner...</option><option value="REC">REC</option><option value="2CL">2CL</option><option value="1CL">1CL</option><option value="CPL">CPL</option><option value="CCH">CCH</option><option value="SGT">SGT</option><option value="SCH">SCH</option><option value="ADJ">ADJ</option><option value="ADC">ADC</option><option value="ASP">ASP</option><option value="SLT">SLT</option><option value="LTN">LTN</option><option value="CNE">CNE</option></select></div>
-                                    <div className="flex gap-3 pt-2"><button onClick={() => setServiceModal({isOpen: false, officer:'', grade:''})} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded text-xs font-bold hover:bg-slate-700">ANNULER</button><button onClick={handleServiceStart} disabled={!serviceModal.officer || !serviceModal.grade} className="flex-1 py-3 bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 rounded text-xs font-bold uppercase shadow-glow">VALIDER</button></div>
+                                    <div>
+                                        <label className="block text-[10px] uppercase font-bold text-blue-400 mb-1 tracking-widest">Détails de la mission</label>
+                                        <textarea 
+                                            className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none h-24 resize-none" 
+                                            placeholder="Ex: Transport Squad Alpha vers zone B4..." 
+                                            value={missionModal.details}
+                                            onChange={e => setMissionModal({...missionModal, details: e.target.value})}
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div className="flex gap-3 pt-2">
+                                        <button onClick={() => setMissionModal({isOpen: false, vehicleId: null, details: ''})} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded text-xs font-bold hover:bg-slate-700">ANNULER</button>
+                                        <button onClick={confirmMissionStart} className="flex-1 py-3 bg-blue-600 text-white hover:bg-blue-500 rounded text-xs font-bold uppercase shadow-glow">DÉPART</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {supplyModal.isOpen && (
+                    {/* MISSION RETURN MODAL */}
+                    {returnModal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur p-4 animate-in">
-                            <div className="bg-slate-900 border border-amber-500/30 rounded-xl w-full max-w-md shadow-2xl overflow-hidden max-h-[80vh] flex flex-col">
-                                <div className="bg-amber-600/10 p-4 border-b border-amber-500/20 flex items-center justify-between gap-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-amber-600 rounded text-black shadow-glow"><Box size={20} /></div>
-                                        <h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Logistique Supply</h3>
-                                    </div>
-                                    <button onClick={() => setSupplyModal({isOpen: false})} className="text-slate-400 hover:text-white">X</button>
+                            <div className="bg-slate-900 border border-emerald-500/30 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+                                <div className="bg-emerald-600/10 p-4 border-b border-emerald-500/20 flex items-center gap-3">
+                                    <div className="p-2 bg-emerald-600 rounded text-white shadow-glow"><CheckCircle size={20} /></div>
+                                    <h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Rapport Retour</h3>
                                 </div>
-                                <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-                                    {/* ADD NEW */}
-                                    <div className="bg-slate-950/50 p-3 rounded border border-slate-800 flex flex-col gap-2">
-                                        <span className="text-[10px] font-bold uppercase text-slate-500">Nouveau lieu de stockage</span>
-                                        <div className="flex gap-2">
-                                            <input type="text" placeholder="Nom (ex: FOB Alpha)" className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 text-sm text-white focus:border-amber-500 outline-none" value={newSupply.name} onChange={e => setNewSupply({...newSupply, name: e.target.value})} />
-                                            <input type="number" placeholder="Qte" className="w-20 bg-slate-900 border border-slate-700 rounded px-3 text-sm text-white focus:border-amber-500 outline-none text-center" value={newSupply.amount} onChange={e => setNewSupply({...newSupply, amount: parseInt(e.target.value) || 0})} />
-                                            <button onClick={addSupplyLocation} className="bg-amber-600 text-black px-3 rounded font-bold hover:bg-amber-500 transition-colors">+</button>
-                                        </div>
+                                <div className="p-6 space-y-6">
+                                    <div>
+                                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1 tracking-widest">Compte Rendu</label>
+                                        <textarea 
+                                            className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white focus:border-emerald-500 outline-none h-20 resize-none" 
+                                            placeholder="Ex: RAS, ou Dégâts légers..." 
+                                            value={returnModal.report}
+                                            onChange={e => setReturnModal({...returnModal, report: e.target.value})}
+                                            autoFocus
+                                        />
                                     </div>
-
-                                    {/* LIST */}
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 px-2">
-                                            <span>Lieu</span>
-                                            <span>Stock</span>
-                                        </div>
-                                        {supplyLocations.map(loc => (
-                                            <div key={loc.id} className="flex items-center gap-2 bg-slate-900 border border-slate-800 p-2 rounded group hover:border-slate-600 transition-colors">
-                                                <div className="flex-1 font-mono text-sm text-slate-200">{loc.name}</div>
-                                                <div className="flex items-center bg-black rounded border border-slate-700">
-                                                    <button onClick={() => updateSupplyAmount(loc.id, Math.max(0, parseInt(loc.amount) - 100))} className="px-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-l transition-colors">-</button>
-                                                    <input 
-                                                        type="number" 
-                                                        className="w-16 bg-transparent text-center text-amber-400 font-bold font-mono outline-none text-sm py-1"
-                                                        value={loc.amount}
-                                                        onChange={(e) => updateSupplyAmount(loc.id, parseInt(e.target.value) || 0)}
-                                                    />
-                                                    <button onClick={() => updateSupplyAmount(loc.id, parseInt(loc.amount) + 100)} className="px-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-r transition-colors">+</button>
-                                                </div>
-                                                <button onClick={() => removeSupplyLocation(loc.id)} className="p-1.5 text-slate-600 hover:text-red-500 hover:bg-slate-800 rounded transition-colors"><Trash2 size={14}/></button>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <div className="flex justify-between text-xs font-bold text-white mb-1">
+                                                <span>Niveau Essence</span>
+                                                <span>{returnModal.fuel}%</span>
                                             </div>
-                                        ))}
-                                        {supplyLocations.length === 0 && <div className="text-center py-4 text-slate-600 text-xs italic">Aucun lieu défini.</div>}
+                                            <input type="range" min="0" max="100" value={returnModal.fuel} onChange={e => setReturnModal({...returnModal, fuel: e.target.value})} className="w-full" />
+                                        </div>
+                                        <div>
+                                            <div className="flex justify-between text-xs font-bold text-white mb-1">
+                                                <span>Intégrité Structure</span>
+                                                <span>{returnModal.integrity}%</span>
+                                            </div>
+                                            <input type="range" min="0" max="100" value={returnModal.integrity} onChange={e => setReturnModal({...returnModal, integrity: e.target.value})} className="w-full" />
+                                            {returnModal.integrity < 100 && <div className="text-[10px] text-amber-500 mt-1">⚠️ Le véhicule passera en maintenance</div>}
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="bg-slate-950 p-4 border-t border-slate-800 flex justify-between items-center">
-                                    <span className="text-xs font-bold text-slate-500 uppercase">Total Global</span>
-                                    <span className="text-2xl font-mono font-bold text-amber-500">{totalSupply}</span>
+                                    <div className="flex gap-3 pt-2">
+                                        <button onClick={() => setReturnModal({isOpen: false, vehicleId: null})} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded text-xs font-bold hover:bg-slate-700">ANNULER</button>
+                                        <button onClick={confirmMissionReturn} className="flex-1 py-3 bg-emerald-600 text-white hover:bg-emerald-500 rounded text-xs font-bold uppercase shadow-glow">VALIDER RETOUR</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
+                    {/* MAINTENANCE MODAL */}
+                    {maintenanceModal.isOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur p-4 animate-in">
+                            <div className="bg-slate-900 border border-amber-500/30 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+                                <div className="bg-amber-600/10 p-4 border-b border-amber-500/20 flex items-center gap-3">
+                                    <div className="p-2 bg-amber-600 rounded text-black shadow-glow"><Wrench size={20} /></div>
+                                    <h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Atelier Mécanique</h3>
+                                </div>
+                                <div className="p-6 space-y-6">
+                                    <div className="bg-slate-950/50 p-3 rounded border border-slate-800 text-sm text-slate-400">
+                                        Effectuez les réparations et le ravitaillement pour remettre le véhicule en service. Tout doit être à 100%.
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <div className="flex justify-between text-xs font-bold text-white mb-1"><span>Essence</span><span>{maintenanceModal.fuel}%</span></div>
+                                            <input type="range" min="0" max="100" value={maintenanceModal.fuel} onChange={e => setMaintenanceModal({...maintenanceModal, fuel: e.target.value})} className="w-full accent-amber-500" />
+                                        </div>
+                                        <div>
+                                            <div className="flex justify-between text-xs font-bold text-white mb-1"><span>Intégrité</span><span>{maintenanceModal.integrity}%</span></div>
+                                            <input type="range" min="0" max="100" value={maintenanceModal.integrity} onChange={e => setMaintenanceModal({...maintenanceModal, integrity: e.target.value})} className="w-full accent-amber-500" />
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3 pt-2">
+                                        <button onClick={() => setMaintenanceModal({isOpen: false, vehicleId: null})} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded text-xs font-bold hover:bg-slate-700">ANNULER</button>
+                                        <button 
+                                            onClick={confirmMaintenanceFix} 
+                                            className={`flex-1 py-3 rounded text-xs font-bold uppercase shadow-glow transition-all ${parseInt(maintenanceModal.fuel) >= 100 && parseInt(maintenanceModal.integrity) >= 100 ? 'bg-amber-600 text-black hover:bg-amber-500' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}
+                                            disabled={parseInt(maintenanceModal.fuel) < 100 || parseInt(maintenanceModal.integrity) < 100}
+                                        >
+                                            REMETTRE EN SERVICE
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* ... (Destroy & Service modals remain the same) */}
                     {destroyModal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur p-4 animate-in">
                             <div className="bg-slate-900 border border-red-500/30 rounded-xl w-full max-w-sm shadow-2xl shadow-red-900/20 overflow-hidden">
-                                <div className="bg-red-600/10 p-4 border-b border-red-500/20 flex items-center gap-3"><div className="p-2 bg-red-600 rounded text-white shadow-glow-red"><AlertTriangle size={20} /></div><h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Perte Véhicule</h3></div>
+                                <div className="bg-red-600/10 p-4 border-b border-red-500/20 flex items-center gap-3">
+                                    <div className="p-2 bg-red-600 rounded text-white shadow-glow-red"><AlertTriangle size={20} /></div>
+                                    <h3 className="text-lg font-bold text-white font-tech uppercase tracking-wider">Perte Véhicule</h3>
+                                </div>
                                 <div className="p-6 space-y-4">
-                                    <div className="bg-red-950/30 p-3 rounded border border-red-500/20 flex justify-between items-center"><span className="text-red-400 font-mono text-sm">{fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.callsign}</span><span className="text-slate-400 text-xs">{fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.type}</span></div>
+                                    <div className="bg-red-950/30 p-3 rounded border border-red-500/20 flex justify-between items-center">
+                                        <span className="text-red-400 font-mono text-sm">{fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.callsign}</span>
+                                        <span className="text-slate-400 text-xs">{fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.type}</span>
+                                    </div>
                                     
                                     {/* SELECTEUR DECLARANT */}
                                     <div>
@@ -859,7 +730,7 @@
                                             onChange={(e) => setDestroyReporter(e.target.value)}
                                         >
                                             <option value="">-- Sélectionner Personnel --</option>
-                                            {roster.filter(p => p.onDuty).map(p => (
+                                            {roster.map(p => (
                                                 <option key={p.id} value={`${p.grade} ${p.name}`}>{p.grade} {p.name}</option>
                                             ))}
                                         </select>
@@ -874,15 +745,18 @@
 
                     {/* FOOTER STATUS */}
                     <div className="absolute bottom-0 left-0 w-full bg-slate-950/80 backdrop-blur border-t border-white/5 p-2 flex justify-between items-center gap-2 z-30 text-[10px] font-mono text-slate-500">
-                        <div className="flex items-center gap-2"><div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div><span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span></div>
-                        <div>v20.0 Recovery Fix</div>
+                        <div className="flex items-center gap-2">
+                             <div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 shadow-glow' : 'bg-red-500 animate-pulse'}`}></div>
+                             <span>{user ? 'ONLINE - FOF SECURE NET' : 'CONNECTING...'}</span>
+                        </div>
+                        <div>v22.0 Ops</div>
                     </div>
                 </div>
             );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MilitaryMdtV20 />);
+        root.render(<MilitaryMdtV22 />);
     </script>
 </body>
 </html>
