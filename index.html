@@ -2,8 +2,8 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MDT Logistique FOF - Gestion Parc v5</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MDT Logistique FOF - Mobile v6</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -24,13 +24,16 @@
                         heading: ['Oswald', 'sans-serif']
                     },
                     animation: {
-                        'in': 'fadeIn 0.2s ease-out',
+                        'in': 'fadeIn 0.3s ease-out',
                     },
                     keyframes: {
                         fadeIn: {
-                            '0%': { opacity: '0', transform: 'translateY(5px)' },
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
                             '100%': { opacity: '1', transform: 'translateY(0)' },
                         }
+                    },
+                    screens: {
+                        'xs': '475px', // Breakpoint extra small pour mobile
                     }
                 }
             }
@@ -40,16 +43,22 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&family=Oswald:wght@500;700&display=swap');
         
-        ::-webkit-scrollbar { width: 6px; }
+        /* Optimisation Mobile */
+        html, body { overscroll-behavior-y: none; } /* Empêche le refresh pull-to-refresh accidentel */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: #0f0f0f; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #444; }
-        body { background-color: #0a0a0a; color: #e2e8f0; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        body { background-color: #0a0a0a; color: #e2e8f0; -webkit-tap-highlight-color: transparent; }
+        
         .bg-grid {
             background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
             background-size: 40px 40px;
         }
+        
+        /* Utility pour cacher la scrollbar mais garder le scroll */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-grid">
@@ -71,27 +80,27 @@
         const Warehouse = (p) => <Icon {...p}><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/><path d="M6 18h12"/><path d="M6 14h12"/><rect x="10" y="6" width="4" height="2"/></Icon>;
         const Car = (p) => <Icon {...p}><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M14 17h-4"/></Icon>;
         const Plus = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
-        const ArrowRight = (p) => <Icon {...p}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></Icon>;
         const AlertTriangle = (p) => <Icon {...p}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></Icon>;
+        const HeartPulse = (p) => <Icon {...p}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08c.82.82 2.13.85 3 .07l2.07-1.9a2.82 2.82 0 0 1 3.18 0l2.94 2.69c.31.29.24.79-.15.84a12 12 0 0 1-5.18.3 9.4 9.4 0 0 1-5.9-5.9 22.8 22.8 0 0 0-.25-2.14"/></Icon>;
+        const Wrench = (p) => <Icon {...p}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></Icon>;
+        const MapPin = (p) => <Icon {...p}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></Icon>;
+        const Menu = (p) => <Icon {...p}><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/></Icon>;
 
-        // --- CATALOGUE GARAGE (Données fixes issues de l'image) ---
+        // --- CATALOGUE GARAGE (Données) ---
         const garageCatalog = [
             // EM (Bleu)
             { id: 'cat_em1', type: 'Jeep EM', group: 'em', grade: '', cost: 110 },
             { id: 'cat_em2', type: 'QG Mobile', group: 'em', grade: '', cost: 420 },
-
-            // Logistique (Rose/Violet clair)
+            // Logistique
             { id: 'cat_log1', type: 'Camion Réparation', group: 'logi', grade: '', cost: 175 },
             { id: 'cat_log2', type: 'Camion Citerne', group: 'logi', grade: '', cost: 160 },
             { id: 'cat_log3', type: 'Camion Arsenal', group: 'logi', grade: '', cost: 380 },
             { id: 'cat_log4', type: 'Camion Construction', group: 'logi', grade: '', cost: 260 },
-
-            // Transport (Jaune)
+            // Transport
             { id: 'cat_tra1', type: 'Camion', group: 'transport', grade: '', cost: 200 },
             { id: 'cat_tra2', type: 'VAB', group: 'transport', grade: '', cost: 1200 },
             { id: 'cat_tra3', type: 'Stryker (non armé)', group: 'transport', grade: '', cost: 1000 },
-
-            // Blindés Multi-Rôles (Orange)
+            // Blindés
             { id: 'cat_bl1', type: 'JLTV M1280 (non-armée)', group: 'blinde', grade: '', cost: 650 },
             { id: 'cat_bl2', type: 'JLTV M1281 - M2HB (12,7)', group: 'blinde', grade: '', cost: 1000 },
             { id: 'cat_bl3', type: 'JLTV M1281 - M134 (7,62)', group: 'blinde', grade: '', cost: 2000 },
@@ -100,21 +109,17 @@
             { id: 'cat_bl6', type: 'JLTV M1278 - M230LF (30mm)', group: 'blinde', grade: '', cost: 2750 },
             { id: 'cat_bl7', type: 'JLTV M1278 + Javelin', group: 'blinde', grade: '', cost: 3700 },
             { id: 'cat_bl8', type: 'JLTV AN-MSY-2 v1 (Stinger)', group: 'blinde', grade: '', cost: 3700 },
-
-            // Combat Infanterie (Or/Jaune foncé)
+            // Infanterie
             { id: 'cat_inf1', type: 'Stryker M1126 - M2HB', group: 'infanterie', grade: '2CL', cost: 2000 },
             { id: 'cat_inf2', type: 'Stryker M1296 (30mm)', group: 'infanterie', grade: '2CL', cost: 3000 },
             { id: 'cat_inf3', type: 'Stryker M1128 (105mm)', group: 'infanterie', grade: '1CL', cost: 5000 },
-
-            // Sanitaire (Vert)
+            // Sanitaire
             { id: 'cat_san1', type: 'Stryker EVASAN', group: 'sanitaire', grade: '', cost: 975 },
             { id: 'cat_san2', type: 'VAB EVASAN', group: 'sanitaire', grade: '', cost: 975 },
-
-            // Chars (Violet foncé)
+            // Chars
             { id: 'cat_char1', type: 'Leclerc', group: 'char', grade: 'CPL + TC1', cost: 8000 },
             { id: 'cat_char2', type: 'Leclerc XLR', group: 'char', grade: 'CPL + TC1', cost: 8500 },
-
-            // ALAT (Bleu bas)
+            // ALAT
             { id: 'cat_air1', type: 'NH90 "Faucon" MEDEVAC', group: 'alat', grade: 'ALAT', cost: 3000 },
             { id: 'cat_air2', type: 'NH90 "Faucon" Transport', group: 'alat', grade: 'ALAT', cost: 3000 },
             { id: 'cat_air3', type: 'Gazelle SA342L (non-armée)', group: 'alat', grade: 'ALAT', cost: 2500 },
@@ -131,23 +136,23 @@
             'blinde': { label: 'Blindés JLTV', color: 'bg-orange-500', text: 'text-orange-500', border: 'border-orange-500' },
             'infanterie': { label: 'Combat Infanterie', color: 'bg-amber-600', text: 'text-amber-600', border: 'border-amber-600' },
             'sanitaire': { label: 'Sanitaire', color: 'bg-green-600', text: 'text-green-600', border: 'border-green-600' },
-            'char': { label: 'Chars de Bataille', color: 'bg-purple-800', text: 'text-purple-500', border: 'border-purple-800' },
+            'char': { label: 'Chars', color: 'bg-purple-800', text: 'text-purple-500', border: 'border-purple-800' },
             'alat': { label: 'ALAT', color: 'bg-blue-500', text: 'text-blue-400', border: 'border-blue-500' },
         };
 
-        function MilitaryMdtV5() {
-            const [activeTab, setActiveTab] = useState('garage'); // 'garage' | 'fleet' | 'logs'
+        function MilitaryMdtV6() {
+            const [activeTab, setActiveTab] = useState('garage');
             const [supplyStock, setSupplyStock] = useState(6000);
-            const [fleet, setFleet] = useState([]); // Commence vide
+            const [fleet, setFleet] = useState([]);
             const [logs, setLogs] = useState([]);
             const [idCounter, setIdCounter] = useState(1);
+            const [medicActive, setMedicActive] = useState(true);
 
             // Modal Destruction
             const [destroyModal, setDestroyModal] = useState({ isOpen: false, vehicleId: null });
             const [destroyReason, setDestroyReason] = useState('');
 
             // --- ACTIONS ---
-
             const addLog = (type, message, details = '') => {
                 const newLog = {
                     id: Date.now(),
@@ -160,22 +165,17 @@
             const deployVehicle = (vehicleModel) => {
                 const newId = idCounter;
                 setIdCounter(prev => prev + 1);
-
-                // Génération matricule (ex: EM-01, JLTV-05)
                 const prefix = vehicleModel.type.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '');
                 const matricule = `${prefix}-${newId.toString().padStart(3, '0')}`;
-
                 const newVehicle = {
                     uniqueId: newId,
-                    ...vehicleModel, // Copie des infos du catalogue
+                    ...vehicleModel,
                     callsign: matricule,
                     status: 'Opérationnel',
                     statusSince: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})
                 };
-
                 setFleet(prev => [...prev, newVehicle]);
-                addLog('deploy', `SORTIE GARAGE: ${newVehicle.type}`, `Matricule attribué: ${matricule}`);
-                // Bascule auto vers la flotte pour voir le véhicule ? (Optionnel, je le laisse sur garage pour en sortir d'autres)
+                addLog('deploy', `SORTIE GARAGE: ${newVehicle.type}`, `Matricule: ${matricule}`);
             };
 
             const updateStatus = (uniqueId, newStatus) => {
@@ -187,140 +187,115 @@
                     return;
                 }
                 if (newStatus === 'Garage') {
-                    // Retour garage = suppression de la liste "Déployés"
                     setFleet(prev => prev.filter(item => item.uniqueId !== uniqueId));
-                    addLog('info', `RETOUR GARAGE: ${v.callsign}`, `${v.type} rentré au parc.`);
+                    addLog('info', `RETOUR GARAGE: ${v.callsign}`, `Retour parc.`);
                     return;
                 }
-
-                setFleet(prev => prev.map(item => {
-                    if (item.uniqueId === uniqueId) return { ...item, status: newStatus };
-                    return item;
-                }));
-
-                if (newStatus === 'En Mission') addLog('mission', `DEPART MISSION: ${v.callsign}`, `Départ de la base.`);
+                setFleet(prev => prev.map(item => item.uniqueId === uniqueId ? { ...item, status: newStatus } : item));
+                if (newStatus === 'En Mission') addLog('mission', `DEPART MISSION: ${v.callsign}`, `Départ base.`);
                 if (newStatus === 'Maintenance') addLog('info', `MAINTENANCE: ${v.callsign}`, `Entrée atelier.`);
             };
 
             const confirmDestruction = () => {
                 const v = fleet.find(item => item.uniqueId === destroyModal.vehicleId);
                 if (!v) return;
-
-                // Suppression de la flotte active (car détruit)
                 setFleet(prev => prev.filter(item => item.uniqueId !== destroyModal.vehicleId));
-                
                 addLog('destroy', `PERTE TOTALE: ${v.callsign}`, `Cause: ${destroyReason}`);
                 setDestroyModal({ isOpen: false, vehicleId: null });
                 setDestroyReason('');
             };
 
-            // Groupement pour l'affichage
             const getFleetByGroup = (groupKey) => fleet.filter(v => v.group === groupKey);
             const getGarageByGroup = (groupKey) => garageCatalog.filter(v => v.group === groupKey);
 
-            // Stats
+            // STATS avec DÉTRUITS
             const stats = useMemo(() => ({
                 deployed: fleet.length,
                 mission: fleet.filter(v => v.status === 'En Mission').length,
                 operational: fleet.filter(v => v.status === 'Opérationnel').length,
-                maintenance: fleet.filter(v => v.status === 'Maintenance').length
-            }), [fleet]);
+                maintenance: fleet.filter(v => v.status === 'Maintenance').length,
+                // On calcule le nombre total de pertes via les logs pour cet exemple, ou on pourrait avoir un compteur séparé
+                destroyed: logs.filter(l => l.type === 'destroy').length 
+            }), [fleet, logs]);
 
             return (
                 <div className="flex flex-col h-screen w-full font-sans overflow-hidden relative selection:bg-blue-500/30">
                     
-                    {/* MODALE DESTRUCTION */}
-                    {destroyModal.isOpen && (
-                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in">
-                            <div className="bg-[#121212] border-2 border-red-600 rounded w-full max-w-md shadow-[0_0_50px_rgba(220,38,38,0.2)]">
-                                <div className="bg-red-600 p-3 flex items-center gap-3">
-                                    <AlertTriangle className="text-white" size={24} />
-                                    <h3 className="text-lg font-bold text-white uppercase tracking-widest font-heading">Confirmation Destruction</h3>
+                    {/* HEADER RESPONSIVE */}
+                    <header className="bg-[#0f0f0f] border-b border-slate-800 p-3 shrink-0 z-20 flex flex-col gap-3">
+                        
+                        {/* Ligne 1 : Titre et Supply (Toujours visible) */}
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-900/10 rounded border border-blue-500/20 flex items-center justify-center shrink-0">
+                                   <Shield size={20} className="text-blue-500" />
                                 </div>
-                                <div className="p-6 space-y-4">
-                                    <p className="text-slate-300 text-sm">Ce véhicule sera retiré définitivement de la flotte active.</p>
-                                    <div>
-                                        <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Rapport (Obligatoire)</label>
-                                        <textarea 
-                                            value={destroyReason}
-                                            onChange={(e) => setDestroyReason(e.target.value)}
-                                            className="w-full bg-black border border-slate-700 p-3 text-sm text-white focus:border-red-500 focus:outline-none rounded h-24 resize-none"
-                                            placeholder="Cause de la destruction..."
-                                            autoFocus
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3 pt-2">
-                                        <button onClick={() => setDestroyModal({isOpen: false, vehicleId: null})} className="py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded uppercase text-xs">Annuler</button>
-                                        <button 
-                                            onClick={confirmDestruction}
-                                            disabled={!destroyReason.trim()}
-                                            className="py-3 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded uppercase text-xs shadow-lg shadow-red-900/20"
-                                        >Confirmer</button>
+                                <h1 className="text-lg md:text-xl font-bold text-white uppercase font-heading leading-none">
+                                    Logistique FOF <span className="block text-xs text-slate-600 font-mono font-normal">MOBILE OPS V6</span>
+                                </h1>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 bg-black px-2 py-1 rounded border border-slate-800">
+                                    <Box size={14} className="text-amber-500" />
+                                    <span className="font-mono text-white font-bold text-sm min-w-[3ch] text-center">{supplyStock}</span>
+                                    <div className="flex flex-col gap-0.5">
+                                        <button onClick={() => setSupplyStock(s => s + 100)} className="h-3 w-4 bg-slate-800 hover:bg-slate-700 text-[8px] rounded-t text-white flex items-center justify-center">▲</button>
+                                        <button onClick={() => setSupplyStock(s => s - 100)} className="h-3 w-4 bg-slate-800 hover:bg-slate-700 text-[8px] rounded-b text-white flex items-center justify-center">▼</button>
                                     </div>
                                 </div>
+                                <button onClick={() => setMedicActive(!medicActive)} className={`p-2 rounded border transition-all ${medicActive ? 'bg-green-600 border-green-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                                    <HeartPulse size={18} className={medicActive ? 'animate-pulse' : ''} />
+                                </button>
                             </div>
                         </div>
-                    )}
 
-                    {/* HEADER */}
-                    <header className="bg-[#0f0f0f] border-b border-slate-800 p-3 shrink-0 z-20">
-                        <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-blue-900/10 rounded border border-blue-500/20 flex items-center justify-center shrink-0">
-                                   <Shield size={28} className="text-blue-500" />
-                                </div>
-                                <div>
-                                    <h1 className="text-xl font-bold text-white tracking-tighter uppercase font-heading">Logistique FOF <span className="text-slate-600 text-sm ml-2 font-mono">v5.0</span></h1>
-                                    <div className="flex gap-2 mt-1">
-                                         <button onClick={() => setActiveTab('garage')} className={`text-[10px] font-bold uppercase tracking-wider px-4 py-1.5 rounded transition-all flex items-center gap-2 ${activeTab === 'garage' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.4)]' : 'text-slate-400 bg-slate-900 hover:bg-slate-800'}`}>
-                                            <Warehouse size={12}/> Garage (Catalogue)
-                                         </button>
-                                         <button onClick={() => setActiveTab('fleet')} className={`text-[10px] font-bold uppercase tracking-wider px-4 py-1.5 rounded transition-all flex items-center gap-2 ${activeTab === 'fleet' ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' : 'text-slate-400 bg-slate-900 hover:bg-slate-800'}`}>
-                                            <Car size={12}/> Flotte Déployée <span className="bg-black/40 px-1.5 rounded text-white ml-1">{stats.deployed}</span>
-                                         </button>
-                                         <button onClick={() => setActiveTab('logs')} className={`text-[10px] font-bold uppercase tracking-wider px-4 py-1.5 rounded transition-all flex items-center gap-2 ${activeTab === 'logs' ? 'bg-slate-200 text-black' : 'text-slate-400 bg-slate-900 hover:bg-slate-800'}`}>
-                                            <History size={12}/> J-LOGS
-                                         </button>
-                                    </div>
-                                </div>
+                        {/* Ligne 2 : Navigation (Scrollable sur mobile) & Stats */}
+                        <div className="flex flex-col md:flex-row gap-3 justify-between">
+                            
+                            {/* Onglets Scrollables */}
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 md:pb-0">
+                                <button onClick={() => setActiveTab('garage')} className={`whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase transition-all flex-shrink-0 ${activeTab === 'garage' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}>
+                                    <Warehouse size={14}/> Garage
+                                </button>
+                                <button onClick={() => setActiveTab('fleet')} className={`whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase transition-all flex-shrink-0 ${activeTab === 'fleet' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}>
+                                    <Car size={14}/> Flotte <span className="bg-black/30 px-1.5 py-0.5 rounded ml-1">{stats.deployed}</span>
+                                </button>
+                                <button onClick={() => setActiveTab('logs')} className={`whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase transition-all flex-shrink-0 ${activeTab === 'logs' ? 'bg-slate-200 text-black' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}>
+                                    <History size={14}/> Logs
+                                </button>
                             </div>
 
-                            {/* COMPTEURS (Uniquement pour la flotte active) */}
-                            <div className="flex bg-black rounded border border-slate-800 overflow-hidden divide-x divide-slate-800">
-                                <div className="px-4 py-2 text-center bg-blue-900/10 min-w-[80px]">
-                                    <div className="text-[9px] text-blue-400 font-bold uppercase mb-0.5">En Mission</div>
-                                    <div className="text-xl font-mono font-bold text-blue-400 leading-none">{stats.mission}</div>
+                            {/* Stats Grid Compacte (Avec DÉTRUITS) */}
+                            <div className="grid grid-cols-4 md:flex bg-black rounded border border-slate-800 divide-x divide-slate-800 text-[10px] md:text-xs">
+                                <div className="px-2 md:px-4 py-1.5 text-center bg-blue-900/10">
+                                    <div className="text-blue-500 font-bold uppercase mb-0.5">Mission</div>
+                                    <div className="text-base md:text-lg font-mono font-bold text-blue-400 leading-none">{stats.mission}</div>
                                 </div>
-                                <div className="px-4 py-2 text-center min-w-[80px]">
-                                    <div className="text-[9px] text-emerald-500 font-bold uppercase mb-0.5">Au Parc</div>
-                                    <div className="text-xl font-mono font-bold text-emerald-500 leading-none">{stats.operational}</div>
+                                <div className="px-2 md:px-4 py-1.5 text-center">
+                                    <div className="text-emerald-500 font-bold uppercase mb-0.5">Parc</div>
+                                    <div className="text-base md:text-lg font-mono font-bold text-emerald-500 leading-none">{stats.operational}</div>
                                 </div>
-                                <div className="px-4 py-2 text-center bg-amber-900/10 min-w-[80px]">
-                                    <div className="text-[9px] text-amber-500 font-bold uppercase mb-0.5">Maint.</div>
-                                    <div className="text-xl font-mono font-bold text-amber-500 leading-none">{stats.maintenance}</div>
+                                <div className="px-2 md:px-4 py-1.5 text-center bg-amber-900/10">
+                                    <div className="text-amber-500 font-bold uppercase mb-0.5">Maint.</div>
+                                    <div className="text-base md:text-lg font-mono font-bold text-amber-500 leading-none">{stats.maintenance}</div>
                                 </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 bg-black px-3 py-2 rounded border border-slate-800">
-                                <Box size={14} className="text-amber-500" />
-                                <span className="font-mono text-white font-bold min-w-[4ch] text-center text-sm">{supplyStock}</span>
-                                <div className="flex flex-col gap-0.5">
-                                    <button onClick={() => setSupplyStock(s => s + 100)} className="h-3 w-4 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-[8px] rounded-t text-white">▲</button>
-                                    <button onClick={() => setSupplyStock(s => s - 100)} className="h-3 w-4 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-[8px] rounded-b text-white">▼</button>
+                                <div className="px-2 md:px-4 py-1.5 text-center bg-red-900/20">
+                                    <div className="text-red-500 font-bold uppercase mb-0.5">Détruit</div>
+                                    <div className="text-base md:text-lg font-mono font-bold text-red-500 leading-none">{stats.destroyed}</div>
                                 </div>
                             </div>
                         </div>
                     </header>
 
                     {/* CONTENU */}
-                    <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#121212]">
+                    <div className="flex-1 overflow-y-auto p-3 md:p-6 bg-[#121212]">
                         
-                        {/* --- VUE GARAGE (CATALOGUE) --- */}
+                        {/* --- VUE GARAGE --- */}
                         {activeTab === 'garage' && (
-                            <div className="space-y-8 pb-20 animate-in">
-                                <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded mb-6 flex items-center gap-3">
-                                    <Warehouse className="text-amber-500" />
-                                    <p className="text-sm text-amber-200">Cliquez sur <span className="font-bold">DÉPLOYER</span> pour sortir un véhicule du hangar et l'ajouter à la flotte active.</p>
+                            <div className="space-y-6 pb-20 animate-in">
+                                <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded text-amber-200 text-xs flex gap-2 items-center">
+                                    <Warehouse size={16} /> <span>Catalogue des véhicules disponibles.</span>
                                 </div>
 
                                 {Object.keys(groupsConfig).map(groupKey => {
@@ -330,14 +305,15 @@
 
                                     return (
                                         <div key={groupKey}>
-                                            <div className="flex items-center gap-3 mb-3 pl-1">
-                                                <div className={`w-1 h-5 rounded-full ${config.color}`}></div>
-                                                <h2 className={`text-md font-bold uppercase tracking-widest ${config.text} opacity-90 font-heading`}>{config.label}</h2>
-                                                <div className="h-px bg-slate-800 flex-1 ml-4 opacity-50"></div>
+                                            <div className="flex items-center gap-2 mb-2 pl-1">
+                                                <div className={`w-1 h-4 rounded-full ${config.color}`}></div>
+                                                <h2 className={`text-sm font-bold uppercase tracking-widest ${config.text} opacity-90 font-heading`}>{config.label}</h2>
+                                                <div className="h-px bg-slate-800 flex-1 ml-2 opacity-50"></div>
                                             </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                                            {/* Grille Mobile : 1 col sur XS, 2 col sur MD */}
+                                            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                                                 {items.map(item => (
-                                                    <div key={item.id} className="bg-[#181818] border border-slate-800 hover:border-slate-600 rounded p-3 flex justify-between items-center group transition-colors">
+                                                    <div key={item.id} className="bg-[#181818] border border-slate-800 active:border-slate-600 rounded p-3 flex justify-between items-center group touch-manipulation">
                                                         <div>
                                                             <div className="font-bold text-slate-200 text-sm">{item.type}</div>
                                                             <div className="flex gap-2 text-[10px] mt-1">
@@ -347,9 +323,9 @@
                                                         </div>
                                                         <button 
                                                             onClick={() => deployVehicle(item)}
-                                                            className="bg-slate-800 hover:bg-amber-600 hover:text-white text-amber-500 border border-slate-700 hover:border-amber-500 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95 flex items-center gap-1"
+                                                            className="bg-slate-800 text-amber-500 border border-slate-700 px-3 py-2 rounded text-[10px] font-bold uppercase active:bg-amber-600 active:text-white transition-colors"
                                                         >
-                                                            <Plus size={10}/> Déployer
+                                                            <Plus size={14}/>
                                                         </button>
                                                     </div>
                                                 ))}
@@ -360,14 +336,14 @@
                             </div>
                         )}
 
-                        {/* --- VUE FLOTTE (ACTIVE) --- */}
+                        {/* --- VUE FLOTTE --- */}
                         {activeTab === 'fleet' && (
-                            <div className="space-y-8 pb-20 animate-in">
+                            <div className="space-y-6 pb-20 animate-in">
                                 {fleet.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-slate-800 rounded-lg text-slate-600">
+                                    <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-slate-800 rounded-lg text-slate-600 m-4">
                                         <Car size={48} className="mb-4 opacity-50"/>
                                         <p className="font-bold">Aucun véhicule déployé</p>
-                                        <button onClick={() => setActiveTab('garage')} className="mt-4 text-amber-500 hover:underline text-sm">Aller au Garage</button>
+                                        <button onClick={() => setActiveTab('garage')} className="mt-4 px-4 py-2 bg-amber-500/10 text-amber-500 rounded font-bold text-xs uppercase">Ouvrir Garage</button>
                                     </div>
                                 ) : (
                                     Object.keys(groupsConfig).map(groupKey => {
@@ -377,16 +353,17 @@
 
                                         return (
                                             <div key={groupKey}>
-                                                 <div className="flex items-center gap-3 mb-3 pl-1">
-                                                    <div className={`w-1 h-5 rounded-full ${config.color}`}></div>
-                                                    <h2 className={`text-md font-bold uppercase tracking-widest ${config.text} opacity-90 font-heading`}>{config.label} <span className="text-slate-600 ml-2 text-xs font-mono">({items.length})</span></h2>
-                                                    <div className="h-px bg-slate-800 flex-1 ml-4 opacity-50"></div>
+                                                 <div className="flex items-center gap-2 mb-2 pl-1">
+                                                    <div className={`w-1 h-4 rounded-full ${config.color}`}></div>
+                                                    <h2 className={`text-sm font-bold uppercase tracking-widest ${config.text} opacity-90 font-heading`}>{config.label} <span className="text-slate-600 ml-1 text-xs font-mono">({items.length})</span></h2>
+                                                    <div className="h-px bg-slate-800 flex-1 ml-2 opacity-50"></div>
                                                 </div>
                                                 
-                                                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                                                {/* Grille Mobile : 1 col sur XS (Cartes larges) */}
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                                     {items.map(item => (
-                                                        <div key={item.uniqueId} className={`relative bg-[#161616] border flex flex-col rounded overflow-hidden transition-all hover:shadow-lg ${
-                                                            item.status === 'En Mission' ? 'border-blue-500/50 shadow-blue-900/20' : 
+                                                        <div key={item.uniqueId} className={`relative bg-[#161616] border flex flex-col rounded overflow-hidden shadow-sm ${
+                                                            item.status === 'En Mission' ? 'border-blue-500/50' : 
                                                             item.status === 'Maintenance' ? 'border-amber-500/50' : 'border-slate-700'
                                                         }`}>
                                                             {/* Status Bar */}
@@ -396,43 +373,42 @@
                                                             }`}></div>
 
                                                             <div className="p-3 flex-1 flex flex-col">
-                                                                <div className="flex justify-between items-start mb-2">
+                                                                <div className="flex justify-between items-start mb-3">
                                                                     <div>
-                                                                        <div className="font-mono text-xs font-bold text-slate-400">{item.callsign}</div>
+                                                                        <div className="font-mono text-xs font-bold text-slate-400 bg-black/30 px-1.5 rounded inline-block mb-1">{item.callsign}</div>
                                                                         <div className="font-bold text-sm text-slate-100 leading-tight">{item.type}</div>
+                                                                    </div>
+                                                                    <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                                                                        item.status === 'Opérationnel' ? 'bg-emerald-900/20 text-emerald-400 border-emerald-900/50' :
+                                                                        item.status === 'En Mission' ? 'bg-blue-900/20 text-blue-400 border-blue-900/50 animate-pulse' :
+                                                                        'bg-amber-900/20 text-amber-400 border-amber-900/50'
+                                                                    }`}>
+                                                                        {item.status}
                                                                     </div>
                                                                 </div>
 
                                                                 <div className="mt-auto space-y-2">
-                                                                    <div className="flex justify-between text-[10px] font-bold uppercase">
-                                                                        <span className="text-slate-500">Statut</span>
-                                                                        <span className={
-                                                                            item.status === 'Opérationnel' ? 'text-emerald-400' : 
-                                                                            item.status === 'En Mission' ? 'text-blue-400 animate-pulse' : 'text-amber-400'
-                                                                        }>{item.status}</span>
-                                                                    </div>
-
-                                                                    {/* Contrôles Rapides */}
-                                                                    <div className="grid grid-cols-2 gap-1">
+                                                                    {/* Gros boutons tactiles (h-10) */}
+                                                                    <div className="grid grid-cols-2 gap-2">
                                                                         {item.status === 'En Mission' ? (
-                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Opérationnel')} className="bg-slate-800 hover:bg-emerald-600 hover:text-white text-emerald-500 py-1.5 rounded text-[9px] font-bold uppercase border border-slate-700">Retour Base</button>
+                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Opérationnel')} className="bg-slate-800 active:bg-emerald-700 text-emerald-500 active:text-white h-10 rounded text-xs font-bold uppercase border border-slate-700 flex items-center justify-center gap-1">Retour</button>
                                                                         ) : (
-                                                                            <button onClick={() => updateStatus(item.uniqueId, 'En Mission')} className="bg-slate-800 hover:bg-blue-600 hover:text-white text-blue-500 py-1.5 rounded text-[9px] font-bold uppercase border border-slate-700">Mission</button>
+                                                                            <button onClick={() => updateStatus(item.uniqueId, 'En Mission')} className="bg-slate-800 active:bg-blue-700 text-blue-500 active:text-white h-10 rounded text-xs font-bold uppercase border border-slate-700 flex items-center justify-center gap-1">Mission</button>
                                                                         )}
                                                                         
                                                                         {item.status === 'Maintenance' ? (
-                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Opérationnel')} className="bg-slate-800 hover:bg-emerald-600 hover:text-white text-emerald-500 py-1.5 rounded text-[9px] font-bold uppercase border border-slate-700">Fin Maint.</button>
+                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Opérationnel')} className="bg-slate-800 active:bg-emerald-700 text-emerald-500 active:text-white h-10 rounded text-xs font-bold uppercase border border-slate-700 flex items-center justify-center gap-1">Fin Maint.</button>
                                                                         ) : (
-                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Maintenance')} className="bg-slate-800 hover:bg-amber-600 hover:text-white text-amber-500 py-1.5 rounded text-[9px] font-bold uppercase border border-slate-700">Maint.</button>
+                                                                            <button onClick={() => updateStatus(item.uniqueId, 'Maintenance')} className="bg-slate-800 active:bg-amber-700 text-amber-500 active:text-white h-10 rounded text-xs font-bold uppercase border border-slate-700 flex items-center justify-center gap-1">Maint.</button>
                                                                         )}
                                                                     </div>
 
-                                                                    <div className="grid grid-cols-2 gap-1 pt-1 border-t border-slate-800/50">
-                                                                         <button onClick={() => updateStatus(item.uniqueId, 'Garage')} className="text-slate-500 hover:text-white text-[9px] uppercase font-bold py-1 flex items-center justify-center gap-1 hover:bg-slate-800 rounded">
-                                                                            <RotateCcw size={10}/> Rentrer
+                                                                    <div className="grid grid-cols-2 gap-2 pt-1">
+                                                                         <button onClick={() => updateStatus(item.uniqueId, 'Garage')} className="text-slate-500 active:text-white text-[10px] uppercase font-bold py-2 flex items-center justify-center gap-1 bg-black/20 rounded">
+                                                                            <RotateCcw size={12}/> Rentrer
                                                                          </button>
-                                                                         <button onClick={() => updateStatus(item.uniqueId, 'Détruit')} className="text-red-900 hover:text-red-500 text-[9px] uppercase font-bold py-1 flex items-center justify-center gap-1 hover:bg-red-900/20 rounded">
-                                                                            <Flame size={10}/> Détruire
+                                                                         <button onClick={() => updateStatus(item.uniqueId, 'Détruit')} className="text-red-800 active:text-red-500 text-[10px] uppercase font-bold py-2 flex items-center justify-center gap-1 bg-red-900/10 rounded">
+                                                                            <Flame size={12}/> Détruire
                                                                          </button>
                                                                     </div>
                                                                 </div>
@@ -455,20 +431,20 @@
                                         <div className="text-center py-10 text-slate-600 border border-dashed border-slate-800 rounded">Rien à signaler.</div>
                                     ) : (
                                         logs.map(log => (
-                                            <div key={log.id} className="bg-[#141414] border border-slate-800 p-3 rounded flex gap-3 text-sm hover:border-slate-700">
-                                                <div className="font-mono text-xs text-slate-500 w-12 shrink-0 pt-0.5">{log.time}</div>
+                                            <div key={log.id} className="bg-[#141414] border border-slate-800 p-3 rounded flex gap-3 text-sm">
+                                                <div className="font-mono text-xs text-slate-500 w-10 shrink-0 pt-0.5">{log.time}</div>
                                                 <div className={`w-1 shrink-0 rounded-full ${
                                                     log.type === 'destroy' ? 'bg-red-500' : 
                                                     log.type === 'mission' ? 'bg-blue-500' : 
                                                     log.type === 'deploy' ? 'bg-amber-500' : 'bg-emerald-500'
                                                 }`}></div>
                                                 <div>
-                                                    <div className={`font-bold ${
+                                                    <div className={`font-bold text-xs md:text-sm ${
                                                         log.type === 'destroy' ? 'text-red-400' : 
                                                         log.type === 'mission' ? 'text-blue-400' : 
                                                         log.type === 'deploy' ? 'text-amber-400' : 'text-slate-200'
                                                     }`}>{log.message}</div>
-                                                    <div className="text-xs text-slate-500 mt-0.5">{log.details}</div>
+                                                    <div className="text-[10px] text-slate-500 mt-0.5">{log.details}</div>
                                                 </div>
                                             </div>
                                         ))
@@ -479,18 +455,48 @@
 
                     </div>
                     
-                    {/* FOOTER */}
-                    <div className="absolute bottom-0 left-0 w-full bg-[#0f0f0f] border-t border-slate-800 p-2 flex justify-end gap-2 shadow-2xl z-30">
-                        <div className="mr-auto text-[10px] text-slate-600 font-mono flex items-center h-full ml-2">FOF-LOGISTICS-OS | SECURE CONNECTION</div>
-                        <button className="bg-blue-700 hover:bg-blue-600 text-white px-6 py-2 rounded text-xs font-bold uppercase flex items-center gap-2 shadow-lg shadow-blue-900/20"><Save size={12}/> Sauvegarder Session</button>
-                    </div>
-
+                    {/* MODALE DESTRUCTION (Responsive) */}
+                    {destroyModal.isOpen && (
+                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in">
+                            <div className="bg-[#121212] border-2 border-red-600 rounded w-full max-w-sm shadow-2xl flex flex-col max-h-[90vh]">
+                                <div className="bg-red-600 p-3 flex items-center gap-3 shrink-0">
+                                    <AlertTriangle className="text-white" size={24} />
+                                    <h3 className="text-lg font-bold text-white uppercase tracking-widest font-heading">Perte Véhicule</h3>
+                                </div>
+                                <div className="p-4 space-y-4 overflow-y-auto">
+                                    <div className="bg-red-900/10 p-2 rounded border border-red-900/30">
+                                        <div className="text-[10px] text-red-400 uppercase font-bold">Confirmer destruction de :</div>
+                                        <div className="text-white font-bold text-lg">
+                                            {fleet.find(f => f.uniqueId === destroyModal.vehicleId)?.callsign}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Rapport (Obligatoire)</label>
+                                        <textarea 
+                                            value={destroyReason}
+                                            onChange={(e) => setDestroyReason(e.target.value)}
+                                            className="w-full bg-black border border-slate-700 p-3 text-sm text-white focus:border-red-500 focus:outline-none rounded h-24 resize-none"
+                                            placeholder="Cause, lieu, équipage..."
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3 pt-2">
+                                        <button onClick={() => setDestroyModal({isOpen: false, vehicleId: null})} className="py-3 bg-slate-800 active:bg-slate-700 text-white font-bold rounded uppercase text-xs">Annuler</button>
+                                        <button 
+                                            onClick={confirmDestruction}
+                                            disabled={!destroyReason.trim()}
+                                            className="py-3 bg-red-600 active:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded uppercase text-xs shadow-lg"
+                                        >Confirmer</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MilitaryMdtV5 />);
+        root.render(<MilitaryMdtV6 />);
     </script>
 </body>
 </html>
